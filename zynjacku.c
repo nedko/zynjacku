@@ -106,8 +106,8 @@ main(int argc, char** argv)
 
   if (!plugin_uri)
   {
-    fprintf(stderr, "\nYou must specify a plugin URI to load.\n");
-    fprintf(stderr, "\nKnown plugins:\n\n");
+    fprintf(stderr, "\nYou must specify a simple LV2 synth plugin URI to load.\n");
+    fprintf(stderr, "\nAvailable simple LV2 synth plugins:\n\n");
     list_plugins(plugins);
     return EXIT_FAILURE;
   }
@@ -314,7 +314,7 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
   free(symbol);
 }
 
-/** Translate from a JACK MIDI buffer to an LV2 MIDI buffer. */
+/* Translate from a JACK MIDI buffer to an LV2 MIDI buffer. */
 void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nframes_t nframes)
 {
   static unsigned bank = 0;
@@ -364,7 +364,7 @@ void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nfram
   output_buf->size = data - output_buf->data;
 }
 
-/** Jack process callback. */
+/* Jack process callback. */
 int
 jack_process_cb(jack_nframes_t nframes, void* data)
 {
@@ -404,14 +404,90 @@ jack_process_cb(jack_nframes_t nframes, void* data)
   return 0;
 }
 
-
 void
 list_plugins(SLV2List list)
 {
   size_t i;
-  for (i=0; i < slv2_list_get_length(list); ++i)
+  uint32_t ports_count;
+  uint32_t port_index;
+  const SLV2Plugin * plugin_ptr;
+  size_t plugins_count;
+  uint32_t audio_out_ports_count;
+  uint32_t midi_in_ports_count;
+  enum SLV2PortClass class;
+  char * type;
+  char * name;
+
+  plugins_count = slv2_list_get_length(list);
+
+  for (i = 0 ; i < plugins_count; i++)
   {
-    const SLV2Plugin* const p = slv2_list_get_plugin_by_index(list, i);
-    printf("%s\n", slv2_plugin_get_uri(p));
+    plugin_ptr = slv2_list_get_plugin_by_index(list, i);
+    if (!slv2_plugin_verify(plugin_ptr))
+    {
+      continue;
+    }
+
+    ports_count = slv2_plugin_get_num_ports(plugin_ptr);
+    audio_out_ports_count = 0;
+    midi_in_ports_count = 0;
+
+    for (port_index = 0 ; port_index < ports_count ; port_index++)
+    {
+      class = slv2_port_get_class(plugin_ptr, port_index);
+      type = slv2_port_get_data_type(plugin_ptr, port_index);
+
+      if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
+      {
+        if (class == SLV2_CONTROL_RATE_INPUT)
+        {
+        }
+        else if (class == SLV2_AUDIO_RATE_OUTPUT)
+        {
+          if (audio_out_ports_count == 2)
+          {
+            goto next_plugin;
+          }
+
+          audio_out_ports_count++;
+        }
+        else if (class == SLV2_AUDIO_RATE_INPUT)
+        {
+          goto next_plugin;
+        }
+      }
+      else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
+      {
+        if (class == SLV2_CONTROL_RATE_INPUT)
+        {
+          if (midi_in_ports_count == 1)
+          {
+            goto next_plugin;
+          }
+
+          midi_in_ports_count++;
+        }
+        else
+        {
+          goto next_plugin;
+        }
+      }
+      else
+      {
+        goto next_plugin;
+      }
+    }
+
+    if (audio_out_ports_count == 0)
+    {
+      goto next_plugin;
+    }
+
+    name = slv2_plugin_get_name(plugin_ptr);
+    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_ptr));
+    free(name);
+
+  next_plugin:
+    ;
   }
 }
