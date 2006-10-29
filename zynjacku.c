@@ -69,26 +69,148 @@ struct zynjacku_plugin
   struct list_head control_ports;
 };
 
+struct zynjacku_simple_plugin_info
+{
+  struct list_head siblings;
+  SLV2Plugin * plugin_ptr;
+};
+
+struct list_head g_available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
+
 void die(const char* msg);
 void create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index);
 int jack_process_cb(jack_nframes_t nframes, void* data);
-void list_plugins(SLV2List list);
+
+void
+find_simple_plugins()
+{
+  SLV2List plugins;
+  size_t i;
+  uint32_t ports_count;
+  uint32_t port_index;
+  const SLV2Plugin * plugin_ptr;
+  size_t plugins_count;
+  uint32_t audio_out_ports_count;
+  uint32_t midi_in_ports_count;
+  enum SLV2PortClass class;
+  char * type;
+  char * name;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+
+  plugins = slv2_list_new();
+  slv2_list_load_all(plugins);
+  plugins_count = slv2_list_get_length(plugins);
+
+  for (i = 0 ; i < plugins_count; i++)
+  {
+    plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
+    if (!slv2_plugin_verify(plugin_ptr))
+    {
+      continue;
+    }
+
+    ports_count = slv2_plugin_get_num_ports(plugin_ptr);
+    audio_out_ports_count = 0;
+    midi_in_ports_count = 0;
+
+    for (port_index = 0 ; port_index < ports_count ; port_index++)
+    {
+      class = slv2_port_get_class(plugin_ptr, port_index);
+      type = slv2_port_get_data_type(plugin_ptr, port_index);
+
+      if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
+      {
+        if (class == SLV2_CONTROL_RATE_INPUT)
+        {
+        }
+        else if (class == SLV2_AUDIO_RATE_OUTPUT)
+        {
+          if (audio_out_ports_count == 2)
+          {
+            goto next_plugin;
+          }
+
+          audio_out_ports_count++;
+        }
+        else if (class == SLV2_AUDIO_RATE_INPUT)
+        {
+          goto next_plugin;
+        }
+      }
+      else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
+      {
+        if (class == SLV2_CONTROL_RATE_INPUT)
+        {
+          if (midi_in_ports_count == 1)
+          {
+            goto next_plugin;
+          }
+
+          midi_in_ports_count++;
+        }
+        else
+        {
+          goto next_plugin;
+        }
+      }
+      else
+      {
+        goto next_plugin;
+      }
+    }
+
+    if (audio_out_ports_count == 0)
+    {
+      goto next_plugin;
+    }
+
+    plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
+    plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
+    list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
+
+  next_plugin:
+    ;
+  }
+
+  slv2_list_free(plugins);
+}
+
+struct zynjacku_simple_plugin_info *
+zynjacku_plugin_lookup_by_uri(const char * uri)
+{
+  struct list_head * node_ptr;
+  const char * current_uri;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+
+  list_for_each(node_ptr, &g_available_plugins)
+  {
+    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
+    current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr);
+    if (strcmp(current_uri, uri) == 0)
+    {
+      return plugin_info_ptr;
+    }
+  }
+
+  return NULL;
+}
 
 int
 main(int argc, char** argv)
 {
   uint32_t i;
-  SLV2List plugins;
   struct zynjacku_plugin plugin;
   const char * plugin_uri;
   char * name;
   uint32_t ports_count;
   struct list_head * node_ptr;
   struct zynjacku_plugin_port * port_ptr;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
   INIT_LIST_HEAD(&g_plugins);
   INIT_LIST_HEAD(&g_midi_ports);
   INIT_LIST_HEAD(&g_audio_ports);
+  INIT_LIST_HEAD(&g_available_plugins);
 
   INIT_LIST_HEAD(&plugin.control_ports);
   list_add_tail(&plugin.siblings, &g_plugins);
@@ -96,10 +218,9 @@ main(int argc, char** argv)
   plugin.audio_out_left_port.type = PORT_TYPE_INVALID;
   plugin.audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  /* Find all installed plugins */
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
-  //slv2_list_load_bundle(plugins, "http://www.scs.carleton.ca/~drobilla/files/Amp-swh.lv2");
+  printf("Searching for suitable plugins... "); fflush(stdout);
+  find_simple_plugins();
+  printf("done.\n"); fflush(stdout);
 
   /* Find the plugin to run */
   plugin_uri = (argc == 2) ? argv[1] : NULL;
@@ -108,18 +229,27 @@ main(int argc, char** argv)
   {
     fprintf(stderr, "\nYou must specify a simple LV2 synth plugin URI to load.\n");
     fprintf(stderr, "\nAvailable simple LV2 synth plugins:\n\n");
-    list_plugins(plugins);
+
+    list_for_each(node_ptr, &g_available_plugins)
+    {
+      plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
+      name = slv2_plugin_get_name(plugin_info_ptr->plugin_ptr);
+      printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr));
+      free(name);
+    }
+
     return EXIT_FAILURE;
   }
 
   printf("URI:\t%s\n", plugin_uri);
-  plugin.plugin = slv2_list_get_plugin_by_uri(plugins, plugin_uri);
-  if (!plugin.plugin)
+  plugin_info_ptr = zynjacku_plugin_lookup_by_uri(plugin_uri);
+  if (plugin_info_ptr == NULL)
   {
     fprintf(stderr, "Failed to find plugin %s.\n", plugin_uri);
-    slv2_list_free(plugins);
     return EXIT_FAILURE;
   }
+
+  plugin.plugin = plugin_info_ptr->plugin_ptr;
 
   /* Get the plugin's name */
   name = slv2_plugin_get_name(plugin.plugin);
@@ -177,7 +307,6 @@ main(int argc, char** argv)
 
   /* Deactivate plugin and JACK */
   slv2_instance_free(plugin.instance);
-  slv2_list_free(plugins);
 
   printf("Shutting down JACK.\n");
 
@@ -402,92 +531,4 @@ jack_process_cb(jack_nframes_t nframes, void* data)
   }
 
   return 0;
-}
-
-void
-list_plugins(SLV2List list)
-{
-  size_t i;
-  uint32_t ports_count;
-  uint32_t port_index;
-  const SLV2Plugin * plugin_ptr;
-  size_t plugins_count;
-  uint32_t audio_out_ports_count;
-  uint32_t midi_in_ports_count;
-  enum SLV2PortClass class;
-  char * type;
-  char * name;
-
-  plugins_count = slv2_list_get_length(list);
-
-  for (i = 0 ; i < plugins_count; i++)
-  {
-    plugin_ptr = slv2_list_get_plugin_by_index(list, i);
-    if (!slv2_plugin_verify(plugin_ptr))
-    {
-      continue;
-    }
-
-    ports_count = slv2_plugin_get_num_ports(plugin_ptr);
-    audio_out_ports_count = 0;
-    midi_in_ports_count = 0;
-
-    for (port_index = 0 ; port_index < ports_count ; port_index++)
-    {
-      class = slv2_port_get_class(plugin_ptr, port_index);
-      type = slv2_port_get_data_type(plugin_ptr, port_index);
-
-      if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
-      {
-        if (class == SLV2_CONTROL_RATE_INPUT)
-        {
-        }
-        else if (class == SLV2_AUDIO_RATE_OUTPUT)
-        {
-          if (audio_out_ports_count == 2)
-          {
-            goto next_plugin;
-          }
-
-          audio_out_ports_count++;
-        }
-        else if (class == SLV2_AUDIO_RATE_INPUT)
-        {
-          goto next_plugin;
-        }
-      }
-      else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
-      {
-        if (class == SLV2_CONTROL_RATE_INPUT)
-        {
-          if (midi_in_ports_count == 1)
-          {
-            goto next_plugin;
-          }
-
-          midi_in_ports_count++;
-        }
-        else
-        {
-          goto next_plugin;
-        }
-      }
-      else
-      {
-        goto next_plugin;
-      }
-    }
-
-    if (audio_out_ports_count == 0)
-    {
-      goto next_plugin;
-    }
-
-    name = slv2_plugin_get_name(plugin_ptr);
-    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_ptr));
-    free(name);
-
-  next_plugin:
-    ;
-  }
 }
