@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <slv2/slv2.h>
 #include <jack/jack.h>
@@ -81,6 +82,73 @@ void die(const char* msg);
 void create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index);
 int jack_process_cb(jack_nframes_t nframes, void* data);
 
+#define LOG_LEVEL_DEBUG      0
+#define LOG_LEVEL_INFO       1
+#define LOG_LEVEL_WARNING    2
+#define LOG_LEVEL_NOTICE     3
+#define LOG_LEVEL_ERROR      4
+#define LOG_LEVEL_FATAL      5
+#define LOG_LEVEL_BLACK_HOLE 6      
+
+#define LOG_LEVEL LOG_LEVEL_NOTICE
+
+void zyn_log(int level, const char * format, ...)
+{
+  va_list arglist;
+
+  va_start(arglist, format);
+  vprintf(format, arglist);
+  va_end(arglist);
+}
+
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
+# define LOG_DEBUG(format, arg...)              \
+  zyn_log(LOG_LEVEL_DEBUG,                      \
+          format "\n", ## arg)
+#else
+# define LOG_DEBUG(format, arg...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_INFO
+# define LOG_INFO(format, arg...)               \
+  zyn_log(LOG_LEVEL_INFO,                       \
+          format "\n", ## arg)
+#else
+# define LOG_INFO(format, arg...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_WARNING
+# define LOG_WARNING(format, arg...)            \
+  zyn_log(LOG_LEVEL_WARNING,                    \
+          format "\n", ## arg)
+#else
+# define LOG_WARNING(format, arg...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_NOTICE
+# define LOG_NOTICE(format, arg...)             \
+  zyn_log(LOG_LEVEL_NOTICE,                     \
+          format "\n", ## arg)
+#else
+# define LOG_NOTICE(format, arg...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
+# define LOG_ERROR(format, arg...)              \
+  zyn_log(LOG_LEVEL_ERROR,                      \
+          format "\n", ## arg)
+#else
+# define LOG_ERROR(format, arg...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_FATAL
+# define LOG_FATAL(format, arg...)              \
+  zyn_log(LOG_LEVEL_FATAL,                      \
+          format "\n", ## arg)
+#else
+# define LOG_FATAL(format, arg...)
+#endif
+
 void
 find_simple_plugins()
 {
@@ -104,9 +172,13 @@ find_simple_plugins()
   for (i = 0 ; i < plugins_count; i++)
   {
     plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
+
+    name = slv2_plugin_get_name(plugin_ptr);
+
     if (!slv2_plugin_verify(plugin_ptr))
     {
-      continue;
+      LOG_WARNING("Skipping slv2 verify failed \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
+      goto next_plugin;
     }
 
     ports_count = slv2_plugin_get_num_ports(plugin_ptr);
@@ -127,6 +199,7 @@ find_simple_plugins()
         {
           if (audio_out_ports_count == 2)
           {
+            LOG_WARNING("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
             goto next_plugin;
           }
 
@@ -134,6 +207,12 @@ find_simple_plugins()
         }
         else if (class == SLV2_AUDIO_RATE_INPUT)
         {
+          LOG_WARNING("Skipping \"%s\" %s, plugin with audio input port", name, slv2_plugin_get_uri(plugin_ptr));
+          goto next_plugin;
+        }
+        else
+        {
+          LOG_WARNING("Skipping \"%s\" %s, plugin with control (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
           goto next_plugin;
         }
       }
@@ -143,6 +222,7 @@ find_simple_plugins()
         {
           if (midi_in_ports_count == 1)
           {
+            LOG_WARNING("Skipping \"%s\" %s, plugin with more than one MIDI input port", name, slv2_plugin_get_uri(plugin_ptr));
             goto next_plugin;
           }
 
@@ -150,26 +230,30 @@ find_simple_plugins()
         }
         else
         {
+          LOG_WARNING("Skipping \"%s\" %s, plugin with MIDI (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
           goto next_plugin;
         }
       }
       else
       {
+        LOG_WARNING("Skipping \"%s\" %s, plugin unknown type \"%s\" port", name, slv2_plugin_get_uri(plugin_ptr), type);
         goto next_plugin;
       }
     }
 
     if (audio_out_ports_count == 0)
     {
+      LOG_WARNING("Skipping \"%s\" %s, plugin without audio output ports", name, slv2_plugin_get_uri(plugin_ptr));
       goto next_plugin;
     }
 
+    LOG_INFO("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
     plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
     plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
 
   next_plugin:
-    ;
+    free(name);
   }
 
   slv2_list_free(plugins);
@@ -218,9 +302,9 @@ main(int argc, char** argv)
   plugin.audio_out_left_port.type = PORT_TYPE_INVALID;
   plugin.audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  printf("Searching for suitable plugins... "); fflush(stdout);
+  LOG_NOTICE("Searching for suitable plugins...");
   find_simple_plugins();
-  printf("done.\n"); fflush(stdout);
+  LOG_NOTICE("done.");
 
   /* Find the plugin to run */
   plugin_uri = (argc == 2) ? argv[1] : NULL;
