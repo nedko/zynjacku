@@ -149,7 +149,7 @@ void zyn_log(int level, const char * format, ...)
 #endif
 
 void
-find_simple_plugins()
+zynjacku_find_simple_plugins()
 {
   SLV2List plugins;
   size_t i;
@@ -290,11 +290,10 @@ zynjacku_plugin_construct(const void * uri)
   if (plugin_ptr == NULL)
   {
     LOG_ERROR("Cannot allocate memory for plugin");
-    return NULL;
+    goto fail;
   }
 
   INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
-  list_add_tail(&plugin_ptr->siblings, &g_plugins);
   plugin_ptr->midi_in_port.type = PORT_TYPE_INVALID;
   plugin_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   plugin_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
@@ -303,7 +302,7 @@ zynjacku_plugin_construct(const void * uri)
   if (plugin_info_ptr == NULL)
   {
     LOG_ERROR("Failed to find plugin <%s>", uri);
-    goto fail;
+    goto fail_free;
   }
 
   plugin_ptr->plugin = plugin_info_ptr->plugin_ptr;
@@ -313,11 +312,10 @@ zynjacku_plugin_construct(const void * uri)
   if (plugin_ptr->instance == NULL)
   {
     LOG_ERROR("Failed to instantiate plugin.");
+    goto fail_free;
   }
-  else
-  {
-    LOG_INFO("Succesfully instantiated plugin.");
-  }
+
+  LOG_INFO("Succesfully instantiated plugin.");
 
   /* Create ports */
   ports_count  = slv2_plugin_get_num_ports(plugin_ptr->plugin);
@@ -327,11 +325,15 @@ zynjacku_plugin_construct(const void * uri)
     create_port(plugin_ptr, i);
   }
 
+  list_add_tail(&plugin_ptr->siblings, &g_plugins);
+
   /* Activate plugin and JACK */
   slv2_instance_activate(plugin_ptr->instance);
 
   return plugin_ptr;
 
+fail_free:
+  free(plugin_ptr);
 fail:
   return NULL;
 }
@@ -372,14 +374,27 @@ zynjacku_plugin_destruct(struct zynjacku_plugin * plugin_ptr)
   free(plugin_ptr);
 }
 
+void
+zynjacku_dump_simple_plugins()
+{
+  char * name;
+  struct list_head * node_ptr;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+
+  list_for_each(node_ptr, &g_available_plugins)
+  {
+    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
+    name = slv2_plugin_get_name(plugin_info_ptr->plugin_ptr);
+    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr));
+    free(name);
+  }
+}
+
 int
 main(int argc, char** argv)
 {
   struct zynjacku_plugin * plugin_ptr;
-  const char * plugin_uri;
-  char * name;
   struct list_head * node_ptr;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
   INIT_LIST_HEAD(&g_plugins);
   INIT_LIST_HEAD(&g_midi_ports);
@@ -387,40 +402,18 @@ main(int argc, char** argv)
   INIT_LIST_HEAD(&g_available_plugins);
 
   LOG_NOTICE("Searching for suitable plugins...");
-  find_simple_plugins();
+  zynjacku_find_simple_plugins();
   LOG_NOTICE("done.");
-
-  /* Find the plugin to run */
-  plugin_uri = (argc == 2) ? argv[1] : NULL;
-
-  if (!plugin_uri)
-  {
-    fprintf(stderr, "\nYou must specify a simple LV2 synth plugin URI to load.\n");
-    fprintf(stderr, "\nAvailable simple LV2 synth plugins:\n\n");
-
-    list_for_each(node_ptr, &g_available_plugins)
-    {
-      plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-      name = slv2_plugin_get_name(plugin_info_ptr->plugin_ptr);
-      printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr));
-      free(name);
-    }
-
-    goto fail;
-  }
-
-  LOG_NOTICE("Plugin URI: <%s>", plugin_uri);
 
   /* Connect to JACK (with plugin name as client name) */
   g_jack_client = jack_client_open("zynjacku", JackNullOption, NULL);
   if (!g_jack_client)
   {
     LOG_ERROR("Failed to connect to JACK.");
+    goto fail;
   }
-  else
-  {
-    LOG_NOTICE("Connected to JACK.");
-  }
+
+  LOG_NOTICE("Connected to JACK.");
 
   jack_set_process_callback(g_jack_client, &jack_process_cb, NULL);
 
@@ -430,11 +423,25 @@ main(int argc, char** argv)
   /* register JACK MIDI input port */
   g_jack_midi_in = jack_port_register(g_jack_client, "midi in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
 
-  plugin_ptr = zynjacku_plugin_construct(plugin_uri);
-  if (plugin_ptr == NULL)
+  argv++;
+  argc--;
+  while (argc)
   {
-    LOG_ERROR("Failed to instantiate plugin <%s>", plugin_uri);
-    goto fail;
+    plugin_ptr = zynjacku_plugin_construct(*argv);
+    if (plugin_ptr == NULL)
+    {
+      LOG_ERROR("Failed to instantiate plugin <%s>", *argv);
+    }
+    argv++;
+    argc--;
+  }
+
+  if (list_empty(&g_plugins))
+  {
+    LOG_NOTICE("You must specify a simple LV2 synth plugin URI to load.");
+    LOG_NOTICE("Available simple LV2 synth plugins:");
+    zynjacku_dump_simple_plugins();
+    goto destroy_plugins;
   }
 
   jack_activate(g_jack_client);
@@ -449,7 +456,14 @@ main(int argc, char** argv)
   /* Deactivate JACK */
   jack_deactivate(g_jack_client);
 
-  zynjacku_plugin_destruct(plugin_ptr);
+destroy_plugins:
+  while (!list_empty(&g_plugins))
+  {
+    node_ptr = g_plugins.next;
+    plugin_ptr = list_entry(node_ptr, struct zynjacku_plugin, siblings);
+    list_del(node_ptr);
+    zynjacku_plugin_destruct(plugin_ptr);
+  }
 
   jack_port_unregister(g_jack_client, g_jack_midi_in);
 
