@@ -67,7 +67,7 @@ struct zynjacku_plugin
   struct zynjacku_plugin_port midi_in_port;
   struct zynjacku_plugin_port audio_out_left_port;
   struct zynjacku_plugin_port audio_out_right_port;
-  struct list_head control_ports;
+  struct list_head parameter_ports;
 };
 
 struct zynjacku_simple_plugin_info
@@ -78,7 +78,6 @@ struct zynjacku_simple_plugin_info
 
 struct list_head g_available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
 
-void die(const char* msg);
 void create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index);
 int jack_process_cb(jack_nframes_t nframes, void* data);
 
@@ -90,7 +89,7 @@ int jack_process_cb(jack_nframes_t nframes, void* data);
 #define LOG_LEVEL_FATAL      5
 #define LOG_LEVEL_BLACK_HOLE 6      
 
-#define LOG_LEVEL LOG_LEVEL_NOTICE
+#define LOG_LEVEL LOG_LEVEL_WARNING
 
 void zyn_log(int level, const char * format, ...)
 {
@@ -279,28 +278,113 @@ zynjacku_plugin_lookup_by_uri(const char * uri)
   return NULL;
 }
 
+struct zynjacku_plugin *
+zynjacku_plugin_construct(const void * uri)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+  uint32_t ports_count;
+  uint32_t i;
+
+  plugin_ptr = (struct zynjacku_plugin *)malloc(sizeof(struct zynjacku_plugin));
+  if (plugin_ptr == NULL)
+  {
+    LOG_ERROR("Cannot allocate memory for plugin");
+    return NULL;
+  }
+
+  INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
+  list_add_tail(&plugin_ptr->siblings, &g_plugins);
+  plugin_ptr->midi_in_port.type = PORT_TYPE_INVALID;
+  plugin_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
+  plugin_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
+
+  plugin_info_ptr = zynjacku_plugin_lookup_by_uri(uri);
+  if (plugin_info_ptr == NULL)
+  {
+    LOG_ERROR("Failed to find plugin <%s>", uri);
+    goto fail;
+  }
+
+  plugin_ptr->plugin = plugin_info_ptr->plugin_ptr;
+
+  /* Instantiate the plugin */
+  plugin_ptr->instance = slv2_plugin_instantiate(plugin_ptr->plugin, jack_get_sample_rate(g_jack_client), NULL);
+  if (plugin_ptr->instance == NULL)
+  {
+    LOG_ERROR("Failed to instantiate plugin.");
+  }
+  else
+  {
+    LOG_INFO("Succesfully instantiated plugin.");
+  }
+
+  /* Create ports */
+  ports_count  = slv2_plugin_get_num_ports(plugin_ptr->plugin);
+
+  for (i = 0 ; i < ports_count ; i++)
+  {
+    create_port(plugin_ptr, i);
+  }
+
+  /* Activate plugin and JACK */
+  slv2_instance_activate(plugin_ptr->instance);
+
+  return plugin_ptr;
+
+fail:
+  return NULL;
+}
+
+void
+zynjacku_plugin_destruct(struct zynjacku_plugin * plugin_ptr)
+{
+  struct list_head * node_ptr;
+  struct zynjacku_plugin_port * port_ptr;
+
+  slv2_instance_free(plugin_ptr->instance);
+
+  while (!list_empty(&plugin_ptr->parameter_ports))
+  {
+    node_ptr = plugin_ptr->parameter_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_plugin_port, plugin_siblings);
+
+    assert(port_ptr->type == PORT_TYPE_PARAMETER);
+
+    list_del(node_ptr);
+    free(port_ptr);
+  }
+
+  assert(plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO);
+  jack_port_unregister(g_jack_client, plugin_ptr->audio_out_left_port.data.audio);
+  list_del(&plugin_ptr->audio_out_left_port.port_type_siblings);
+
+  if (plugin_ptr->audio_out_right_port.type != PORT_TYPE_INVALID) /* stereo? */
+  {
+    assert(plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO);
+    jack_port_unregister(g_jack_client, plugin_ptr->audio_out_right_port.data.audio);
+    list_del(&plugin_ptr->audio_out_right_port.port_type_siblings);
+  }
+
+  assert(plugin_ptr->midi_in_port.type == PORT_TYPE_MIDI);
+  list_del(&plugin_ptr->midi_in_port.port_type_siblings);
+
+  free(plugin_ptr);
+}
+
 int
 main(int argc, char** argv)
 {
-  uint32_t i;
-  struct zynjacku_plugin plugin;
+  struct zynjacku_plugin * plugin_ptr;
   const char * plugin_uri;
   char * name;
-  uint32_t ports_count;
   struct list_head * node_ptr;
-  struct zynjacku_plugin_port * port_ptr;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
   INIT_LIST_HEAD(&g_plugins);
   INIT_LIST_HEAD(&g_midi_ports);
   INIT_LIST_HEAD(&g_audio_ports);
   INIT_LIST_HEAD(&g_available_plugins);
-
-  INIT_LIST_HEAD(&plugin.control_ports);
-  list_add_tail(&plugin.siblings, &g_plugins);
-  plugin.midi_in_port.type = PORT_TYPE_INVALID;
-  plugin.audio_out_left_port.type = PORT_TYPE_INVALID;
-  plugin.audio_out_right_port.type = PORT_TYPE_INVALID;
 
   LOG_NOTICE("Searching for suitable plugins...");
   find_simple_plugins();
@@ -322,64 +406,37 @@ main(int argc, char** argv)
       free(name);
     }
 
-    return EXIT_FAILURE;
+    goto fail;
   }
 
-  printf("URI:\t%s\n", plugin_uri);
-  plugin_info_ptr = zynjacku_plugin_lookup_by_uri(plugin_uri);
-  if (plugin_info_ptr == NULL)
-  {
-    fprintf(stderr, "Failed to find plugin %s.\n", plugin_uri);
-    return EXIT_FAILURE;
-  }
-
-  plugin.plugin = plugin_info_ptr->plugin_ptr;
-
-  /* Get the plugin's name */
-  name = slv2_plugin_get_name(plugin.plugin);
-  printf("Name:\t%s\n", name);
+  LOG_NOTICE("Plugin URI: <%s>", plugin_uri);
 
   /* Connect to JACK (with plugin name as client name) */
-  g_jack_client = jack_client_open(name, JackNullOption, NULL);
-  free(name);
+  g_jack_client = jack_client_open("zynjacku", JackNullOption, NULL);
   if (!g_jack_client)
   {
-    die("Failed to connect to JACK.");
+    LOG_ERROR("Failed to connect to JACK.");
   }
   else
   {
-    printf("Connected to JACK.\n");
+    LOG_NOTICE("Connected to JACK.");
   }
 
-  /* Instantiate the plugin */
-  plugin.instance = slv2_plugin_instantiate(plugin.plugin, jack_get_sample_rate(g_jack_client), NULL);
-  if (!plugin.instance)
-  {
-    die("Failed to instantiate plugin.\n");
-  }
-  else
-  {
-    printf("Succesfully instantiated plugin.\n");
-  }
-
-  jack_set_process_callback(g_jack_client, &jack_process_cb, &plugin);
+  jack_set_process_callback(g_jack_client, &jack_process_cb, NULL);
 
   g_lv2_midi_buffer.capacity = LV2MIDI_BUFFER_SIZE;
   g_lv2_midi_buffer.data = malloc(LV2MIDI_BUFFER_SIZE);
 
-  /* Create ports */
-  ports_count  = slv2_plugin_get_num_ports(plugin.plugin);
-
-  for (i = 0 ; i < ports_count ; i++)
-  {
-    create_port(&plugin, i);
-  }
-
   /* register JACK MIDI input port */
   g_jack_midi_in = jack_port_register(g_jack_client, "midi in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
 
-  /* Activate plugin and JACK */
-  slv2_instance_activate(plugin.instance);
+  plugin_ptr = zynjacku_plugin_construct(plugin_uri);
+  if (plugin_ptr == NULL)
+  {
+    LOG_ERROR("Failed to instantiate plugin <%s>", plugin_uri);
+    goto fail;
+  }
+
   jack_activate(g_jack_client);
 
   /* Run */
@@ -387,41 +444,24 @@ main(int argc, char** argv)
   getc(stdin);
   printf("\n");
 
+  LOG_NOTICE("Shutting down JACK.");
+
+  /* Deactivate JACK */
   jack_deactivate(g_jack_client);
 
-  /* Deactivate plugin and JACK */
-  slv2_instance_free(plugin.instance);
-
-  printf("Shutting down JACK.\n");
+  zynjacku_plugin_destruct(plugin_ptr);
 
   jack_port_unregister(g_jack_client, g_jack_midi_in);
 
-  list_for_each(node_ptr, &g_audio_ports)
-  {
-    port_ptr = list_entry(node_ptr, struct zynjacku_plugin_port, port_type_siblings);
-    assert(port_ptr->type == PORT_TYPE_AUDIO);
-    jack_port_unregister(g_jack_client, port_ptr->data.audio);
-  }
-
   jack_client_close(g_jack_client);
 
-  while (!list_empty(&plugin.control_ports))
-  {
-    node_ptr = plugin.control_ports.next;
-    port_ptr = list_entry(node_ptr, struct zynjacku_plugin_port, plugin_siblings);
-    list_del(node_ptr);
-    free(port_ptr);
-  }
+  assert(list_empty(&g_audio_ports));
+  assert(list_empty(&g_midi_ports));
 
   return 0;
-}
 
-/* Abort and exit on error */
-void
-die(const char* msg)
-{
-  fprintf(stderr, "%s\n", msg);
-  exit(EXIT_FAILURE);
+fail:
+  return EXIT_FAILURE;
 }
 
 void
@@ -449,7 +489,8 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
       port_ptr->index = port_index;
       port_ptr->data.parameter = slv2_port_get_default_value(plugin_ptr->plugin, port_index);
       slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
-      printf("Set %s to %f\n", symbol, port_ptr->data.parameter);
+      LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
+      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
     }
     else if (class == SLV2_AUDIO_RATE_OUTPUT)
     {
@@ -463,7 +504,8 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
       }
       else
       {
-        /* Notify user that maximum two audio output ports are supported. Maybe just add message to log */
+        /* Maximum two audio output ports are supported. */
+        assert(0);              /* we should load only pre-checked plugins */
         return;
       }
 
@@ -474,18 +516,18 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
     }
     else if (class == SLV2_AUDIO_RATE_INPUT)
     {
-      /* Notify user that audio input ports are not supported. Maybe just add message to log */
-      return;
+      /* audio input ports are not supported. */
+      assert(0);                /* we should load only pre-checked plugins */
     }
     else if (class == SLV2_CONTROL_RATE_OUTPUT)
     {
-      /* Notify user that control rate float output ports are not supported. Maybe just add message to log */
-      return;
+      /* control rate float output ports are not supported. */
+      assert(0);                /* we should load only pre-checked plugins */
     }
     else
     {
-      /* Notify user about unrecognized port. Maybe just add message to log */
-      return;
+      /* unrecognized port. */
+      assert(0);                /* we should load only pre-checked plugins */
     }
   }
   else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
@@ -498,7 +540,8 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
       }
       else
       {
-        /* Notify user that maximum one midi input port is supported. Maybe just add message to log */
+        /* maximum one midi input port is supported. */
+        assert(0);              /* we should load only pre-checked plugins */
         return;
       }
 
@@ -509,18 +552,19 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
     }
     else if (class == SLV2_CONTROL_RATE_OUTPUT)
     {
-      /* Notify user that midi output ports are not supported. Maybe just add message to log */
-      return;
+      /* midi output ports are not supported. */
+      assert(0);                /* we should load only pre-checked plugins */
     }
     else
     {
-      /* Notify user about unrecognized port. Maybe just add message to log */
-      return;
+      /* unrecognized port. */
+      assert(0);                /* we should load only pre-checked plugins */
     }
   }
   else
   {
-    die("Unrecognized data type, aborting.");
+    /* unrecognized data type. */
+    assert(0);                  /* we should load only pre-checked plugins */
   }
 
   free(type);
@@ -530,13 +574,10 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
 /* Translate from a JACK MIDI buffer to an LV2 MIDI buffer. */
 void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nframes_t nframes)
 {
-  static unsigned bank = 0;
-
   void * input_buf;
   jack_midi_event_t input_event;
   jack_nframes_t input_event_index;
   jack_nframes_t input_event_count;
-  jack_nframes_t timestamp;
   jack_nframes_t i;
   unsigned char * data;
 
