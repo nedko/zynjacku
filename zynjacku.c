@@ -1,7 +1,7 @@
 /* -*- Mode: C ; c-basic-offset: 2 -*- */
 /*****************************************************************************
  *
- *   This file is part of jack_mixer
+ *   This file is part of zynjacku
  *
  *   Copyright (C) 2006 Nedko Arnaudov <nedko@arnaudov.name>
  *   Copyright (C) 2006 Dave Robillard <drobilla@connect.carleton.ca>
@@ -22,8 +22,6 @@
  *****************************************************************************/
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <slv2/slv2.h>
 #include <jack/jack.h>
@@ -31,6 +29,8 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
+#include "slv2.h"
+#include "log.h"
 
 #define BOOL int
 #define TRUE 1
@@ -74,237 +74,8 @@ struct zynjacku_plugin
   struct list_head parameter_ports;
 };
 
-struct zynjacku_simple_plugin_info
-{
-  struct list_head siblings;
-  SLV2Plugin * plugin_ptr;
-};
-
-struct list_head g_available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
-
 BOOL create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index);
 int jack_process_cb(jack_nframes_t nframes, void* data);
-
-#define LOG_LEVEL_DEBUG      0
-#define LOG_LEVEL_INFO       1
-#define LOG_LEVEL_WARNING    2
-#define LOG_LEVEL_NOTICE     3
-#define LOG_LEVEL_ERROR      4
-#define LOG_LEVEL_FATAL      5
-#define LOG_LEVEL_BLACK_HOLE 6      
-
-#define LOG_LEVEL LOG_LEVEL_WARNING
-
-void zyn_log(int level, const char * format, ...)
-{
-  va_list arglist;
-
-  va_start(arglist, format);
-  vprintf(format, arglist);
-  va_end(arglist);
-}
-
-#if LOG_LEVEL <= LOG_LEVEL_DEBUG
-# define LOG_DEBUG(format, arg...)              \
-  zyn_log(LOG_LEVEL_DEBUG,                      \
-          format "\n", ## arg)
-#else
-# define LOG_DEBUG(format, arg...)
-#endif
-
-#if LOG_LEVEL <= LOG_LEVEL_INFO
-# define LOG_INFO(format, arg...)               \
-  zyn_log(LOG_LEVEL_INFO,                       \
-          format "\n", ## arg)
-#else
-# define LOG_INFO(format, arg...)
-#endif
-
-#if LOG_LEVEL <= LOG_LEVEL_WARNING
-# define LOG_WARNING(format, arg...)            \
-  zyn_log(LOG_LEVEL_WARNING,                    \
-          format "\n", ## arg)
-#else
-# define LOG_WARNING(format, arg...)
-#endif
-
-#if LOG_LEVEL <= LOG_LEVEL_NOTICE
-# define LOG_NOTICE(format, arg...)             \
-  zyn_log(LOG_LEVEL_NOTICE,                     \
-          format "\n", ## arg)
-#else
-# define LOG_NOTICE(format, arg...)
-#endif
-
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
-# define LOG_ERROR(format, arg...)              \
-  zyn_log(LOG_LEVEL_ERROR,                      \
-          format "\n", ## arg)
-#else
-# define LOG_ERROR(format, arg...)
-#endif
-
-#if LOG_LEVEL <= LOG_LEVEL_FATAL
-# define LOG_FATAL(format, arg...)              \
-  zyn_log(LOG_LEVEL_FATAL,                      \
-          format "\n", ## arg)
-#else
-# define LOG_FATAL(format, arg...)
-#endif
-
-void
-zynjacku_find_simple_plugins()
-{
-  SLV2List plugins;
-  size_t i;
-  uint32_t ports_count;
-  uint32_t port_index;
-  const SLV2Plugin * plugin_ptr;
-  size_t plugins_count;
-  uint32_t audio_out_ports_count;
-  uint32_t midi_in_ports_count;
-  enum SLV2PortClass class;
-  char * type;
-  char * name;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
-  plugins_count = slv2_list_get_length(plugins);
-
-  for (i = 0 ; i < plugins_count; i++)
-  {
-    plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
-
-    name = slv2_plugin_get_name(plugin_ptr);
-
-    if (!slv2_plugin_verify(plugin_ptr))
-    {
-      LOG_DEBUG("Skipping slv2 verify failed \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
-      goto next_plugin;
-    }
-
-    ports_count = slv2_plugin_get_num_ports(plugin_ptr);
-    audio_out_ports_count = 0;
-    midi_in_ports_count = 0;
-
-    for (port_index = 0 ; port_index < ports_count ; port_index++)
-    {
-      class = slv2_port_get_class(plugin_ptr, port_index);
-      type = slv2_port_get_data_type(plugin_ptr, port_index);
-
-      if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
-      {
-        if (class == SLV2_CONTROL_RATE_INPUT)
-        {
-        }
-        else if (class == SLV2_AUDIO_RATE_OUTPUT)
-        {
-          if (audio_out_ports_count == 2)
-          {
-            LOG_DEBUG("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
-            goto next_plugin;
-          }
-
-          audio_out_ports_count++;
-        }
-        else if (class == SLV2_AUDIO_RATE_INPUT)
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with audio input port", name, slv2_plugin_get_uri(plugin_ptr));
-          goto next_plugin;
-        }
-        else
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with control (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
-          goto next_plugin;
-        }
-      }
-      else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
-      {
-        if (class == SLV2_CONTROL_RATE_INPUT)
-        {
-          if (midi_in_ports_count == 1)
-          {
-            LOG_DEBUG("Skipping \"%s\" %s, plugin with more than one MIDI input port", name, slv2_plugin_get_uri(plugin_ptr));
-            goto next_plugin;
-          }
-
-          midi_in_ports_count++;
-        }
-        else
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with MIDI (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
-          goto next_plugin;
-        }
-      }
-      else
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin unknown type \"%s\" port", name, slv2_plugin_get_uri(plugin_ptr), type);
-        goto next_plugin;
-      }
-    }
-
-    if (audio_out_ports_count == 0)
-    {
-      LOG_DEBUG("Skipping \"%s\" %s, plugin without audio output ports", name, slv2_plugin_get_uri(plugin_ptr));
-      goto next_plugin;
-    }
-
-    LOG_DEBUG("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
-    plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
-    plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
-    list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
-
-  next_plugin:
-    free(name);
-  }
-
-  slv2_list_free(plugins);
-}
-
-void
-zynjacku_find_all_plugins()
-{
-  SLV2List plugins;
-  size_t i;
-  const SLV2Plugin * plugin_ptr;
-  size_t plugins_count;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
-  plugins_count = slv2_list_get_length(plugins);
-
-  for (i = 0 ; i < plugins_count; i++)
-  {
-    plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
-    plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
-    plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
-    list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
-  }
-
-  slv2_list_free(plugins);
-}
-
-struct zynjacku_simple_plugin_info *
-zynjacku_plugin_lookup_by_uri(const char * uri)
-{
-  struct list_head * node_ptr;
-  const char * current_uri;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-
-  list_for_each(node_ptr, &g_available_plugins)
-  {
-    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-    current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr);
-    if (strcmp(current_uri, uri) == 0)
-    {
-      return plugin_info_ptr;
-    }
-  }
-
-  return NULL;
-}
 
 void
 zynjacku_plugin_free_ports(struct zynjacku_plugin * plugin_ptr)
@@ -346,7 +117,6 @@ struct zynjacku_plugin *
 zynjacku_plugin_construct(const void * uri)
 {
   struct zynjacku_plugin * plugin_ptr;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
   uint32_t ports_count;
   uint32_t i;
 
@@ -362,14 +132,12 @@ zynjacku_plugin_construct(const void * uri)
   plugin_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   plugin_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  plugin_info_ptr = zynjacku_plugin_lookup_by_uri(uri);
-  if (plugin_info_ptr == NULL)
+  plugin_ptr->plugin = zynjacku_plugin_lookup_by_uri(uri);
+  if (plugin_ptr->plugin == NULL)
   {
     LOG_ERROR("Failed to find plugin <%s>", uri);
     goto fail_free;
   }
-
-  plugin_ptr->plugin = plugin_info_ptr->plugin_ptr;
 
   /* Instantiate the plugin */
   plugin_ptr->instance = slv2_plugin_instantiate(plugin_ptr->plugin, jack_get_sample_rate(g_jack_client), NULL);
@@ -421,22 +189,6 @@ zynjacku_plugin_destruct(struct zynjacku_plugin * plugin_ptr)
   free(plugin_ptr);
 }
 
-void
-zynjacku_dump_simple_plugins()
-{
-  char * name;
-  struct list_head * node_ptr;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-
-  list_for_each(node_ptr, &g_available_plugins)
-  {
-    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-    name = slv2_plugin_get_name(plugin_info_ptr->plugin_ptr);
-    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr));
-    free(name);
-  }
-}
-
 int
 main(int argc, char** argv)
 {
@@ -448,12 +200,6 @@ main(int argc, char** argv)
   INIT_LIST_HEAD(&g_plugins);
   INIT_LIST_HEAD(&g_midi_ports);
   INIT_LIST_HEAD(&g_audio_ports);
-  INIT_LIST_HEAD(&g_available_plugins);
-
-  LOG_NOTICE("Searching for suitable plugins...");
-  zynjacku_find_simple_plugins();
-  LOG_NOTICE("done.");
-/*   zynjacku_find_all_plugins(); */
 
   /* Connect to JACK (with plugin name as client name) */
   g_jack_client = jack_client_open("zynjacku", JackNullOption, NULL);
@@ -461,7 +207,7 @@ main(int argc, char** argv)
   {
     LOG_ERROR("Failed to connect to JACK.");
     ret = EXIT_FAILURE;
-    goto destroy_available_plugins_list;
+    goto exit;
   }
 
   ret = jack_set_process_callback(g_jack_client, &jack_process_cb, NULL);
@@ -495,9 +241,9 @@ main(int argc, char** argv)
 
   if (argc == 0)
   {
-    LOG_NOTICE("You must specify a simple LV2 synth plugin URI to load.");
-    LOG_NOTICE("Available simple LV2 synth plugins:");
-    zynjacku_dump_simple_plugins();
+    LOG_NOTICE("You must specify at least one simple LV2 synth plugin URI to load.");
+    //LOG_NOTICE("Available simple LV2 synth plugins:");
+    //zynjacku_dump_simple_plugins();
     ret = EXIT_FAILURE;
     goto unregister_midi_port;
   }
@@ -547,8 +293,7 @@ free_lv2_midi_buffer:
 close_jack_client:
   jack_client_close(g_jack_client);
 
-destroy_available_plugins_list:
-
+exit:
   assert(list_empty(&g_audio_ports));
   assert(list_empty(&g_midi_ports));
 
