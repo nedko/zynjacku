@@ -440,6 +440,7 @@ zynjacku_dump_simple_plugins()
 int
 main(int argc, char** argv)
 {
+  int ret;
   struct zynjacku_plugin * plugin_ptr;
   struct list_head * node_ptr;
   int plugins_count;
@@ -459,18 +460,35 @@ main(int argc, char** argv)
   if (!g_jack_client)
   {
     LOG_ERROR("Failed to connect to JACK.");
-    goto fail;
+    ret = EXIT_FAILURE;
+    goto destroy_available_plugins_list;
   }
 
-  LOG_NOTICE("Connected to JACK.");
-
-  jack_set_process_callback(g_jack_client, &jack_process_cb, NULL);
+  ret = jack_set_process_callback(g_jack_client, &jack_process_cb, NULL);
+  if (ret != 0)
+  {
+    LOG_ERROR("jack_set_process_callback() failed.");
+    ret = EXIT_FAILURE;
+    goto close_jack_client;
+  }
 
   g_lv2_midi_buffer.capacity = LV2MIDI_BUFFER_SIZE;
   g_lv2_midi_buffer.data = malloc(LV2MIDI_BUFFER_SIZE);
+  if (g_lv2_midi_buffer.data == NULL)
+  {
+    LOG_ERROR("Failed to allocate memory for LV2 midi data buffer.");
+    ret = EXIT_FAILURE;
+    goto close_jack_client;
+  }
 
   /* register JACK MIDI input port */
   g_jack_midi_in = jack_port_register(g_jack_client, "midi in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+  if (g_jack_midi_in == NULL)
+  {
+    LOG_ERROR("Failed to registe JACK MIDI input port.");
+    ret = EXIT_FAILURE;
+    goto free_lv2_midi_buffer;
+  }
 
   argv++;
   argc--;
@@ -480,7 +498,8 @@ main(int argc, char** argv)
     LOG_NOTICE("You must specify a simple LV2 synth plugin URI to load.");
     LOG_NOTICE("Available simple LV2 synth plugins:");
     zynjacku_dump_simple_plugins();
-    goto destroy_plugins;
+    ret = EXIT_FAILURE;
+    goto unregister_midi_port;
   }
 
   while (argc)
@@ -510,7 +529,7 @@ main(int argc, char** argv)
     jack_deactivate(g_jack_client);
   }
 
-destroy_plugins:
+//destroy_plugins:
   while (!list_empty(&g_plugins))
   {
     node_ptr = g_plugins.next;
@@ -519,17 +538,21 @@ destroy_plugins:
     zynjacku_plugin_destruct(plugin_ptr);
   }
 
+unregister_midi_port:
   jack_port_unregister(g_jack_client, g_jack_midi_in);
 
+free_lv2_midi_buffer:
+  free(g_lv2_midi_buffer.data);
+
+close_jack_client:
   jack_client_close(g_jack_client);
+
+destroy_available_plugins_list:
 
   assert(list_empty(&g_audio_ports));
   assert(list_empty(&g_midi_ports));
 
-  return 0;
-
-fail:
-  return EXIT_FAILURE;
+  return ret;
 }
 
 BOOL
