@@ -119,6 +119,11 @@ zynjacku_plugin_construct(const void * uri)
   struct zynjacku_plugin * plugin_ptr;
   uint32_t ports_count;
   uint32_t i;
+  static unsigned int id;
+  char * name;
+  char * port_name;
+  size_t size_name;
+  size_t size_id;
 
   plugin_ptr = (struct zynjacku_plugin *)malloc(sizeof(struct zynjacku_plugin));
   if (plugin_ptr == NULL)
@@ -158,6 +163,48 @@ zynjacku_plugin_construct(const void * uri)
       goto fail_free_ports;
     }
   }
+
+  name = slv2_plugin_get_name(plugin_ptr->plugin);
+  if (name == NULL)
+  {
+    LOG_ERROR("Failed to get plugin name");
+    goto fail_free_ports;
+  }
+
+  size_name = strlen(name);
+  port_name = (char *)malloc(size_name + 1024);
+  if (port_name == NULL)
+  {
+    free(name);
+    LOG_ERROR("Failed to allocate memory for port name");
+    goto fail_free_ports;
+  }
+
+  size_id = sprintf(port_name, "%u:", id);
+  memcpy(port_name + size_id, name, size_name);
+
+  if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
+      plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+  {
+    sprintf(port_name + size_id + size_name, " L");
+    plugin_ptr->audio_out_left_port.data.audio = jack_port_register(g_jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&plugin_ptr->audio_out_left_port.port_type_siblings, &g_audio_ports);
+
+    sprintf(port_name + size_id + size_name, " R");
+    plugin_ptr->audio_out_right_port.data.audio = jack_port_register(g_jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&plugin_ptr->audio_out_right_port.port_type_siblings, &g_audio_ports);
+  }
+  else if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
+           plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+  {
+    port_name[size_id + size_name] = 0;
+    plugin_ptr->audio_out_left_port.data.audio = jack_port_register(g_jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&plugin_ptr->audio_out_left_port.port_type_siblings, &g_audio_ports);
+  }
+
+  free(name);
+
+  id++;
 
   list_add_tail(&plugin_ptr->siblings, &g_plugins);
 
@@ -347,8 +394,6 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
 
       port_ptr->type = PORT_TYPE_AUDIO;
       port_ptr->index = port_index;
-      port_ptr->data.audio = jack_port_register(g_jack_client, symbol, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-      list_add_tail(&port_ptr->port_type_siblings, &g_audio_ports);
     }
     else if (class == SLV2_AUDIO_RATE_INPUT)
     {
