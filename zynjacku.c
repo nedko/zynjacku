@@ -31,6 +31,7 @@
 #include "list.h"
 #include "slv2.h"
 #include "log.h"
+#include "dynparam.h"
 
 #define BOOL int
 #define TRUE 1
@@ -72,6 +73,7 @@ struct zynjacku_plugin
   struct zynjacku_plugin_port audio_out_left_port;
   struct zynjacku_plugin_port audio_out_right_port;
   struct list_head parameter_ports;
+  lv2dynparam_host_instance dynparams;
 };
 
 BOOL create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index);
@@ -125,7 +127,7 @@ zynjacku_plugin_construct(const void * uri)
   size_t size_name;
   size_t size_id;
 
-  plugin_ptr = (struct zynjacku_plugin *)malloc(sizeof(struct zynjacku_plugin));
+  plugin_ptr = malloc(sizeof(struct zynjacku_plugin));
   if (plugin_ptr == NULL)
   {
     LOG_ERROR("Cannot allocate memory for plugin");
@@ -152,6 +154,16 @@ zynjacku_plugin_construct(const void * uri)
     goto fail_free;
   }
 
+  if (!lv2dynparam_host_add_synth(
+        slv2_instance_get_descriptor(plugin_ptr->instance),
+        slv2_instance_get_handle(plugin_ptr->instance),
+        plugin_ptr,
+        &plugin_ptr->dynparams))
+  {
+    LOG_ERROR("Failed to instantiate dynparams extension.");
+    goto fail_free;
+  }
+
   /* Create ports */
   ports_count  = slv2_plugin_get_num_ports(plugin_ptr->plugin);
 
@@ -172,7 +184,7 @@ zynjacku_plugin_construct(const void * uri)
   }
 
   size_name = strlen(name);
-  port_name = (char *)malloc(size_name + 1024);
+  port_name = malloc(size_name + 1024);
   if (port_name == NULL)
   {
     free(name);
@@ -368,7 +380,7 @@ create_port(struct zynjacku_plugin * plugin_ptr, uint32_t port_index)
   {
     if (class == SLV2_CONTROL_RATE_INPUT)
     {
-      port_ptr = (struct zynjacku_plugin_port *)malloc(sizeof(struct zynjacku_plugin_port));
+      port_ptr = malloc(sizeof(struct zynjacku_plugin_port));
       port_ptr->type = PORT_TYPE_PARAMETER;
       port_ptr->index = port_index;
       port_ptr->data.parameter = slv2_port_get_default_value(plugin_ptr->plugin, port_index);
@@ -471,7 +483,7 @@ void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nfram
   input_event_index = 0;
   output_buf->event_count = 0;
   input_buf = jack_port_get_buffer(jack_port, nframes);
-  input_event_count = jack_midi_port_get_info(input_buf, nframes)->event_count;
+  input_event_count = jack_midi_get_event_count(input_buf, nframes);
 
   /* iterate over all incoming JACK MIDI events */
   data = output_buf->data;
@@ -520,6 +532,8 @@ jack_process_cb(jack_nframes_t nframes, void* data)
   {
     plugin_ptr = list_entry(plugin_node_ptr, struct zynjacku_plugin, siblings);
 
+    lv2dynparam_host_realtime_run(plugin_ptr->dynparams);
+
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
     if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
     {
@@ -543,4 +557,27 @@ jack_process_cb(jack_nframes_t nframes, void* data)
   }
 
   return 0;
+}
+
+#define plugin_ptr ((struct zynjacku_plugin *)instance_ui_context)
+
+void
+dynparam_generic_group_appeared(
+  void * instance_ui_context,
+  const char * group_name,
+  void ** group_ui_context)
+{
+  char * name;
+
+  name = slv2_plugin_get_name(plugin_ptr->plugin);
+  if (name == NULL)
+  {
+    LOG_ERROR("Failed to get plugin name");
+    goto exit;
+  }
+
+  LOG_NOTICE("Group \"%s\" appeared", group_name);
+
+exit:
+  *group_ui_context = NULL;
 }
