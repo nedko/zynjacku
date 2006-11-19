@@ -33,7 +33,9 @@ void zyn_log(int level, const char * format, ...);
 #define LOG_LEVEL_FATAL      5
 #define LOG_LEVEL_BLACK_HOLE 6      
 
+#if !defined(LOG_LEVEL)
 #define LOG_LEVEL LOG_LEVEL_WARNING
+#endif
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
 # define LOG_DEBUG(format, arg...)              \

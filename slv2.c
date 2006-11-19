@@ -136,7 +136,7 @@ zynjacku_find_simple_plugins()
     }
 
     LOG_DEBUG("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
-    plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
+    plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
     plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
 
@@ -163,7 +163,7 @@ zynjacku_find_all_plugins()
   for (i = 0 ; i < plugins_count; i++)
   {
     plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
-    plugin_info_ptr = (struct zynjacku_simple_plugin_info *)malloc(sizeof(struct zynjacku_simple_plugin_info));
+    plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
     plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
   }
