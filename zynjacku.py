@@ -50,6 +50,10 @@ if not engine.start_jack(client_name):
 
 synths = []
 
+def on_group_added(obj):
+    print "on_group_added() called !!!!!!!!!!!!!!!!!!"
+    return
+
 for arg in sys.argv[1:]:
     print "Loading %s" % arg
     synth = zynjacku.Synth()
@@ -57,6 +61,7 @@ for arg in sys.argv[1:]:
         print"Failed to construct %s" % arg
     else:
         synths.append(synth)
+        synth.connect("group-added", on_group_added)
     del(synth)
 
 main_window = glade_xml.get_widget("zynjacku_main")

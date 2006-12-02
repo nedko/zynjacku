@@ -33,6 +33,8 @@ G_BEGIN_DECLS
 #define ZYNJACKU_IS_ENGINE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), ZYNJACKU_ENGINE_TYPE))
 #define ZYNJACKU_ENGINE_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), ZYNJACKU_ENGINE_TYPE, ZynjackuEngineClass))
 
+#define ZYNJACKU_TYPE_ENGINE ZYNJACKU_ENGINE_TYPE
+
 typedef struct _ZynjackuEngine ZynjackuEngine;
 typedef struct _ZynjackuEngineClass ZynjackuEngineClass;
 

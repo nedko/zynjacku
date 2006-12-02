@@ -26,12 +26,14 @@
 
 G_BEGIN_DECLS
 
-#define ZYNJACKU_TYPE_SYNTH (zynjacku_synth_get_type())
+#define ZYNJACKU_SYNTH_TYPE (zynjacku_synth_get_type())
 #define ZYNJACKU_SYNTH(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), ZYNJACKU_TYPE_SYNTH, ZynjackuSynth))
 #define ZYNJACKU_SYNTH_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), ZYNJACKU_TYPE_SYNTH, ZynjackuSynthClass))
 #define ZYNJACKU_IS_SYNTH(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), ZYNJACKU_TYPE_SYNTH))
 #define ZYNJACKU_IS_SYNTH_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), ZYNJACKU_TYPE_SYNTH))
 #define ZYNJACKU_SYNTH_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), ZYNJACKU_TYPE_SYNTH, ZynjackuSynthClass))
+
+#define ZYNJACKU_TYPE_SYNTH ZYNJACKU_SYNTH_TYPE
 
 typedef struct _ZynjackuSynth ZynjackuSynth;
 typedef struct _ZynjackuSynthClass ZynjackuSynthClass;
