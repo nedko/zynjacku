@@ -29,7 +29,7 @@
 #include "list.h"
 #include "dynparam_internal.h"
 
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 static struct lv2dynparam_host_callbacks g_lv2dynparam_host_callbacks =
@@ -82,7 +82,7 @@ lv2dynparam_host_add_synth(
   INIT_LIST_HEAD(&instance_ptr->ui_to_realtime_queue);
   instance_ptr->lv2instance = lv2instance;
   instance_ptr->root_group_ptr = NULL;
-  instance_ptr->ui = TRUE;
+  instance_ptr->ui = FALSE;
 
   if (!instance_ptr->callbacks_ptr->host_attach(
         lv2instance,
@@ -177,6 +177,22 @@ lv2dynparam_host_ui_run(
     lv2dynparam_put_unused_message(message_ptr);
   }
   
+  audiolock_leave_ui(instance_ptr->lock);
+}
+
+void
+lv2dynparam_host_ui_on(
+  lv2dynparam_host_instance instance)
+{
+  audiolock_enter_ui(instance_ptr->lock);
+  audiolock_leave_ui(instance_ptr->lock);
+}
+
+void
+lv2dynparam_host_ui_off(
+  lv2dynparam_host_instance instance)
+{
+  audiolock_enter_ui(instance_ptr->lock);
   audiolock_leave_ui(instance_ptr->lock);
 }
 
