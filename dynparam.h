@@ -23,7 +23,9 @@
 #ifndef DYNPARAM_H__5090F477_0BE7_439F_BF1D_F2EB78822760__INCLUDED
 #define DYNPARAM_H__5090F477_0BE7_439F_BF1D_F2EB78822760__INCLUDED
 
-#if !defined(BOOL)
+#if defined(GLIB_CHECK_VERSION)
+#define BOOL gboolean
+#elif !defined(BOOL)
 #define BOOL int
 #define TRUE 1
 #define FALSE 0
@@ -34,6 +36,7 @@
 typedef void * lv2dynparam_host_instance;
 typedef void * lv2dynparam_host_parameter;
 typedef void * lv2dynparam_host_group;
+typedef void * lv2dynparam_host_command;
 
 /* called from ui thread */
 BOOL
@@ -73,16 +76,29 @@ lv2dynparam_host_cc_unconfigure(
   lv2dynparam_host_instance instance,
   lv2dynparam_host_parameter parameter);
 
+/* called from ui thread */
+void
+lv2dynparam_host_ui_on(
+  lv2dynparam_host_instance instance);
+
+/* called from ui thread */
+void
+lv2dynparam_host_ui_off(
+  lv2dynparam_host_instance instance);
+
 /* callback called from ui thread */
 void
 dynparam_generic_group_appeared(
+  lv2dynparam_host_group group_handle,
   void * instance_ui_context,
+  void * parent_group_ui_context,
   const char * group_name,
   void ** group_ui_context);
 
 /* callback called from ui thread */
 void
 dynparam_command_appeared(
+  lv2dynparam_host_command command_handle,
   void * instance_ui_context,
   void * group_ui_context,
   const char * command_name,
@@ -91,11 +107,12 @@ dynparam_command_appeared(
 /* callback called from ui thread */
 void
 dynparam_parameter_boolean_appeared(
+  lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,
   void * group_ui_context,
   lv2dynparam_host_parameter parameter,
   const char * parameter_name,
-  int value,
+  BOOL value,
   void ** parameter_ui_context);
 
 /* callback called from ui thread */
@@ -104,6 +121,6 @@ dynparam_parameter_boolean_changed(
   void * instance_ui_context,
   void * group_ui_context,
   void * parameter_ui_context,
-  int value);
+  BOOL value);
 
 #endif /* #ifndef DYNPARAM_H__5090F477_0BE7_439F_BF1D_F2EB78822760__INCLUDED */

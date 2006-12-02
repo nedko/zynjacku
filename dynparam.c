@@ -78,7 +78,11 @@ lv2dynparam_host_add_synth(
     goto fail_destroy_lock;
   }
 
+  INIT_LIST_HEAD(&instance_ptr->realtime_to_ui_queue);
+  INIT_LIST_HEAD(&instance_ptr->ui_to_realtime_queue);
   instance_ptr->lv2instance = lv2instance;
+  instance_ptr->root_group_ptr = NULL;
+  instance_ptr->ui = FALSE;
 
   if (!instance_ptr->callbacks_ptr->host_attach(
         lv2instance,
@@ -122,7 +126,51 @@ void
 lv2dynparam_host_ui_run(
   lv2dynparam_host_instance instance)
 {
+  struct list_head * node_ptr;
+  struct lv2dynparam_host_message * message_ptr;
+/*   struct lv2dynparam_host_command * command_ptr; */
+/*   struct lv2dynparam_host_parameter * parameter_ptr; */
+/*   struct lv2dynparam_host_group * group_ptr; */
+
   audiolock_enter_ui(instance_ptr->lock);
+
+  while (!list_empty(&instance_ptr->realtime_to_ui_queue))
+  {
+    node_ptr = instance_ptr->realtime_to_ui_queue.next;
+    list_del(node_ptr);
+    message_ptr = list_entry(node_ptr, struct lv2dynparam_host_message, siblings);
+
+    if (instance_ptr->ui)
+    {
+      switch (message_ptr->message_type)
+      {
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR:
+        {
+          dynparam_generic_group_appeared(
+            message_ptr->context.group_ptr,
+            instance_ptr->instance_ui_context,
+            message_ptr->context.group_ptr->parent_group_ptr->ui_context,
+            message_ptr->context.group_ptr->name,
+            &message_ptr->context.group_ptr->ui_context);
+        }
+
+        message_ptr->context.group_ptr->gui_referenced = TRUE;
+
+        break;
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_DISAPPEAR:
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_APPEAR:
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_DISAPPEAR:
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE:
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_APPEAR:
+      case LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_DISAPPEAR:
+      default:
+        LOG_ERROR("Message of unknown type %u received", message_ptr->message_type);
+      }
+    }
+
+    lv2dynparam_put_unused_message(message_ptr);
+  }
+  
   audiolock_leave_ui(instance_ptr->lock);
 }
 
@@ -137,8 +185,12 @@ lv2dynparam_host_group_appear(
   void ** group_host_context)
 {
   struct lv2dynparam_host_group * group_ptr;
+  struct lv2dynparam_host_group * parent_group_ptr;
+  struct lv2dynparam_host_message * message_ptr;
 
   LOG_DEBUG("Group appeared.");
+
+  parent_group_ptr = (struct lv2dynparam_host_group *)parent_group_host_context;
 
   group_ptr = lv2dynparam_get_unused_group();
   if (group_ptr == NULL)
@@ -146,7 +198,12 @@ lv2dynparam_host_group_appear(
     goto fail;
   }
 
+  group_ptr->parent_group_ptr = parent_group_ptr;
   group_ptr->group_handle = group;
+  INIT_LIST_HEAD(&group_ptr->child_groups);
+  INIT_LIST_HEAD(&group_ptr->child_params);
+  INIT_LIST_HEAD(&group_ptr->child_commands);
+  group_ptr->gui_referenced = FALSE;
 
   if (!instance_ptr->callbacks_ptr->group_get_name(
         group_ptr->group_handle,
@@ -154,16 +211,42 @@ lv2dynparam_host_group_appear(
         LV2DYNPARAM_MAX_STRING_SIZE))
   {
     LOG_ERROR("lv2dynparam get_group_name() failed.");
-    goto fail_put;
+    goto fail_put_group;
   }
 
   LOG_DEBUG("Group name is \"%s\"", group_ptr->name);
 
-//  dynparam_generic_group_appeared(instance_ui_context, instance_ptr->root_group.name, &instance_ptr->root_group.ui_context);
+  if (!instance_ptr->callbacks_ptr->group_get_type_uri(
+        group_ptr->group_handle,
+        group_ptr->type,
+        LV2DYNPARAM_MAX_STRING_SIZE))
+  {
+    LOG_ERROR("lv2dynparam get_group_type_uri() failed.");
+    goto fail_put_group;
+  }
+
+  LOG_DEBUG("Group type is \"%s\"", group_ptr->type);
+
+  message_ptr = lv2dynparam_get_unused_message();
+  if (message_ptr == NULL)
+  {
+    goto fail_put_group;
+  }
+
+  if (parent_group_ptr == NULL)
+  {
+    instance_ptr->root_group_ptr = group_ptr;
+  }
+  else
+  {
+    list_add_tail(&group_ptr->siblings, &parent_group_ptr->child_groups);
+  }
+
+  list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
 
   return TRUE;
 
-fail_put:
+fail_put_group:
   lv2dynparam_put_unused_group(group_ptr);
 
 fail:
@@ -206,6 +289,17 @@ lv2dynparam_host_parameter_appear(
   }
 
   LOG_DEBUG("Parameter name is \"%s\"", param_ptr->name);
+
+  if (!instance_ptr->callbacks_ptr->parameter_get_type_uri(
+        param_ptr->param_handle,
+        param_ptr->type_uri,
+        LV2DYNPARAM_MAX_STRING_SIZE))
+  {
+    LOG_ERROR("lv2dynparam get_parameter_type_uri() failed.");
+    goto fail_put;
+  }
+
+  LOG_DEBUG("Parameter type is \"%s\"", param_ptr->type_uri);
 
 //  dynparam_generic_parameter_appeared(instance_ui_context, instance_ptr->root_param.name, &instance_ptr->root_param.ui_context);
 

@@ -195,12 +195,19 @@ zynjacku_plugin_lookup_by_uri_list(const char * uri)
 SLV2Plugin *
 zynjacku_plugin_lookup_by_uri(const char * uri)
 {
+  SLV2Plugin * plugin_ptr;
   SLV2List plugins;
 
   plugins = slv2_list_new();
   slv2_list_load_all(plugins);
 
-  return slv2_plugin_duplicate(slv2_list_get_plugin_by_uri(plugins, uri));
+  plugin_ptr = slv2_list_get_plugin_by_uri(plugins, uri);
+  if (plugin_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return slv2_plugin_duplicate(plugin_ptr);
 }
 
 void
