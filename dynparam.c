@@ -82,7 +82,7 @@ lv2dynparam_host_add_synth(
   INIT_LIST_HEAD(&instance_ptr->ui_to_realtime_queue);
   instance_ptr->lv2instance = lv2instance;
   instance_ptr->root_group_ptr = NULL;
-  instance_ptr->ui = FALSE;
+  instance_ptr->ui = TRUE;
 
   if (!instance_ptr->callbacks_ptr->host_attach(
         lv2instance,
@@ -132,6 +132,8 @@ lv2dynparam_host_ui_run(
 /*   struct lv2dynparam_host_parameter * parameter_ptr; */
 /*   struct lv2dynparam_host_group * group_ptr; */
 
+  //LOG_DEBUG("lv2dynparam_host_ui_run() called.");
+
   audiolock_enter_ui(instance_ptr->lock);
 
   while (!list_empty(&instance_ptr->realtime_to_ui_queue))
@@ -166,6 +168,10 @@ lv2dynparam_host_ui_run(
       default:
         LOG_ERROR("Message of unknown type %u received", message_ptr->message_type);
       }
+    }
+    else
+    {
+      LOG_DEBUG("ignoring message because UI is off.");
     }
 
     lv2dynparam_put_unused_message(message_ptr);

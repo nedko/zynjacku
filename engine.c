@@ -410,8 +410,24 @@ zynjacku_engine_deactivate_synth(
 }
 
 void
-zynjacku_ui_run()
+zynjacku_engine_ui_run(
+  ZynjackuEngine * engine_obj_ptr)
 {
+  struct list_head * synth_node_ptr;
+  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_engine * engine_ptr;
+
+  LOG_DEBUG("zynjacku_engine_ui_run() called.");
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  /* Iterate over plugins */
+  list_for_each(synth_node_ptr, &engine_ptr->plugins)
+  {
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
+
+    lv2dynparam_host_ui_run(synth_ptr->dynparams);
+  }
 }
 
 guint

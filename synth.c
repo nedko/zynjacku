@@ -40,6 +40,12 @@
 
 #include "zynjacku.h"
 
+/* signals */
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED      0
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT           1
+
+static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
+
 static void
 zynjacku_synth_dispose(GObject * obj)
 {
@@ -102,6 +108,20 @@ zynjacku_synth_class_init(
   G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_synth_finalize;
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_synth));
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED] =
+    g_signal_new(
+      "group-added",            /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_FIRST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_STRING);
 }
 
 static void
@@ -178,12 +198,22 @@ void
 zynjacku_synth_ui_on(
   ZynjackuSynth * obj_ptr)
 {
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+
+//  lv2dynparam_host_ui_on(synth_ptr->dynparams);
 }
 
 void
 zynjacku_synth_ui_off(
   ZynjackuSynth * obj_ptr)
 {
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+
+//  lv2dynparam_host_ui_off(synth_ptr->dynparams);
 }
 
 gboolean
@@ -450,6 +480,9 @@ zynjacku_synth_construct(
   g_object_ref(synth_ptr->engine_obj_ptr);
 
   LOG_DEBUG("Constructed plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
+
+//  LOG_NOTICE("Signal emmission...");
+//  g_signal_emit(synth_obj_ptr, g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED], 0, "test group");
 
   return TRUE;
 

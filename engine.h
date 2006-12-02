@@ -74,13 +74,10 @@ guint
 zynjacku_engine_get_sample_rate(
   ZynjackuEngine * engine_obj_ptr);
 
-G_END_DECLS
-
-/*
-
 void
-zynjacku_ui_run();
+zynjacku_engine_ui_run(
+  ZynjackuEngine * engine_obj_ptr);
 
-*/
+G_END_DECLS
 
 #endif /* #ifndef ENGINE_H__512BF192_2626_4759_839B_47B7780A971B__INCLUDED */
