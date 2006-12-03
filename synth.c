@@ -44,6 +44,9 @@
 #define ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED      0
 #define ZYNJACKU_SYNTH_SIGNALS_COUNT           1
 
+/* properties */
+#define ZYNJACKU_SYNTH_PROP_URI                1
+
 static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
 
 static void
@@ -76,6 +79,12 @@ zynjacku_synth_dispose(GObject * obj)
     zynjacku_synth_destruct(ZYNJACKU_SYNTH(obj));
   }
 
+  if (synth_ptr->uri != NULL)
+  {
+    g_free(synth_ptr->uri);
+    synth_ptr->uri = NULL;
+  }
+
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
 }
@@ -98,10 +107,72 @@ zynjacku_synth_finalize(GObject * obj)
 }
 
 static void
+zynjacku_synth_set_property(
+  GObject * object_ptr,
+  guint property_id,
+  const GValue * value_ptr,
+  GParamSpec * param_spec_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(object_ptr);
+
+  switch (property_id)
+  {
+  case ZYNJACKU_SYNTH_PROP_URI:
+    //LOG_DEBUG("setting synth uri to: \"%s\"", g_value_get_string(value_ptr));
+    //break;
+    if (synth_ptr->uri != NULL)
+    {
+      g_free(synth_ptr->uri);
+    }
+    synth_ptr->uri = g_value_dup_string(value_ptr);
+    LOG_DEBUG("synth uri set to: \"%s\"", synth_ptr->uri);
+    break;
+  default:
+    /* We don't have any other property... */
+    G_OBJECT_WARN_INVALID_PROPERTY_ID(object_ptr, property_id, param_spec_ptr);
+    break;
+  }
+}
+
+static void
+zynjacku_synth_get_property(
+  GObject * object_ptr,
+  guint property_id,
+  GValue * value_ptr,
+  GParamSpec * param_spec_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(object_ptr);
+
+  switch (property_id)
+  {
+  case ZYNJACKU_SYNTH_PROP_URI:
+    if (synth_ptr->uri != NULL)
+    {
+      g_value_set_string(value_ptr, synth_ptr->uri);
+    }
+    else
+    {
+      g_value_set_string(value_ptr, "");
+    }
+    break;
+  default:
+    /* We don't have any other property... */
+    G_OBJECT_WARN_INVALID_PROPERTY_ID(object_ptr, property_id, param_spec_ptr);
+    break;
+  }
+}
+
+static void
 zynjacku_synth_class_init(
   gpointer class_ptr,
   gpointer class_data_ptr)
 {
+  GParamSpec * uri_param_spec;
+
   LOG_DEBUG("zynjacku_synth_class_init() called.");
 
   G_OBJECT_CLASS(class_ptr)->dispose = zynjacku_synth_dispose;
@@ -122,6 +193,21 @@ zynjacku_synth_class_init(
       G_TYPE_NONE,              /* return type */
       1,                        /* n_params */
       G_TYPE_STRING);
+
+  G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
+  G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
+
+  uri_param_spec = g_param_spec_string(
+    "uri",
+    "Synth LV2 URI construct property",
+    "Synth LV2 URI construct property",
+    "" /* default value */,
+    G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
+
+  g_object_class_install_property(
+    G_OBJECT_CLASS(class_ptr),
+    ZYNJACKU_SYNTH_PROP_URI,
+    uri_param_spec);
 }
 
 static void
@@ -141,6 +227,7 @@ zynjacku_synth_init(
   synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
   synth_ptr->instance = NULL;
+  synth_ptr->uri = NULL;
 }
 
 GType zynjacku_synth_get_type()
@@ -384,7 +471,6 @@ zynjacku_synth_construct(
   char * port_name;
   size_t size_name;
   size_t size_id;
-  const char * uri;
   struct zynjacku_synth * synth_ptr;
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
@@ -392,12 +478,16 @@ zynjacku_synth_construct(
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
-  uri = "http://nedko.arnaudov.name/zynadd/0";
+  if (synth_ptr->uri == NULL)
+  {
+    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
+    goto fail;
+  }
 
-  synth_ptr->plugin = zynjacku_plugin_lookup_by_uri(uri);
+  synth_ptr->plugin = zynjacku_plugin_lookup_by_uri(synth_ptr->uri);
   if (synth_ptr->plugin == NULL)
   {
-    LOG_ERROR("Failed to find plugin <%s>", uri);
+    LOG_ERROR("Failed to find plugin <%s>", synth_ptr->uri);
     goto fail;
   }
 

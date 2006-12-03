@@ -61,8 +61,8 @@ main_window.set_title(client_name)
 
 for arg in sys.argv[1:]:
     print "Loading %s" % arg
-    synth = zynjacku.Synth()
-    print "signal registration..."
+    synth = zynjacku.Synth(uri=arg)
+    #print "signal registration..."
     synth.connect("group-added", on_group_added)
     if not synth.construct(engine):
         print"Failed to construct %s" % arg

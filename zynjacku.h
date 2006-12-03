@@ -49,6 +49,7 @@ struct zynjacku_synth
   gboolean dispose_has_run;
 
   GObject * engine_obj_ptr;
+  gchar * uri;
 
   struct list_head siblings;
   SLV2Plugin * plugin;          /* plugin "class" (actually just a few strings) */
