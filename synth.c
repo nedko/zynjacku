@@ -31,7 +31,7 @@
 #include "lv2-miditype.h"
 #include "list.h"
 #include "slv2.h"
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "dynparam.h"
 
@@ -200,6 +200,8 @@ zynjacku_synth_ui_on(
 {
   struct zynjacku_synth * synth_ptr;
 
+  LOG_DEBUG("zynjacku_synth_ui_on() called.");
+
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
 //  lv2dynparam_host_ui_on(synth_ptr->dynparams);
@@ -210,6 +212,8 @@ zynjacku_synth_ui_off(
   ZynjackuSynth * obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;
+
+  LOG_DEBUG("zynjacku_synth_ui_off() called.");
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
