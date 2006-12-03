@@ -311,39 +311,42 @@ jack_process_cb(
   jack_nframes_t nframes,
   void * context_ptr)
 {
-  struct list_head * plugin_node_ptr;
-  struct zynjacku_synth * plugin_ptr;
+  struct list_head * synth_node_ptr;
+  struct zynjacku_synth * synth_ptr;
 
   /* Copy MIDI input data to all LV2 midi in ports */
   jackmidi2lv2midi(engine_ptr->jack_midi_in, &engine_ptr->lv2_midi_buffer, nframes);
 
   /* Iterate over plugins */
-  list_for_each(plugin_node_ptr, &engine_ptr->plugins)
+  list_for_each(synth_node_ptr, &engine_ptr->plugins)
   {
-    plugin_ptr = list_entry(plugin_node_ptr, struct zynjacku_synth, siblings);
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
 
-    lv2dynparam_host_realtime_run(plugin_ptr->dynparams);
-
-    /* Connect plugin LV2 output audio ports directly to JACK buffers */
-    if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
+    if (synth_ptr->dynparams)
     {
-      slv2_instance_connect_port(
-        plugin_ptr->instance,
-        plugin_ptr->audio_out_left_port.index,
-        jack_port_get_buffer(plugin_ptr->audio_out_left_port.data.audio, nframes));
+      lv2dynparam_host_realtime_run(synth_ptr->dynparams);
     }
 
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
-    if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+    if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
     {
       slv2_instance_connect_port(
-        plugin_ptr->instance,
-        plugin_ptr->audio_out_right_port.index,
-        jack_port_get_buffer(plugin_ptr->audio_out_right_port.data.audio, nframes));
+        synth_ptr->instance,
+        synth_ptr->audio_out_left_port.index,
+        jack_port_get_buffer(synth_ptr->audio_out_left_port.data.audio, nframes));
+    }
+
+    /* Connect plugin LV2 output audio ports directly to JACK buffers */
+    if (synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+    {
+      slv2_instance_connect_port(
+        synth_ptr->instance,
+        synth_ptr->audio_out_right_port.index,
+        jack_port_get_buffer(synth_ptr->audio_out_right_port.data.audio, nframes));
     }
 
     /* Run plugin for this cycle */
-    slv2_instance_run(plugin_ptr->instance, nframes);
+    slv2_instance_run(synth_ptr->instance, nframes);
   }
 
   return 0;
@@ -426,7 +429,10 @@ zynjacku_engine_ui_run(
   {
     synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
 
-    lv2dynparam_host_ui_run(synth_ptr->dynparams);
+    if (synth_ptr->dynparams)
+    {
+      lv2dynparam_host_ui_run(synth_ptr->dynparams);
+    }
   }
 }
 

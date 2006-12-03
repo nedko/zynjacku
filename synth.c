@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <slv2/slv2.h>
+#include <slv2/query.h>
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>
@@ -291,7 +292,10 @@ zynjacku_synth_ui_on(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
+  if (synth_ptr->dynparams)
+  {
 //  lv2dynparam_host_ui_on(synth_ptr->dynparams);
+  }
 }
 
 void
@@ -304,7 +308,10 @@ zynjacku_synth_ui_off(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
+  if (synth_ptr->dynparams)
+  {
 //  lv2dynparam_host_ui_off(synth_ptr->dynparams);
+  }
 }
 
 gboolean
@@ -474,6 +481,9 @@ zynjacku_synth_construct(
   struct zynjacku_synth * synth_ptr;
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
+  SLV2Property slv2_property;
+  size_t value_index;
+  gboolean dynparams_supported;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
@@ -491,6 +501,42 @@ zynjacku_synth_construct(
     goto fail;
   }
 
+  dynparams_supported = FALSE;
+
+  slv2_property = slv2_plugin_get_required_features(synth_ptr->plugin);
+
+  LOG_DEBUG("Plugin has %u required features", (unsigned int)slv2_property->num_values);
+  for (value_index = 0 ; value_index < slv2_property->num_values ; value_index++)
+  {
+    LOG_DEBUG("\"%s\"", slv2_property->values[value_index]);
+    if (strcmp(LV2DYNPARAM_URI, slv2_property->values[value_index]) == 0)
+    {
+      dynparams_supported = TRUE;
+    }
+    else
+    {
+      LOG_DEBUG("Plugin requires unsupported feature \"%s\"", slv2_property->values[value_index]);
+      slv2_property_free(slv2_property);
+      goto fail;
+    }
+  }
+
+  slv2_property_free(slv2_property);
+
+  slv2_property = slv2_plugin_get_optional_features(synth_ptr->plugin);
+
+  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_property->num_values);
+  for (value_index = 0 ; value_index < slv2_property->num_values ; value_index++)
+  {
+    LOG_NOTICE("\"%s\"", slv2_property->values[value_index]);
+    if (strcmp(LV2DYNPARAM_URI, slv2_property->values[value_index]) == 0)
+    {
+      dynparams_supported = TRUE;
+    }
+  }
+
+  slv2_property_free(slv2_property);
+
   sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_obj_ptr));
 
   /* Instantiate the plugin */
@@ -501,14 +547,21 @@ zynjacku_synth_construct(
     goto fail;
   }
 
-  if (!lv2dynparam_host_add_synth(
-        slv2_instance_get_descriptor(synth_ptr->instance),
-        slv2_instance_get_handle(synth_ptr->instance),
-        synth_ptr,
-        &synth_ptr->dynparams))
+  if (dynparams_supported)
   {
-    LOG_ERROR("Failed to instantiate dynparams extension.");
-    goto fail_instance_free;
+    if (!lv2dynparam_host_add_synth(
+          slv2_instance_get_descriptor(synth_ptr->instance),
+          slv2_instance_get_handle(synth_ptr->instance),
+          synth_ptr,
+          &synth_ptr->dynparams))
+    {
+      LOG_ERROR("Failed to instantiate dynparams extension.");
+      goto fail_instance_free;
+    }
+  }
+  else
+  {
+    synth_ptr->dynparams = NULL;
   }
 
   /* Create ports */
