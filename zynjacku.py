@@ -56,6 +56,9 @@ def on_group_added(obj, group_name):
     print repr(group_name)
     return
 
+main_window = glade_xml.get_widget("zynjacku_main")
+main_window.set_title(client_name)
+
 for arg in sys.argv[1:]:
     print "Loading %s" % arg
     synth = zynjacku.Synth()
@@ -65,26 +68,46 @@ for arg in sys.argv[1:]:
         print"Failed to construct %s" % arg
     else:
         synths.append(synth)
+        synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        synth.ui_win.set_title(synth.get_name())
+        synth.ui_win.set_role("zynjacku_synth_ui")
     del(synth)
-
-main_window = glade_xml.get_widget("zynjacku_main")
-main_window.set_title(client_name)
 
 synths_widget = glade_xml.get_widget("treeview_synths")
 
-store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-renderer = gtk.CellRendererText()
+def col1_toggled_cb(cell, path, model):
+    """
+    Sets the toggled state on the toggle button to true or false.
+    """
 
-column_name = gtk.TreeViewColumn("Name", renderer, text=0)
-column_class = gtk.TreeViewColumn("Class", renderer, text=1)
-column_uri = gtk.TreeViewColumn("URI", renderer, text=2)
+    if model[path][0]:
+        model[path][4].ui_off()
+        model[path][4].ui_win.hide_all()
+        model[path][0] = False
+    else:
+        model[path][4].ui_win.show_all()
+        model[path][4].ui_on()
+        model[path][0] = True
 
+store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+text_renderer = gtk.CellRendererText()
+toggle_renderer = gtk.CellRendererToggle()
+toggle_renderer.set_property('activatable', True)
+toggle_renderer.connect('toggled', col1_toggled_cb, store)
+
+column_ui_visible = gtk.TreeViewColumn("UI Visible", toggle_renderer)
+column_ui_visible.add_attribute(toggle_renderer, "active", 0)
+column_name = gtk.TreeViewColumn("Name", text_renderer, text=1)
+column_class = gtk.TreeViewColumn("Class", text_renderer, text=2)
+column_uri = gtk.TreeViewColumn("URI", text_renderer, text=3)
+
+synths_widget.append_column(column_ui_visible)
 synths_widget.append_column(column_name)
 synths_widget.append_column(column_class)
 synths_widget.append_column(column_uri)
 
 for synth in synths:
-    row = synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
+    row = False, synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
     store.append(row)
     del(row)
     del(synth)
