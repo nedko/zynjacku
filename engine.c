@@ -354,31 +354,6 @@ jack_process_cb(
 
 #undef engine_ptr
 
-#define plugin_ptr ((struct zynjacku_synth *)instance_ui_context)
-
-void
-dynparam_generic_group_appeared(
-  lv2dynparam_host_group group_handle,
-  void * instance_ui_context,
-  void * parent_group_ui_context,
-  const char * group_name,
-  void ** group_ui_context)
-{
-  char * name;
-
-  name = slv2_plugin_get_name(plugin_ptr->plugin);
-  if (name == NULL)
-  {
-    LOG_ERROR("Failed to get plugin name");
-    goto exit;
-  }
-
-  LOG_NOTICE("Generic group \"%s\" appeared", group_name);
-
-exit:
-  *group_ui_context = NULL;
-}
-
 void
 zynjacku_engine_activate_synth(
   ZynjackuEngine * engine_obj_ptr,

@@ -294,7 +294,7 @@ zynjacku_synth_ui_on(
 
   if (synth_ptr->dynparams)
   {
-//  lv2dynparam_host_ui_on(synth_ptr->dynparams);
+    lv2dynparam_host_ui_on(synth_ptr->dynparams);
   }
 }
 
@@ -310,7 +310,7 @@ zynjacku_synth_ui_off(
 
   if (synth_ptr->dynparams)
   {
-//  lv2dynparam_host_ui_off(synth_ptr->dynparams);
+    lv2dynparam_host_ui_off(synth_ptr->dynparams);
   }
 }
 
@@ -552,7 +552,7 @@ zynjacku_synth_construct(
     if (!lv2dynparam_host_add_synth(
           slv2_instance_get_descriptor(synth_ptr->instance),
           slv2_instance_get_handle(synth_ptr->instance),
-          synth_ptr,
+          synth_obj_ptr,
           &synth_ptr->dynparams))
     {
       LOG_ERROR("Failed to instantiate dynparams extension.");
@@ -628,9 +628,6 @@ zynjacku_synth_construct(
 
   LOG_DEBUG("Constructed plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
-//  LOG_NOTICE("Signal emmission...");
-//  g_signal_emit(synth_obj_ptr, g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED], 0, "test group");
-
   return TRUE;
 
 fail_free_ports:
@@ -665,4 +662,38 @@ zynjacku_synth_destruct(
   g_object_unref(synth_ptr->engine_obj_ptr);
 
   synth_ptr->instance = NULL;
+}
+
+void
+dynparam_generic_group_appeared(
+  lv2dynparam_host_group group_handle,
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  const char * group_name,
+  void ** group_ui_context)
+{
+/*   char * name; */
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
+
+/*
+  name = slv2_plugin_get_name(synth_ptr->plugin);
+  if (name == NULL)
+  {
+    LOG_ERROR("Failed to get plugin name");
+    goto exit;
+  }
+*/
+
+  LOG_NOTICE("Generic group \"%s\" appeared", group_name);
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED],
+    0,
+    group_name);
+
+/* exit: */
+  *group_ui_context = NULL;
 }

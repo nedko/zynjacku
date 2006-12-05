@@ -29,7 +29,7 @@
 #include "list.h"
 #include "dynparam_internal.h"
 
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 static struct lv2dynparam_host_callbacks g_lv2dynparam_host_callbacks =
@@ -107,6 +107,58 @@ fail:
   return 0;
 }
 
+void
+lv2dynparam_host_notify_group_appeared(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_group * group_ptr)
+{
+  void * parent_group_ui_context;
+
+  if (group_ptr->parent_group_ptr)
+  {
+    parent_group_ui_context = group_ptr->parent_group_ptr->ui_context;
+  }
+  else
+  {
+    /* Master Yoda says: The root group it is */
+    parent_group_ui_context = NULL;
+  }
+
+  /* C block because this is the last of not implemented yet if statements for vairous group types */
+  {
+    dynparam_generic_group_appeared(
+      group_ptr,
+      instance_ptr->instance_ui_context,
+      parent_group_ui_context,
+      group_ptr->name,
+      &group_ptr->ui_context);
+  }
+
+  group_ptr->gui_referenced = TRUE;
+}
+
+void
+lv2dynparam_host_notify(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_group * group_ptr)
+{
+  struct list_head * node_ptr;
+  struct lv2dynparam_host_group * child_group_ptr;
+
+  list_for_each(node_ptr, &group_ptr->child_groups)
+  {
+    child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
+
+    if (!group_ptr->gui_referenced)
+    {
+      /* UI knows nothing about this group - notify it */
+      lv2dynparam_host_notify_group_appeared(
+        instance_ptr,
+        child_group_ptr);
+    }
+  }
+}
+
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance)
 
 void
@@ -115,7 +167,7 @@ lv2dynparam_host_realtime_run(
 {
   if (!audiolock_enter_audio(instance_ptr->lock))
   {
-    /* we are not lucky enough ui thread, is accessing the protected data */
+    /* we are not lucky enough - ui thread, is accessing the protected data */
     return;
   }
 
@@ -130,7 +182,7 @@ lv2dynparam_host_ui_run(
   struct lv2dynparam_host_message * message_ptr;
 /*   struct lv2dynparam_host_command * command_ptr; */
 /*   struct lv2dynparam_host_parameter * parameter_ptr; */
-/*   struct lv2dynparam_host_group * group_ptr; */
+  struct lv2dynparam_host_group * group_ptr;
 
   //LOG_DEBUG("lv2dynparam_host_ui_run() called.");
 
@@ -147,16 +199,11 @@ lv2dynparam_host_ui_run(
       switch (message_ptr->message_type)
       {
       case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR:
-        {
-          dynparam_generic_group_appeared(
-            message_ptr->context.group_ptr,
-            instance_ptr->instance_ui_context,
-            message_ptr->context.group_ptr->parent_group_ptr->ui_context,
-            message_ptr->context.group_ptr->name,
-            &message_ptr->context.group_ptr->ui_context);
-        }
+        lv2dynparam_host_notify_group_appeared(
+          instance_ptr,
+          message_ptr->context.group_ptr);
 
-        message_ptr->context.group_ptr->gui_referenced = TRUE;
+        group_ptr->gui_referenced = TRUE;
 
         break;
       case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_DISAPPEAR:
@@ -185,6 +232,24 @@ lv2dynparam_host_ui_on(
   lv2dynparam_host_instance instance)
 {
   audiolock_enter_ui(instance_ptr->lock);
+
+  LOG_DEBUG("UI on - notifying for new things.");
+
+  if (instance_ptr->root_group_ptr != NULL)
+  {
+    if (!instance_ptr->root_group_ptr->gui_referenced)
+    {
+      /* UI knows nothing about this group - notify it */
+      lv2dynparam_host_notify_group_appeared(
+        instance_ptr,
+        instance_ptr->root_group_ptr);
+    }
+
+    lv2dynparam_host_notify(
+      instance_ptr,
+      instance_ptr->root_group_ptr);
+  }
+
   audiolock_leave_ui(instance_ptr->lock);
 }
 
