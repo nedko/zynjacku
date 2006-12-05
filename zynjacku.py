@@ -68,34 +68,41 @@ for arg in sys.argv[1:]:
         print"Failed to construct %s" % arg
     else:
         synths.append(synth)
-        synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        synth.ui_win.set_title(synth.get_name())
-        synth.ui_win.set_role("zynjacku_synth_ui")
+        synth.ui_win = None
     del(synth)
 
 synths_widget = glade_xml.get_widget("treeview_synths")
 
-def col1_toggled_cb(cell, path, model):
-    """
-    Sets the toggled state on the toggle button to true or false.
-    """
+def on_synth_ui_window_destroyed(window, synth, row):
+    synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
+    synth.ui_win = None
+    row[0] = False
 
+def create_synth_window(synth, row):
+    synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", on_synth_ui_window_destroyed, synth, row)
+    synth.ui_win.set_title(synth.get_name())
+    synth.ui_win.set_role("zynjacku_synth_ui")
+
+def on_ui_visible_toggled(cell, path, model):
     if model[path][0]:
-        model[path][4].ui_off()
         model[path][4].ui_win.hide_all()
+        model[path][4].ui_off()
         model[path][0] = False
     else:
-        model[path][4].ui_win.show_all()
+        if not model[path][4].ui_win:
+            create_synth_window(model[path][4], model[path])
         model[path][4].ui_on()
+        model[path][4].ui_win.show_all()
         model[path][0] = True
 
 store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
 text_renderer = gtk.CellRendererText()
 toggle_renderer = gtk.CellRendererToggle()
 toggle_renderer.set_property('activatable', True)
-toggle_renderer.connect('toggled', col1_toggled_cb, store)
+toggle_renderer.connect('toggled', on_ui_visible_toggled, store)
 
-column_ui_visible = gtk.TreeViewColumn("UI Visible", toggle_renderer)
+column_ui_visible = gtk.TreeViewColumn("UI", toggle_renderer)
 column_ui_visible.add_attribute(toggle_renderer, "active", 0)
 column_name = gtk.TreeViewColumn("Name", text_renderer, text=1)
 column_class = gtk.TreeViewColumn("Class", text_renderer, text=2)
@@ -128,6 +135,8 @@ gtk.main()
 store.clear()
 
 for synth in synths:
+    if synth.ui_win:
+        synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
     synth.destruct()
     del(synth)
 
