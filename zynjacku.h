@@ -48,7 +48,8 @@ struct zynjacku_synth
 {
   gboolean dispose_has_run;
 
-  GObject * engine_obj_ptr;
+  GObject * owner_object_ptr;
+  GObject * engine_object_ptr;
   gchar * uri;
 
   struct list_head siblings;

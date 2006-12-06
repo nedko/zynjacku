@@ -54,6 +54,7 @@ GType zynjacku_synth_get_type();
 gboolean
 zynjacku_synth_construct(
   ZynjackuSynth * synth_obj_ptr,
+  GObject * owner_object_ptr,
   GObject * engine_obj_ptr);
 
 void

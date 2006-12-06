@@ -24,38 +24,16 @@ import gtk
 import gtk.glade
 import gobject
 
-def on_group_added(obj, group_name, context):
+def on_group_added(synth, host, group_name, context):
     print "on_group_added() called !!!!!!!!!!!!!!!!!!"
-    return obj
+    print repr(host)
+    return None
 
 def on_test(obj1, obj2):
     print "on_test() called !!!!!!!!!!!!!!!!!!"
     print repr(obj2)
 
-def on_synth_ui_window_destroyed(window, synth, row):
-    synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
-    synth.ui_win = None
-    row[0] = False
-
-def create_synth_window(synth, row):
-    synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", on_synth_ui_window_destroyed, synth, row)
-    synth.ui_win.set_title(synth.get_name())
-    synth.ui_win.set_role("zynjacku_synth_ui")
-
-def on_ui_visible_toggled(cell, path, model):
-    if model[path][0]:
-        model[path][4].ui_win.hide_all()
-        model[path][4].ui_off()
-        model[path][0] = False
-    else:
-        if not model[path][4].ui_win:
-            create_synth_window(model[path][4], model[path])
-        model[path][4].ui_on()
-        model[path][4].ui_win.show_all()
-        model[path][0] = True
-
-class ZynjackuHost:
+class ZynjackuHost(gobject.GObject):
     def __init__(self, client_name):
         print "ZynjackuHost constructor called."
         self.engine = zynjacku.Engine()
@@ -78,6 +56,12 @@ class ZynjackuHost:
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
 
+    def create_synth_window(self, synth):
+        ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        ui_win.set_title(synth.get_name())
+        ui_win.set_role("zynjacku_synth_ui")
+        return ui_win
+
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
         print "ZynjackuHostMulti constructor called."
@@ -91,10 +75,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         for uri in uris:
             print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
-            #print "signal registration..."
             synth.connect("group-added", on_group_added)
-            #synth.connect("test", on_test)
-            if not synth.construct(self.engine):
+            if not synth.construct(self, self.engine):
                 print"Failed to construct %s" % uri
             else:
                 self.synths.append(synth)
@@ -104,12 +86,11 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         text_renderer = gtk.CellRendererText()
-        toggle_renderer = gtk.CellRendererToggle()
-        toggle_renderer.set_property('activatable', True)
-        toggle_renderer.connect('toggled', on_ui_visible_toggled, self.store)
+        self.toggle_renderer = gtk.CellRendererToggle()
+        self.toggle_renderer.set_property('activatable', True)
 
-        column_ui_visible = gtk.TreeViewColumn("UI", toggle_renderer)
-        column_ui_visible.add_attribute(toggle_renderer, "active", 0)
+        column_ui_visible = gtk.TreeViewColumn("UI", self.toggle_renderer)
+        column_ui_visible.add_attribute(self.toggle_renderer, "active", 0)
         column_name = gtk.TreeViewColumn("Name", text_renderer, text=1)
         column_class = gtk.TreeViewColumn("Class", text_renderer, text=2)
         column_uri = gtk.TreeViewColumn("URI", text_renderer, text=3)
@@ -134,9 +115,61 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.store.clear()
 
         for synth in self.synths:
+            synth.destruct()
+
+        ZynjackuHost.__del__(self)
+
+    def run(self):
+        toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
+        ZynjackuHost.run(self)
+        for synth in self.synths:
             if synth.ui_win:
                 synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
-            synth.destruct()
+        self.toggle_renderer.disconnect(toggled_connect_id)
+
+    def on_synth_ui_window_destroyed(self, window, synth, row):
+        synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
+        synth.ui_win = None
+        row[0] = False
+
+    def create_synth_window(self, synth, row):
+        synth.ui_win = ZynjackuHost.create_synth_window(self, synth)
+        synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
+
+    def on_ui_visible_toggled(self, cell, path, model):
+        if model[path][0]:
+            model[path][4].ui_win.hide_all()
+            model[path][4].ui_off()
+            model[path][0] = False
+        else:
+            if not model[path][4].ui_win:
+                self.create_synth_window(model[path][4], model[path])
+            model[path][4].ui_on()
+            model[path][4].ui_win.show_all()
+            model[path][0] = True
+
+class ZynjackuHostOne(ZynjackuHost):
+    def __init__(self, glade_xml, client_name, uri):
+        print "ZynjackuHostOne constructor called."
+        ZynjackuHost.__init__(self, client_name)
+
+        self.synth = zynjacku.Synth(uri=uri)
+        self.synth.connect("group-added", on_group_added)
+        if not self.synth.construct(self, self.engine):
+            print"Failed to construct %s" % uri
+            del(self.synth)
+            self.synth = None
+        else:
+            self.ui_win = ZynjackuHost.create_synth_window(self, self.synth)
+            self.synth.ui_on()
+            self.ui_win.show_all()
+            self.ui_win.connect("destroy", gtk.main_quit)
+
+    def __del__(self):
+        print "ZynjackuHostOne destructor called."
+
+        if (self.synth):
+            self.synth.destruct()
 
         ZynjackuHost.__del__(self)
 
@@ -157,7 +190,10 @@ def main():
 
     glade_xml = gtk.glade.XML(glade_file)
 
-    host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
+    if len(sys.argv) == 2:
+        host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
+    else:
+        host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
     host.run()
 
 main()

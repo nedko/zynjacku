@@ -193,7 +193,8 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      2,                        /* n_params */
+      3,                        /* n_params */
+      G_TYPE_OBJECT,
       G_TYPE_STRING,
       G_TYPE_POINTER);
 
@@ -485,7 +486,8 @@ zynjacku_synth_free_ports(
 gboolean
 zynjacku_synth_construct(
   ZynjackuSynth * synth_obj_ptr,
-  GObject * engine_obj_ptr)
+  GObject * owner_object_ptr,
+  GObject * engine_object_ptr)
 {
   uint32_t ports_count;
   uint32_t i;
@@ -502,7 +504,9 @@ zynjacku_synth_construct(
   gboolean dynparams_supported;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
+
+  LOG_NOTICE("OWNER %p", owner_object_ptr);
 
   if (synth_ptr->uri == NULL)
   {
@@ -553,7 +557,7 @@ zynjacku_synth_construct(
 
   slv2_property_free(slv2_property);
 
-  sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_obj_ptr));
+  sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
 
   /* Instantiate the plugin */
   synth_ptr->instance = slv2_plugin_instantiate(synth_ptr->plugin, sample_rate, NULL);
@@ -637,12 +641,14 @@ zynjacku_synth_construct(
 
   id++;
 
-  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_obj_ptr), G_OBJECT(synth_obj_ptr));
+  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(synth_obj_ptr));
 
-  synth_ptr->engine_obj_ptr = engine_obj_ptr;
-  g_object_ref(synth_ptr->engine_obj_ptr);
+  synth_ptr->engine_object_ptr = engine_object_ptr;
+  g_object_ref(synth_ptr->engine_object_ptr);
 
-  LOG_DEBUG("Constructed plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
+  synth_ptr->owner_object_ptr = owner_object_ptr;
+
+  LOG_DEBUG("Constructed synth <%s>, owner %p", slv2_plugin_get_uri(synth_ptr->plugin), synth_ptr->owner_object_ptr);
 
   return TRUE;
 
@@ -665,17 +671,17 @@ zynjacku_synth_destruct(
   struct zynjacku_engine * engine_ptr;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(synth_ptr->engine_obj_ptr);
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(synth_ptr->engine_object_ptr);
 
   LOG_DEBUG("Destructing plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
-  zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(synth_ptr->engine_obj_ptr), G_OBJECT(synth_obj_ptr));
+  zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(synth_ptr->engine_object_ptr), G_OBJECT(synth_obj_ptr));
 
   slv2_instance_free(synth_ptr->instance);
 
   zynjacku_synth_free_ports(engine_ptr, synth_ptr);
 
-  g_object_unref(synth_ptr->engine_obj_ptr);
+  g_object_unref(synth_ptr->engine_object_ptr);
 
   synth_ptr->instance = NULL;
 }
@@ -703,12 +709,13 @@ dynparam_generic_group_appeared(
   }
 */
 
-  LOG_NOTICE("Generic group \"%s\" appeared, handle %p", group_name, group_handle);
+  LOG_NOTICE("Generic group \"%s\" appeared, handle %p, owner %p", group_name, group_handle, synth_ptr->owner_object_ptr);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED],
     0,
+    NULL,//synth_ptr->owner_object_ptr,
     group_name,
     group_handle,
     &ret_obj_ptr);
