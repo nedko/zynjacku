@@ -23,14 +23,9 @@ import zynjacku
 import gtk
 import gtk.glade
 import gobject
-#import gc
 
 def on_group_added(obj, group_name, context):
     print "on_group_added() called !!!!!!!!!!!!!!!!!!"
-    #print repr(obj)
-    #print repr(group_name)
-    #print repr(context)
-    #print repr(engine)
     return obj
 
 def on_test(obj1, obj2):
@@ -72,6 +67,8 @@ class ZynjackuHost:
     def __del__(self):
         print "ZynjackuHost destructor called."
 
+        self.engine.stop_jack()
+
     def ui_run(self):
         self.engine.ui_run()
         return True
@@ -102,7 +99,6 @@ class ZynjackuHostMulti(ZynjackuHost):
             else:
                 self.synths.append(synth)
                 synth.ui_win = None
-            #del(synth)
 
         self.synths_widget = glade_xml.get_widget("treeview_synths")
 
@@ -126,8 +122,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         for synth in self.synths:
             row = False, synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
             self.store.append(row)
-            #del(row)
-            #del(synth)
 
         self.synths_widget.set_model(self.store)
 
@@ -137,21 +131,14 @@ class ZynjackuHostMulti(ZynjackuHost):
     def __del__(self):
         print "ZynjackuHostMulti destructor called."
 
-        ZynjackuHost.__del__(self)
-
         self.store.clear()
 
         for synth in self.synths:
             if synth.ui_win:
                 synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
             synth.destruct()
-            #del(synth)
 
-        #del(self.synths)
-
-        self.engine.stop_jack()
-
-        #del(self.engine)
+        ZynjackuHost.__del__(self)
 
 def main():
     glade_dir = os.path.dirname(sys.argv[0])
@@ -172,17 +159,5 @@ def main():
 
     host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
     host.run()
-    #del(host)
-
-# class test:
-#     def __init__(self):
-#         print "test constructor called."
-
-#     def __del__(self):
-#         print "test destructor called."
-
-# test = test()
 
 main()
-#print gc.get_count()
-#gc.collect()
