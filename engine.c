@@ -31,7 +31,7 @@
 #include "lv2-miditype.h"
 #include "list.h"
 #include "slv2.h"
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "dynparam.h"
 
@@ -395,7 +395,7 @@ zynjacku_engine_ui_run(
   struct zynjacku_synth * synth_ptr;
   struct zynjacku_engine * engine_ptr;
 
-  LOG_DEBUG("zynjacku_engine_ui_run() called.");
+//  LOG_DEBUG("zynjacku_engine_ui_run() called.");
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
