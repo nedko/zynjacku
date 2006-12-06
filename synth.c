@@ -43,7 +43,8 @@
 
 /* signals */
 #define ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED      0
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT           1
+#define ZYNJACKU_SYNTH_SIGNAL_TEST             1
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT           2
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -185,7 +186,22 @@ zynjacku_synth_class_init(
     g_signal_new(
       "group-added",            /* signal_name */
       ZYNJACKU_SYNTH_TYPE,      /* itype */
-      G_SIGNAL_RUN_FIRST |
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      2,                        /* n_params */
+      G_TYPE_STRING,
+      G_TYPE_POINTER);
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_TEST] =
+    g_signal_new(
+      "test",                   /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
       NULL,                     /* accumulator */
@@ -193,7 +209,7 @@ zynjacku_synth_class_init(
       NULL,                     /* c_marshaller */
       G_TYPE_NONE,              /* return type */
       1,                        /* n_params */
-      G_TYPE_STRING);
+      G_TYPE_OBJECT);
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
@@ -674,6 +690,7 @@ dynparam_generic_group_appeared(
 {
 /*   char * name; */
   struct zynjacku_synth * synth_ptr;
+  GObject * ret_obj_ptr;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
 
@@ -686,14 +703,29 @@ dynparam_generic_group_appeared(
   }
 */
 
-  LOG_NOTICE("Generic group \"%s\" appeared", group_name);
+  LOG_NOTICE("Generic group \"%s\" appeared, handle %p", group_name, group_handle);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED],
     0,
-    group_name);
+    group_name,
+    group_handle,
+    &ret_obj_ptr);
+
+  if (ret_obj_ptr != NULL)
+  {
+    g_object_unref(ret_obj_ptr);
+  }
 
 /* exit: */
   *group_ui_context = NULL;
 }
+
+#if 0
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_TEST],
+    0,
+    ret_obj_ptr);
+#endif
