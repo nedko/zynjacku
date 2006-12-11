@@ -25,6 +25,8 @@ import gtk.glade
 import gobject
 import gc
 
+group_shadow = gtk.SHADOW_ETCHED_OUT
+
 class ZynjackuHost:
     def __init__(self, client_name):
         print "ZynjackuHost constructor called."
@@ -50,19 +52,24 @@ class ZynjackuHost:
         gobject.source_remove(ui_run_callback_id)
 
     def create_synth_window(self, synth):
-        ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        ui_win.set_title(synth.get_name())
-        ui_win.set_role("zynjacku_synth_ui")
-        return ui_win
+        synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        synth.ui_win.set_title(synth.get_name())
+        synth.ui_win.set_role("zynjacku_synth_ui")
 
     def on_group_added(self, synth, parent, group_name, context):
-        print "on_group_added() called !!!!!!!!!!!!!!!!!!"
+        print "-------------- Group added"
         print "synth: %s" % repr(synth)
         print "parent: %s" % repr(parent)
         print "group_name: %s" % group_name
         print "context: %s" % repr(context)
-        #return ZynjackuTestPyObject()
-        return ZynjackuTestPyDerivedObject()
+
+        if not parent:
+            top_frame = gtk.Frame(group_name)
+            synth.ui_win.add(top_frame)
+            top_frame.set_shadow_type(group_shadow)
+            return top_frame
+
+        return None
 
     def on_test(obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
@@ -140,7 +147,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         row[0] = False
 
     def create_synth_window(self, synth, row):
-        synth.ui_win = ZynjackuHost.create_synth_window(self, synth)
+        ZynjackuHost.create_synth_window(self, synth)
         synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
 
     def on_ui_visible_toggled(self, cell, path, model):
@@ -161,20 +168,26 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.__init__(self, client_name)
 
         self.synth = zynjacku.Synth(uri=uri)
-        self.synth.connect("group-added", self.on_group_added)
-        self.synth.connect("test", self.on_test)
         if not self.synth.construct(self.engine):
             print"Failed to construct %s" % uri
             del(self.synth)
             self.synth = None
         else:
-            self.ui_win = ZynjackuHost.create_synth_window(self, self.synth)
+            ZynjackuHost.create_synth_window(self, self.synth)
 
     def run(self):
         if (self.synth):
+            group_added_connect_id = self.synth.connect("group-added", self.on_group_added)
+            test_connect_id =self.synth.connect("test", self.on_test)
             self.synth.ui_on()
-            self.ui_win.show_all()
-            self.ui_win.connect("destroy", gtk.main_quit)
+            self.synth.ui_win.show_all()
+            self.synth.ui_win.connect("destroy", gtk.main_quit)
+
+        ZynjackuHost.run(self)
+
+        if (self.synth):
+            self.synth.disconnect(group_added_connect_id)
+            self.synth.disconnect(test_connect_id)
 
     def __del__(self):
         print "ZynjackuHostOne destructor called."
