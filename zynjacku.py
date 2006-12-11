@@ -78,11 +78,12 @@ class ZynjackuHost:
 
         return frame
 
-    def on_bool_appeared(self, synth, parent, name, context):
+    def on_bool_appeared(self, synth, parent, name, value, context):
         print "-------------- Bool appeared"
         print "synth: %s" % repr(synth)
         print "parent: %s" % repr(parent)
         print "name: %s" % name
+        print "value: %s" % repr(value)
         print "context: %s" % repr(context)
 
         widget = gtk.ToggleButton(name)

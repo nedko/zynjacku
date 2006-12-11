@@ -161,7 +161,7 @@ lv2dynparam_host_notify_parameter_appeared(
       instance_ptr->instance_ui_context,
       parameter_ptr->group_ptr->ui_context,
       parameter_ptr->name,
-      FALSE,
+      parameter_ptr->value.boolean,
       &parameter_ptr->ui_context);
   }
 
@@ -193,6 +193,7 @@ lv2dynparam_host_notify(
   list_for_each(node_ptr, &group_ptr->child_params)
   {
     parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
+    //LOG_DEBUG("host notify - parameter");
 
     if (!parameter_ptr->gui_referenced)
     {
@@ -416,6 +417,7 @@ lv2dynparam_host_parameter_appear(
   }
 
   param_ptr->param_handle = parameter;
+  param_ptr->gui_referenced = FALSE;
 
   if (!instance_ptr->callbacks_ptr->parameter_get_name(
         param_ptr->param_handle,
@@ -441,6 +443,35 @@ lv2dynparam_host_parameter_appear(
 
   lv2dynparam_host_map_type_uri(param_ptr);
 
+  instance_ptr->callbacks_ptr->parameter_get_value(
+    parameter,
+    &param_ptr->value_ptr);
+
+  if (param_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_FLOAT ||
+      param_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_INT ||
+      param_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_NOTE)
+  {
+    /* ranged type */
+    instance_ptr->callbacks_ptr->parameter_get_range(
+      parameter,
+      &param_ptr->min_ptr,
+      &param_ptr->max_ptr);
+  }
+  else
+  {
+    /* unranged type, range predefined or not applicable */
+    param_ptr->min_ptr = NULL;
+    param_ptr->max_ptr = NULL;
+  }
+
+  /* read current value */
+  if (param_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN)
+  {
+    param_ptr->value.boolean = *(unsigned char *)(param_ptr->value_ptr);
+    LOG_DEBUG("Boolean parameter with value %s", param_ptr->value.boolean ? "TRUE" : "FALSE");
+  }
+
+  /* Add parameter as child of its group */
   param_ptr->group_ptr = group_ptr;
   list_add_tail(&param_ptr->siblings, &group_ptr->child_params);
 

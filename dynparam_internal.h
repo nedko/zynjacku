@@ -70,6 +70,15 @@ struct lv2dynparam_host_parameter
   char type_uri[LV2DYNPARAM_MAX_STRING_SIZE];
   unsigned int type;
 
+  void * value_ptr;
+  void * min_ptr;
+  void * max_ptr;
+
+  union
+  {
+    BOOL boolean;
+  } value;
+
   BOOL gui_referenced;
   void * ui_context;
 };

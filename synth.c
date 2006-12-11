@@ -224,9 +224,10 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      3,                        /* n_params */
+      4,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
+      G_TYPE_BOOLEAN,           /* value */
       G_TYPE_POINTER);          /* context */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
@@ -738,7 +739,11 @@ dynparam_parameter_boolean_appeared(
 {
   GObject * ret_obj_ptr;
 
-  LOG_NOTICE("Boolean parameter \"%s\" appeared, handle %p", parameter_name, parameter_handle);
+  LOG_NOTICE(
+    "Boolean parameter \"%s\" appeared, value %s, handle %p",
+    parameter_name,
+    value ? "TRUE" : "FALSE",
+    parameter_handle);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
@@ -746,6 +751,7 @@ dynparam_parameter_boolean_appeared(
     0,
     group_ui_context,
     parameter_name,
+    (gboolean)value,
     parameter_handle,
     &ret_obj_ptr);
 
