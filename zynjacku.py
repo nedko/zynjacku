@@ -63,24 +63,34 @@ class ZynjackuHost:
         print "group_name: %s" % group_name
         print "context: %s" % repr(context)
 
-        if not parent:
-            top_frame = gtk.Frame(group_name)
-            synth.ui_win.add(top_frame)
-            top_frame.set_shadow_type(group_shadow)
-            return top_frame
+        frame = gtk.Frame(group_name)
+        frame.set_shadow_type(group_shadow)
 
-        return None
+        frame.vbox = gtk.VBox()
+        frame.hbox = gtk.HBox()
+        frame.vbox.add(frame.hbox)
+        frame.add(frame.vbox)
 
-    def on_bool_appeared(self, synth, parent, group_name, context):
+        if parent:
+            parent.vbox.add(frame)
+        else:
+            synth.ui_win.add(frame)
+
+        return frame
+
+    def on_bool_appeared(self, synth, parent, name, context):
         print "-------------- Bool appeared"
         print "synth: %s" % repr(synth)
         print "parent: %s" % repr(parent)
-        print "name: %s" % group_name
+        print "name: %s" % name
         print "context: %s" % repr(context)
 
-        return None
+        widget = gtk.CheckButton(name)
+        parent.hbox.add(widget)
 
-    def on_test(obj1, obj2):
+        return widget
+
+    def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
         print repr(obj2)
@@ -230,26 +240,5 @@ def main():
     else:
         host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
     host.run()
-
-class ZynjackuTestPyObject(gobject.GObject):
-    def __init__(self):
-        print "ZynjackuTestPyObject constructor called."
-        gobject.GObject.__init__(self)
-
-    def __del__(self):
-        print "ZynjackuTestPyObject destructor called."
-        gobject.GObject.__del__(self)
-
-class ZynjackuTestPyDerivedObject(ZynjackuTestPyObject):
-    def __init__(self):
-        print "ZynjackuTestPyDerivedObject constructor called."
-        ZynjackuTestPyObject.__init__(self)
-
-    def __del__(self):
-        print "ZynjackuTestPyDerivedObject destructor called."
-        ZynjackuTestPyObject.__del__(self)
-
-gobject.type_register(ZynjackuTestPyObject)
-gobject.type_register(ZynjackuTestPyDerivedObject)
 
 main()
