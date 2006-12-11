@@ -85,7 +85,7 @@ class ZynjackuHost:
         print "name: %s" % name
         print "context: %s" % repr(context)
 
-        widget = gtk.CheckButton(name)
+        widget = gtk.ToggleButton(name)
         parent.hbox.add(widget)
 
         return widget
