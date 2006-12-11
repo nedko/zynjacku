@@ -42,7 +42,7 @@
 #include "zynjacku.h"
 
 /* signals */
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED      0
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED   0
 #define ZYNJACKU_SYNTH_SIGNAL_TEST             1
 #define ZYNJACKU_SYNTH_SIGNALS_COUNT           2
 
@@ -182,9 +182,9 @@ zynjacku_synth_class_init(
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_synth));
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED] =
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED] =
     g_signal_new(
-      "group-added",            /* signal_name */
+      "group-appeared",         /* signal_name */
       ZYNJACKU_SYNTH_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
@@ -698,7 +698,7 @@ dynparam_generic_group_appeared(
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED],
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED],
     0,
     parent_group_ui_context,
     group_name,

@@ -56,8 +56,8 @@ class ZynjackuHost:
         synth.ui_win.set_title(synth.get_name())
         synth.ui_win.set_role("zynjacku_synth_ui")
 
-    def on_group_added(self, synth, parent, group_name, context):
-        print "-------------- Group added"
+    def on_group_appeared(self, synth, parent, group_name, context):
+        print "-------------- Group appeared"
         print "synth: %s" % repr(synth)
         print "parent: %s" % repr(parent)
         print "group_name: %s" % group_name
@@ -89,7 +89,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         for uri in uris:
             print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
-            synth.connect("group-added", self.on_group_added)
+            synth.connect("group-appeared", self.on_group_appeared)
             if not synth.construct(self.engine):
                 print"Failed to construct %s" % uri
             else:
@@ -177,7 +177,7 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def run(self):
         if (self.synth):
-            group_added_connect_id = self.synth.connect("group-added", self.on_group_added)
+            group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
             test_connect_id =self.synth.connect("test", self.on_test)
             self.synth.ui_on()
             self.synth.ui_win.show_all()
@@ -186,7 +186,7 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.run(self)
 
         if (self.synth):
-            self.synth.disconnect(group_added_connect_id)
+            self.synth.disconnect(group_appeared_connect_id)
             self.synth.disconnect(test_connect_id)
 
     def __del__(self):
