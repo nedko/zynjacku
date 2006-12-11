@@ -23,25 +23,12 @@ import zynjacku
 import gtk
 import gtk.glade
 import gobject
+import gc
 
-the_host = None
-
-def on_group_added(synth, parent, group_name, context):
-    print "on_group_added() called !!!!!!!!!!!!!!!!!!"
-    print "synth: %s" % repr(synth)
-    print "parent: %s" % repr(parent)
-    print "group_name: %s" % group_name
-    print "context: %s" % repr(context)
-    return the_host
-
-def on_test(obj1, obj2):
-    print "on_test() called !!!!!!!!!!!!!!!!!!"
-    print repr(obj1)
-    print repr(obj2)
-
-class ZynjackuHost(gobject.GObject):
+class ZynjackuHost:
     def __init__(self, client_name):
         print "ZynjackuHost constructor called."
+
         self.engine = zynjacku.Engine()
 
         if not self.engine.start_jack(client_name):
@@ -68,6 +55,20 @@ class ZynjackuHost(gobject.GObject):
         ui_win.set_role("zynjacku_synth_ui")
         return ui_win
 
+    def on_group_added(self, synth, parent, group_name, context):
+        print "on_group_added() called !!!!!!!!!!!!!!!!!!"
+        print "synth: %s" % repr(synth)
+        print "parent: %s" % repr(parent)
+        print "group_name: %s" % group_name
+        print "context: %s" % repr(context)
+        #return ZynjackuTestPyObject()
+        return ZynjackuTestPyDerivedObject()
+
+    def on_test(obj1, obj2):
+        print "on_test() called !!!!!!!!!!!!!!!!!!"
+        print repr(obj1)
+        print repr(obj2)
+
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
         print "ZynjackuHostMulti constructor called."
@@ -81,7 +82,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         for uri in uris:
             print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
-            synth.connect("group-added", on_group_added)
+            synth.connect("group-added", self.on_group_added)
             if not synth.construct(self.engine):
                 print"Failed to construct %s" % uri
             else:
@@ -160,8 +161,8 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.__init__(self, client_name)
 
         self.synth = zynjacku.Synth(uri=uri)
-        self.synth.connect("group-added", on_group_added)
-        self.synth.connect("test", on_test)
+        self.synth.connect("group-added", self.on_group_added)
+        self.synth.connect("test", self.on_test)
         if not self.synth.construct(self.engine):
             print"Failed to construct %s" % uri
             del(self.synth)
@@ -204,7 +205,27 @@ def main():
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
     else:
         host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
-    the_host = host
     host.run()
+
+class ZynjackuTestPyObject(gobject.GObject):
+    def __init__(self):
+        print "ZynjackuTestPyObject constructor called."
+        gobject.GObject.__init__(self)
+
+    def __del__(self):
+        print "ZynjackuTestPyObject destructor called."
+        gobject.GObject.__del__(self)
+
+class ZynjackuTestPyDerivedObject(ZynjackuTestPyObject):
+    def __init__(self):
+        print "ZynjackuTestPyDerivedObject constructor called."
+        ZynjackuTestPyObject.__init__(self)
+
+    def __del__(self):
+        print "ZynjackuTestPyDerivedObject destructor called."
+        ZynjackuTestPyObject.__del__(self)
+
+gobject.type_register(ZynjackuTestPyObject)
+gobject.type_register(ZynjackuTestPyDerivedObject)
 
 main()
