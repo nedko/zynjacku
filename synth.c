@@ -42,9 +42,10 @@
 #include "zynjacku.h"
 
 /* signals */
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED   0
-#define ZYNJACKU_SYNTH_SIGNAL_TEST             1
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT           2
+#define ZYNJACKU_SYNTH_SIGNAL_TEST             0
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED   1
+#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED    2
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT           3
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -182,22 +183,6 @@ zynjacku_synth_class_init(
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_synth));
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED] =
-    g_signal_new(
-      "group-appeared",         /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_OBJECT,            /* return type */
-      3,                        /* n_params */
-      G_TYPE_OBJECT,
-      G_TYPE_STRING,
-      G_TYPE_POINTER);
-
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_TEST] =
     g_signal_new(
       "test",                   /* signal_name */
@@ -211,6 +196,38 @@ zynjacku_synth_class_init(
       G_TYPE_NONE,              /* return type */
       1,                        /* n_params */
       G_TYPE_OBJECT);
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED] =
+    g_signal_new(
+      "group-appeared",         /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      3,                        /* n_params */
+      G_TYPE_OBJECT,            /* parent */
+      G_TYPE_STRING,            /* group name */
+      G_TYPE_POINTER);          /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED] =
+    g_signal_new(
+      "bool-appeared",         /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      3,                        /* n_params */
+      G_TYPE_OBJECT,            /* parent */
+      G_TYPE_STRING,            /* parameter name */
+      G_TYPE_POINTER);          /* context */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
@@ -705,12 +722,7 @@ dynparam_generic_group_appeared(
     group_handle,
     &ret_obj_ptr);
 
-  LOG_NOTICE("signal returned object ptr is %p", ret_obj_ptr);
-
-/*   if (ret_obj_ptr != NULL) */
-/*   { */
-/*     g_object_unref(ret_obj_ptr); */
-/*   } */
+  LOG_NOTICE("group-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   *group_ui_context = ret_obj_ptr;
 }
@@ -724,14 +736,20 @@ dynparam_parameter_boolean_appeared(
   BOOL value,
   void ** parameter_ui_context)
 {
-  LOG_NOTICE("Boolean parameter \"%s\" appeared, handle %p", parameter_name, parameter_handle);
-  *parameter_ui_context = NULL;
-}
+  GObject * ret_obj_ptr;
 
-#if 0
+  LOG_NOTICE("Boolean parameter \"%s\" appeared, handle %p", parameter_name, parameter_handle);
+
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_TEST],
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED],
     0,
-    ret_obj_ptr);
-#endif
+    group_ui_context,
+    parameter_name,
+    parameter_handle,
+    &ret_obj_ptr);
+
+  LOG_NOTICE("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  *parameter_ui_context = ret_obj_ptr;
+}

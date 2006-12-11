@@ -71,6 +71,15 @@ class ZynjackuHost:
 
         return None
 
+    def on_bool_appeared(self, synth, parent, group_name, context):
+        print "-------------- Bool appeared"
+        print "synth: %s" % repr(synth)
+        print "parent: %s" % repr(parent)
+        print "name: %s" % group_name
+        print "context: %s" % repr(context)
+
+        return None
+
     def on_test(obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
@@ -177,8 +186,9 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def run(self):
         if (self.synth):
-            group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
             test_connect_id =self.synth.connect("test", self.on_test)
+            group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
+            bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
             self.synth.ui_on()
             self.synth.ui_win.show_all()
             self.synth.ui_win.connect("destroy", gtk.main_quit)
@@ -186,6 +196,7 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.run(self)
 
         if (self.synth):
+            self.synth.disconnect(bool_appeared_connect_id)
             self.synth.disconnect(group_appeared_connect_id)
             self.synth.disconnect(test_connect_id)
 
