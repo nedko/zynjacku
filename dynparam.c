@@ -517,3 +517,14 @@ lv2dynparam_host_command_disappear(
   void * command_host_context)
 {
 }
+
+#define parameter_ptr ((struct lv2dynparam_host_parameter *)parameter_handle)
+
+void
+dynparam_parameter_boolean_change(
+  lv2dynparam_host_instance instance,
+  lv2dynparam_host_parameter parameter_handle,
+  BOOL value)
+{
+  LOG_DEBUG("\"%s\" changed to \"%s\"", parameter_ptr->name, value ? "TRUE" : "FALSE");
+}

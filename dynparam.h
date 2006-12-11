@@ -118,8 +118,14 @@ dynparam_parameter_boolean_appeared(
 void
 dynparam_parameter_boolean_changed(
   void * instance_ui_context,
-  void * group_ui_context,
   void * parameter_ui_context,
+  BOOL value);
+
+/* called from ui thread, to change boolean parameter value */
+void
+dynparam_parameter_boolean_change(
+  lv2dynparam_host_instance instance,
+  lv2dynparam_host_parameter parameter_handle,
   BOOL value);
 
 #endif /* #ifndef DYNPARAM_H__5090F477_0BE7_439F_BF1D_F2EB78822760__INCLUDED */

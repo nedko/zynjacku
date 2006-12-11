@@ -797,8 +797,16 @@ zynjacku_synth_bool_set(
   gboolean value)
 {
   void * context;
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
   context = zynjacku_synth_context_from_string(string_context);
 
   LOG_DEBUG("zynjacku_synth_bool_set() called, context %p", context);
+
+  dynparam_parameter_boolean_change(
+    synth_ptr->dynparams,
+    (lv2dynparam_host_parameter)context,
+    value);
 }
