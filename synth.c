@@ -52,6 +52,36 @@
 
 static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
 
+gchar *
+zynjacku_synth_context_to_string(
+  void * void_context)
+{
+  static gchar string_context[100];
+
+  sprintf(string_context, "%p", void_context);
+
+  LOG_ERROR("Context %p converted to \"%s\"", void_context, string_context);
+
+  return string_context;
+}
+
+void *
+zynjacku_synth_context_from_string(
+  gchar * string_context)
+{
+  void * void_context;
+
+  if (sscanf(string_context, "%p", &void_context) != 1)
+  {
+    LOG_ERROR("Cannot convert string context \"%s\" to void pointer context", string_context);
+    return NULL;
+  }
+
+  LOG_ERROR("String context \"%s\" converted to %p", string_context, void_context);
+
+  return void_context;
+}
+
 static void
 zynjacku_synth_dispose(GObject * obj)
 {
@@ -211,7 +241,7 @@ zynjacku_synth_class_init(
       3,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* group name */
-      G_TYPE_POINTER);          /* context */
+      G_TYPE_STRING);           /* context */
 
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED] =
     g_signal_new(
@@ -228,7 +258,7 @@ zynjacku_synth_class_init(
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
       G_TYPE_BOOLEAN,           /* value */
-      G_TYPE_POINTER);          /* context */
+      G_TYPE_STRING);           /* context */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
@@ -720,7 +750,7 @@ dynparam_generic_group_appeared(
     0,
     parent_group_ui_context,
     group_name,
-    group_handle,
+    zynjacku_synth_context_to_string(group_handle),
     &ret_obj_ptr);
 
   LOG_NOTICE("group-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -752,10 +782,23 @@ dynparam_parameter_boolean_appeared(
     group_ui_context,
     parameter_name,
     (gboolean)value,
-    parameter_handle,
+    zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_NOTICE("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   *parameter_ui_context = ret_obj_ptr;
+}
+
+void
+zynjacku_synth_bool_set(
+  ZynjackuSynth * synth_obj_ptr,
+  gchar * string_context,
+  gboolean value)
+{
+  void * context;
+
+  context = zynjacku_synth_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_synth_bool_set() called, context %p", context);
 }

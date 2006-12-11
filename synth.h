@@ -80,6 +80,12 @@ void
 zynjacku_synth_ui_off(
   ZynjackuSynth * obj_ptr);
 
+void
+zynjacku_synth_bool_set(
+  ZynjackuSynth * obj_ptr,
+  gchar * context,
+  gboolean value);
+
 G_END_DECLS
 
 #endif /* #ifndef SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */

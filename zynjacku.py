@@ -76,6 +76,7 @@ class ZynjackuHost:
         else:
             synth.ui_win.add(frame)
 
+        frame.context = context
         return frame
 
     def on_bool_appeared(self, synth, parent, name, value, context):
@@ -87,14 +88,20 @@ class ZynjackuHost:
         print "context: %s" % repr(context)
 
         widget = gtk.ToggleButton(name)
+        widget.changed_connect_id  = widget.connect("toggled", self.on_bool_toggled, synth)
         parent.hbox.add(widget)
 
+        widget.context = context
         return widget
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
         print repr(obj2)
+
+    def on_bool_toggled(self, widget, synth):
+        print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
+        synth.bool_set(widget.context, widget.get_active())
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
