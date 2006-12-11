@@ -26,10 +26,10 @@ import gobject
 
 the_host = None
 
-def on_group_added(synth, host, group_name, context):
+def on_group_added(synth, parent, group_name, context):
     print "on_group_added() called !!!!!!!!!!!!!!!!!!"
     print "synth: %s" % repr(synth)
-    print "host: %s" % repr(host)
+    print "parent: %s" % repr(parent)
     print "group_name: %s" % group_name
     print "context: %s" % repr(context)
     return the_host
@@ -150,7 +150,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         else:
             if not model[path][4].ui_win:
                 self.create_synth_window(model[path][4], model[path])
-            model[path][4].ui_on(self)
+            model[path][4].ui_on()
             model[path][4].ui_win.show_all()
             model[path][0] = True
 
@@ -171,7 +171,7 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def run(self):
         if (self.synth):
-            self.synth.ui_on(self)
+            self.synth.ui_on()
             self.ui_win.show_all()
             self.ui_win.connect("destroy", gtk.main_quit)
 
