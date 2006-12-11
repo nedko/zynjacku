@@ -110,7 +110,6 @@ dynparam_parameter_boolean_appeared(
   lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,
   void * group_ui_context,
-  lv2dynparam_host_parameter parameter,
   const char * parameter_name,
   BOOL value,
   void ** parameter_ui_context);

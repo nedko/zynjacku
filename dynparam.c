@@ -21,6 +21,7 @@
  *****************************************************************************/
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "lv2.h"
 #include "lv2dynparam.h"
@@ -31,6 +32,17 @@
 
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
+
+void
+lv2dynparam_host_map_type_uri(
+  struct lv2dynparam_host_parameter * parameter_ptr)
+{
+  if (strcmp(parameter_ptr->type_uri, LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN_URI) == 0)
+  {
+    parameter_ptr->type = LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN;
+    return;
+  }
+}
 
 static struct lv2dynparam_host_callbacks g_lv2dynparam_host_callbacks =
 {
@@ -138,12 +150,32 @@ lv2dynparam_host_notify_group_appeared(
 }
 
 void
+lv2dynparam_host_notify_parameter_appeared(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_parameter * parameter_ptr)
+{
+  if (parameter_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN)
+  {
+    dynparam_parameter_boolean_appeared(
+      parameter_ptr,
+      instance_ptr->instance_ui_context,
+      parameter_ptr->group_ptr->ui_context,
+      parameter_ptr->name,
+      FALSE,
+      &parameter_ptr->ui_context);
+  }
+
+  parameter_ptr->gui_referenced = TRUE;
+}
+
+void
 lv2dynparam_host_notify(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_group * group_ptr)
 {
   struct list_head * node_ptr;
   struct lv2dynparam_host_group * child_group_ptr;
+  struct lv2dynparam_host_parameter * parameter_ptr;
 
   list_for_each(node_ptr, &group_ptr->child_groups)
   {
@@ -155,6 +187,18 @@ lv2dynparam_host_notify(
       lv2dynparam_host_notify_group_appeared(
         instance_ptr,
         child_group_ptr);
+    }
+  }
+
+  list_for_each(node_ptr, &group_ptr->child_params)
+  {
+    parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
+
+    if (!parameter_ptr->gui_referenced)
+    {
+      lv2dynparam_host_notify_parameter_appeared(
+        instance_ptr,
+        parameter_ptr);
     }
   }
 }
@@ -185,6 +229,8 @@ lv2dynparam_host_ui_run(
   struct lv2dynparam_host_group * group_ptr;
 
   //LOG_DEBUG("lv2dynparam_host_ui_run() called.");
+
+  return;
 
   audiolock_enter_ui(instance_ptr->lock);
 
@@ -331,6 +377,8 @@ lv2dynparam_host_group_appear(
 
   list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
 
+  *group_host_context = group_ptr;
+
   return TRUE;
 
 fail_put_group:
@@ -355,8 +403,11 @@ lv2dynparam_host_parameter_appear(
   void ** parameter_host_context)
 {
   struct lv2dynparam_host_parameter * param_ptr;
+  struct lv2dynparam_host_group * group_ptr;
 
   LOG_DEBUG("Parameter appeared.");
+
+  group_ptr = (struct lv2dynparam_host_group *)group_host_context;
 
   param_ptr = lv2dynparam_get_unused_parameter();
   if (param_ptr == NULL)
@@ -388,7 +439,12 @@ lv2dynparam_host_parameter_appear(
 
   LOG_DEBUG("Parameter type is \"%s\"", param_ptr->type_uri);
 
-//  dynparam_generic_parameter_appeared(instance_ui_context, instance_ptr->root_param.name, &instance_ptr->root_param.ui_context);
+  lv2dynparam_host_map_type_uri(param_ptr);
+
+  param_ptr->group_ptr = group_ptr;
+  list_add_tail(&param_ptr->siblings, &group_ptr->child_params);
+
+  //list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
 
   return TRUE;
 

@@ -715,6 +715,19 @@ dynparam_generic_group_appeared(
   *group_ui_context = ret_obj_ptr;
 }
 
+void
+dynparam_parameter_boolean_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  const char * parameter_name,
+  BOOL value,
+  void ** parameter_ui_context)
+{
+  LOG_NOTICE("Boolean parameter \"%s\" appeared, handle %p", parameter_name, parameter_handle);
+  *parameter_ui_context = NULL;
+}
+
 #if 0
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
