@@ -24,13 +24,19 @@ import gtk
 import gtk.glade
 import gobject
 
+the_host = None
+
 def on_group_added(synth, host, group_name, context):
     print "on_group_added() called !!!!!!!!!!!!!!!!!!"
-    print repr(host)
-    return None
+    print "synth: %s" % repr(synth)
+    print "host: %s" % repr(host)
+    print "group_name: %s" % group_name
+    print "context: %s" % repr(context)
+    return the_host
 
 def on_test(obj1, obj2):
     print "on_test() called !!!!!!!!!!!!!!!!!!"
+    print repr(obj1)
     print repr(obj2)
 
 class ZynjackuHost(gobject.GObject):
@@ -76,7 +82,7 @@ class ZynjackuHostMulti(ZynjackuHost):
             print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
             synth.connect("group-added", on_group_added)
-            if not synth.construct(self, self.engine):
+            if not synth.construct(self.engine):
                 print"Failed to construct %s" % uri
             else:
                 self.synths.append(synth)
@@ -144,7 +150,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         else:
             if not model[path][4].ui_win:
                 self.create_synth_window(model[path][4], model[path])
-            model[path][4].ui_on()
+            model[path][4].ui_on(self)
             model[path][4].ui_win.show_all()
             model[path][0] = True
 
@@ -155,13 +161,17 @@ class ZynjackuHostOne(ZynjackuHost):
 
         self.synth = zynjacku.Synth(uri=uri)
         self.synth.connect("group-added", on_group_added)
-        if not self.synth.construct(self, self.engine):
+        self.synth.connect("test", on_test)
+        if not self.synth.construct(self.engine):
             print"Failed to construct %s" % uri
             del(self.synth)
             self.synth = None
         else:
             self.ui_win = ZynjackuHost.create_synth_window(self, self.synth)
-            self.synth.ui_on()
+
+    def run(self):
+        if (self.synth):
+            self.synth.ui_on(self)
             self.ui_win.show_all()
             self.ui_win.connect("destroy", gtk.main_quit)
 
@@ -194,6 +204,7 @@ def main():
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
     else:
         host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
+    the_host = host
     host.run()
 
 main()

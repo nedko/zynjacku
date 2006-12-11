@@ -301,13 +301,13 @@ zynjacku_synth_get_class_uri(
 
 void
 zynjacku_synth_ui_on(
-  ZynjackuSynth * obj_ptr)
+  ZynjackuSynth * synth_obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;
 
   LOG_DEBUG("zynjacku_synth_ui_on() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
   if (synth_ptr->dynparams)
   {
@@ -486,7 +486,6 @@ zynjacku_synth_free_ports(
 gboolean
 zynjacku_synth_construct(
   ZynjackuSynth * synth_obj_ptr,
-  GObject * owner_object_ptr,
   GObject * engine_object_ptr)
 {
   uint32_t ports_count;
@@ -505,8 +504,6 @@ zynjacku_synth_construct(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
-
-  LOG_NOTICE("OWNER %p", owner_object_ptr);
 
   if (synth_ptr->uri == NULL)
   {
@@ -646,9 +643,7 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->owner_object_ptr = owner_object_ptr;
-
-  LOG_DEBUG("Constructed synth <%s>, owner %p", slv2_plugin_get_uri(synth_ptr->plugin), synth_ptr->owner_object_ptr);
+  LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
   return TRUE;
 
@@ -694,39 +689,30 @@ dynparam_generic_group_appeared(
   const char * group_name,
   void ** group_ui_context)
 {
-/*   char * name; */
   struct zynjacku_synth * synth_ptr;
   GObject * ret_obj_ptr;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
 
-/*
-  name = slv2_plugin_get_name(synth_ptr->plugin);
-  if (name == NULL)
-  {
-    LOG_ERROR("Failed to get plugin name");
-    goto exit;
-  }
-*/
-
-  LOG_NOTICE("Generic group \"%s\" appeared, handle %p, owner %p", group_name, group_handle, synth_ptr->owner_object_ptr);
+  LOG_NOTICE("Generic group \"%s\" appeared, handle %p", group_name, group_handle);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_ADDED],
     0,
-    NULL,//synth_ptr->owner_object_ptr,
+    parent_group_ui_context,
     group_name,
     group_handle,
     &ret_obj_ptr);
 
-  if (ret_obj_ptr != NULL)
-  {
-    g_object_unref(ret_obj_ptr);
-  }
+  LOG_NOTICE("signal returned object ptr is %p", ret_obj_ptr);
 
-/* exit: */
-  *group_ui_context = NULL;
+/*   if (ret_obj_ptr != NULL) */
+/*   { */
+/*     g_object_unref(ret_obj_ptr); */
+/*   } */
+
+  *group_ui_context = ret_obj_ptr;
 }
 
 #if 0
