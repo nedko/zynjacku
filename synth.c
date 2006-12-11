@@ -52,10 +52,18 @@
 
 static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
 
+/* UGLY: We convert dynparam context poitners to string to pass them
+   as opaque types through Python. Silly, but codegen fails to create
+   marshaling code for gpointer arguments. If possible at all, it is a
+   hidden black magic. Other workaround ideas: GObject wrapper, GBoxed
+   and GValue. */
+
 gchar *
 zynjacku_synth_context_to_string(
   void * void_context)
 {
+  /* we reuse this array because we call this function only from the UI thread,
+     so there is no need to be thread safe */
   static gchar string_context[100];
 
   sprintf(string_context, "%p", void_context);
