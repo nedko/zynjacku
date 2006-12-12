@@ -181,6 +181,8 @@ lv2dynparam_host_notify(
   struct lv2dynparam_host_group * child_group_ptr;
   struct lv2dynparam_host_parameter * parameter_ptr;
 
+  LOG_DEBUG("Iterating \"%s\" groups begin", group_ptr->name);
+
   list_for_each(node_ptr, &group_ptr->child_groups)
   {
     child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
@@ -193,7 +195,14 @@ lv2dynparam_host_notify(
         instance_ptr,
         child_group_ptr);
     }
+
+    lv2dynparam_host_notify(
+      instance_ptr,
+      child_group_ptr);
   }
+
+  LOG_DEBUG("Iterating \"%s\" groups end", group_ptr->name);
+  LOG_DEBUG("Iterating \"%s\" params begin", group_ptr->name);
 
   list_for_each(node_ptr, &group_ptr->child_params)
   {
@@ -207,6 +216,8 @@ lv2dynparam_host_notify(
         parameter_ptr);
     }
   }
+
+  LOG_DEBUG("Iterating \"%s\" params end", group_ptr->name);
 }
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance)
