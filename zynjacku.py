@@ -121,19 +121,25 @@ class ZynjackuHost:
         print "context: %s" % repr(context)
 
         box = gtk.VBox()
+        box.pack_start(gtk.Label(name), False, False)
         adjustment = gtk.Adjustment(value, min, max, 1, 19)
+
+
+        hbox = gtk.HBox()
         knob = phat.Knob(adjustment)
         align = gtk.Alignment(0.5, 0.5)
         align.add(knob)
-        box.pack_start(gtk.Label(name), False, False)
-        box.pack_start(align, False, False)
-        adjustment.connect("value-changed", self.on_float_value_changed, synth)
-        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(10, 10, 10, 10)
-        align.add(box)
-        parent.box_params.pack_start(align, False, False)
+        hbox.pack_start(align, False, False)
+        hbox.pack_start(gtk.SpinButton(adjustment), False, False)
 
-        knob.context = context
+        align = gtk.Alignment(0.5, 0.5)
+        align.add(hbox)
+        box.pack_start(align, False, False)
+
+        adjustment.connect("value-changed", self.on_float_value_changed, synth)
+        parent.box_params.pack_start(box, False, False)
+
+        adjustment.context = context
         return knob
 
     def on_test(self, obj1, obj2):
