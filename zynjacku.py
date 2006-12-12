@@ -70,6 +70,7 @@ class ZynjackuHost:
         frame.hbox = gtk.HBox()
         frame.vbox.pack_start(frame.hbox, False, False)
         frame.add(frame.vbox)
+        frame.hbox.set_spacing(10)
 
         if parent:
             parent.vbox.add(frame)
@@ -94,6 +95,30 @@ class ZynjackuHost:
         widget.context = context
         return widget
 
+    def on_float_appeared(self, synth, parent, name, value, min, max, context):
+        print "-------------- Float appeared"
+        print "synth: %s" % repr(synth)
+        print "parent: %s" % repr(parent)
+        print "name: %s" % name
+        print "value: %s" % repr(value)
+        print "value: %s" % repr(min)
+        print "value: %s" % repr(max)
+        print "context: %s" % repr(context)
+
+        vbox = gtk.VBox()
+        spinbutton = gtk.SpinButton()
+        spinbutton.set_range(min, max)
+        spinbutton.set_value(value)
+        spinbutton.set_increments(1, 10)
+        vbox.pack_start(spinbutton, False, False)
+        label = gtk.Label(name)
+        vbox.pack_start(label, False, False)
+        spinbutton.changed_connect_id  = spinbutton.connect("value-changed", self.on_float_value_changed, synth)
+        parent.hbox.pack_start(vbox, False, False)
+
+        spinbutton.context = context
+        return spinbutton
+
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
@@ -102,6 +127,10 @@ class ZynjackuHost:
     def on_bool_toggled(self, widget, synth):
         print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
         synth.bool_set(widget.context, widget.get_active())
+
+    def on_float_value_changed(self, widget, synth):
+        print "Float changed. ... set to %f" % widget.get_value()
+        synth.float_set(widget.context, widget.get_value())
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
@@ -207,6 +236,7 @@ class ZynjackuHostOne(ZynjackuHost):
             test_connect_id =self.synth.connect("test", self.on_test)
             group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
             bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
+            float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
             self.synth.ui_on()
             self.synth.ui_win.show_all()
             self.synth.ui_win.connect("destroy", gtk.main_quit)
@@ -214,6 +244,7 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.run(self)
 
         if (self.synth):
+            self.synth.disconnect(float_appeared_connect_id)
             self.synth.disconnect(bool_appeared_connect_id)
             self.synth.disconnect(group_appeared_connect_id)
             self.synth.disconnect(test_connect_id)
