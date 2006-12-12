@@ -128,6 +128,8 @@ lv2dynparam_host_notify_group_appeared(
 {
   void * parent_group_ui_context;
 
+  LOG_DEBUG("lv2dynparam_host_notify_group_appeared() called.");
+
   if (group_ptr->parent_group_ptr)
   {
     parent_group_ui_context = group_ptr->parent_group_ptr->ui_context;
@@ -182,8 +184,9 @@ lv2dynparam_host_notify(
   list_for_each(node_ptr, &group_ptr->child_groups)
   {
     child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
+    LOG_DEBUG("host notify - group \"%s\"", child_group_ptr->name);
 
-    if (!group_ptr->gui_referenced)
+    if (!child_group_ptr->gui_referenced)
     {
       /* UI knows nothing about this group - notify it */
       lv2dynparam_host_notify_group_appeared(
@@ -195,7 +198,7 @@ lv2dynparam_host_notify(
   list_for_each(node_ptr, &group_ptr->child_params)
   {
     parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
-    //LOG_DEBUG("host notify - parameter");
+    LOG_DEBUG("host notify - parameter");
 
     if (!parameter_ptr->gui_referenced)
     {
