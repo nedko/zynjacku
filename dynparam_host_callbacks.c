@@ -96,10 +96,12 @@ lv2dynparam_host_group_appear(
 
   if (parent_group_ptr == NULL)
   {
+    LOG_DEBUG("The top level group.");
     instance_ptr->root_group_ptr = group_ptr;
   }
   else
   {
+    LOG_DEBUG("Parent is \"%s\".", parent_group_ptr->name);
     list_add_tail(&group_ptr->siblings, &parent_group_ptr->child_groups);
   }
 
@@ -139,6 +141,8 @@ lv2dynparam_host_parameter_appear(
   LOG_DEBUG("Parameter appeared.");
 
   group_ptr = (struct lv2dynparam_host_group *)group_host_context;
+
+  LOG_DEBUG("Parent is \"%s\".", group_ptr->name);
 
   param_ptr = lv2dynparam_get_unused_parameter();
   if (param_ptr == NULL)
