@@ -25,43 +25,43 @@
 #ifndef DYNPARAM_HOST_CALLBACKS_H__17AEA0D2_0207_478E_AF6F_9719018DEFB6__INCLUDED
 #define DYNPARAM_HOST_CALLBACKS_H__17AEA0D2_0207_478E_AF6F_9719018DEFB6__INCLUDED
 
-BOOL
+unsigned char
 lv2dynparam_host_group_appear(
   void * instance_host_context,
   void * parent_group_host_context,
   lv2dynparam_group_handle group,
   void ** host_context);
 
-void
+unsigned char
 lv2dynparam_host_group_disappear(
   void * instance_host_context,
   void * group_host_context);
 
-BOOL
+unsigned char
 lv2dynparam_host_parameter_appear(
   void * instance_host_context,
   void * group_host_context,
   lv2dynparam_parameter_handle parameter,
   void ** parameter_host_context);
 
-void
+unsigned char
 lv2dynparam_host_parameter_disappear(
   void * instance_host_context,
   void * parameter_host_context);
 
-void
+unsigned char
 lv2dynparam_host_parameter_change(
   void * instance_host_context,
   void * parameter_host_context);
 
-BOOL
+unsigned char
 lv2dynparam_host_command_appear(
   void * instance_host_context,
   void * group_host_context,
   lv2dynparam_command_handle command,
   void ** command_context);
 
-void
+unsigned char
 lv2dynparam_host_command_disappear(
   void * instance_host_context,
   void * command_host_context);

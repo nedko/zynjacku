@@ -38,7 +38,7 @@
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance_host_context)
 
-BOOL
+unsigned char
 lv2dynparam_host_group_appear(
   void * instance_host_context,
   void * parent_group_host_context,
@@ -104,7 +104,7 @@ lv2dynparam_host_group_appear(
   }
 
   message_ptr->message_type = LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR;
-  message_ptr->context.group_ptr = group_ptr;
+  message_ptr->context.group = group_ptr;
   list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
 
   *group_host_context = group_ptr;
@@ -118,14 +118,15 @@ fail:
   return FALSE;
 }
 
-void
+unsigned char
 lv2dynparam_host_group_disappear(
   void * instance_host_context,
   void * group_host_context)
 {
+  return TRUE;
 }
 
-BOOL
+unsigned char
 lv2dynparam_host_parameter_appear(
   void * instance_host_context,
   void * group_host_context,
@@ -215,21 +216,23 @@ fail:
   return FALSE;
 }
 
-void
+unsigned char
 lv2dynparam_host_parameter_disappear(
   void * instance_host_context,
   void * parameter_host_context)
 {
+  return TRUE;
 }
 
-void
+unsigned char
 lv2dynparam_host_parameter_change(
   void * instance_host_context,
   void * parameter_host_context)
 {
+  return TRUE;
 }
 
-BOOL
+unsigned char
 lv2dynparam_host_command_appear(
   void * instance_host_context,
   void * group_host_context,
@@ -240,9 +243,10 @@ lv2dynparam_host_command_appear(
   return FALSE;                 /* not implemented */
 }
 
-void
+unsigned char
 lv2dynparam_host_command_disappear(
   void * instance_host_context,
   void * command_host_context)
 {
+  return TRUE;
 }
