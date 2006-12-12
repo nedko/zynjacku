@@ -63,26 +63,34 @@ class ZynjackuHost:
         print "group_name: %s" % group_name
         print "context: %s" % repr(context)
 
-        frame = gtk.Frame(group_name)
-        frame.set_shadow_type(group_shadow)
+        if parent:
+            frame = gtk.Frame(group_name)
+            frame.set_shadow_type(group_shadow)
+            group = frame
+        else:
+            scrolled_window = gtk.ScrolledWindow()
+            scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            group = scrolled_window
 
-        frame.box_params = gtk.VBox()
-        frame.box_top = gtk.HBox()
-        frame.box_top.pack_start(frame.box_params, False, False)
-        frame.add(frame.box_top)
-        #frame.box_top.set_spacing(10)
-
-        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(3, 10, 10, 10)
-        align.add(frame)
+        group.box_params = gtk.VBox()
+        group.box_top = gtk.HBox()
+        group.box_top.pack_start(group.box_params, False, False)
 
         if parent:
-            parent.box_top.pack_start(align, True, True)
-        else:
-            synth.ui_win.add(align)
+           frame.add(frame.box_top)
+           frame.set_label_align(0.5, 0.5)
+           #frame.box_top.set_spacing(0)
 
-        frame.context = context
-        return frame
+           align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+           align.set_padding(3, 10, 10, 10)
+           align.add(frame)
+           parent.box_top.pack_start(align)
+        else:
+            scrolled_window.add_with_viewport(group.box_top)
+            synth.ui_win.add(scrolled_window)
+
+        group.context = context
+        return group
 
     def on_bool_appeared(self, synth, parent, name, value, context):
         print "-------------- Bool appeared"
