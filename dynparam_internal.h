@@ -102,9 +102,9 @@ struct lv2dynparam_host_message
 
   union
   {
-    struct lv2dynparam_host_group * group_ptr;
-    struct lv2dynparam_host_parameter * parameter_ptr;
-    struct lv2dynparam_host_command * command_ptr;
+    struct lv2dynparam_host_group * group;
+    struct lv2dynparam_host_parameter * parameter;
+    struct lv2dynparam_host_command * command;
   } context;
 };
 

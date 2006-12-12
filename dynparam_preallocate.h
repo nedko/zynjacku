@@ -40,8 +40,15 @@ void
 lv2dynparam_put_unused_parameter(
   struct lv2dynparam_host_parameter * parameter_ptr);
 
+/* return preallocated message struct */
+/* realtime safe */
 struct lv2dynparam_host_message *
 lv2dynparam_get_unused_message();
+
+/* return message struct, always. */
+/* may block, not realtime safe */
+struct lv2dynparam_host_message *
+lv2dynparam_get_unused_message_may_block();
 
 void
 lv2dynparam_put_unused_message(

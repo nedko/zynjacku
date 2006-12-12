@@ -214,6 +214,7 @@ lv2dynparam_host_realtime_run(
 {
   struct list_head * node_ptr;
   struct lv2dynparam_host_message * message_ptr;
+  struct lv2dynparam_host_parameter * parameter_ptr;
 
   if (!audiolock_enter_audio(instance_ptr->lock))
   {
@@ -226,6 +227,28 @@ lv2dynparam_host_realtime_run(
     node_ptr = instance_ptr->ui_to_realtime_queue.next;
     list_del(node_ptr);
     message_ptr = list_entry(node_ptr, struct lv2dynparam_host_message, siblings);
+
+    switch (message_ptr->message_type)
+    {
+    case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE:
+      parameter_ptr = message_ptr->context.parameter;
+
+      switch (parameter_ptr->type)
+      {
+      case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+        *((unsigned char *)parameter_ptr->value_ptr) = parameter_ptr->value.boolean ? 1 : 0;
+        break;
+      default:
+        LOG_ERROR("Parameter change for parameter of unknown type %u received", message_ptr->message_type);
+      }
+
+      instance_ptr->callbacks_ptr->parameter_change(parameter_ptr->param_handle);
+      break;
+    default:
+       LOG_ERROR("Message of unknown type %u received", message_ptr->message_type);
+     }
+
+    lv2dynparam_put_unused_message(message_ptr);
   }
 
   audiolock_leave_audio(instance_ptr->lock);
@@ -258,7 +281,7 @@ lv2dynparam_host_ui_run(
       case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR:
         lv2dynparam_host_notify_group_appeared(
           instance_ptr,
-          message_ptr->context.group_ptr);
+          message_ptr->context.group);
 
         group_ptr->gui_referenced = TRUE;
 
@@ -318,8 +341,6 @@ lv2dynparam_host_ui_off(
   audiolock_leave_ui(instance_ptr->lock);
 }
 
-#undef instance_ptr
-
 #define parameter_ptr ((struct lv2dynparam_host_parameter *)parameter_handle)
 
 void
@@ -328,5 +349,21 @@ dynparam_parameter_boolean_change(
   lv2dynparam_host_parameter parameter_handle,
   BOOL value)
 {
+  struct lv2dynparam_host_message * message_ptr;
+
+  audiolock_enter_ui(instance_ptr->lock);
+
   LOG_DEBUG("\"%s\" changed to \"%s\"", parameter_ptr->name, value ? "TRUE" : "FALSE");
+
+  message_ptr = lv2dynparam_get_unused_message_may_block();
+
+  parameter_ptr->value.boolean = value;
+
+  message_ptr->message_type = LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE;
+
+  message_ptr->context.parameter = parameter_ptr;
+
+  list_add_tail(&message_ptr->siblings, &instance_ptr->ui_to_realtime_queue);
+
+  audiolock_leave_ui(instance_ptr->lock);
 }

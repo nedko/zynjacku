@@ -154,6 +154,21 @@ lv2dynparam_get_unused_message()
   return message_ptr;
 }
 
+struct lv2dynparam_host_message *
+lv2dynparam_get_unused_message_may_block()
+{
+  struct lv2dynparam_host_message * message_ptr;
+
+  do
+  {
+    lv2dynparam_preallocate();
+    message_ptr = lv2dynparam_get_unused_message();
+  }
+  while (message_ptr == NULL);
+
+  return message_ptr;
+}
+
 void
 lv2dynparam_put_unused_message(
   struct lv2dynparam_host_message * message_ptr)
