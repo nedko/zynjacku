@@ -77,7 +77,18 @@ struct lv2dynparam_host_parameter
   union
   {
     BOOL boolean;
+    float fpoint;
   } value;
+
+  union
+  {
+    float fpoint;
+  } min;
+
+  union
+  {
+    float fpoint;
+  } max;
 
   BOOL gui_referenced;
   void * ui_context;

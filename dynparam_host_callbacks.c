@@ -199,10 +199,26 @@ lv2dynparam_host_parameter_appear(
   }
 
   /* read current value */
-  if (param_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN)
+  switch (param_ptr->type)
   {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
     param_ptr->value.boolean = *(unsigned char *)(param_ptr->value_ptr);
     LOG_DEBUG("Boolean parameter with value %s", param_ptr->value.boolean ? "TRUE" : "FALSE");
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    param_ptr->value.fpoint = *(float *)(param_ptr->value_ptr);
+    LOG_DEBUG("Float parameter with value %f", param_ptr->value.fpoint);
+    break;
+  }
+
+  /* read current range */
+  switch (param_ptr->type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    param_ptr->min.fpoint = *(float *)(param_ptr->min_ptr);
+    param_ptr->max.fpoint = *(float *)(param_ptr->max_ptr);
+    LOG_DEBUG("Float parameter with range %f - %f", param_ptr->min.fpoint, param_ptr->max.fpoint);
+    break;
   }
 
   /* Add parameter as child of its group */

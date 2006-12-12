@@ -116,6 +116,18 @@ dynparam_parameter_boolean_appeared(
 
 /* callback called from ui thread */
 void
+dynparam_parameter_float_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  const char * parameter_name,
+  float value,
+  float min,
+  float max,
+  void ** parameter_ui_context);
+
+/* callback called from ui thread */
+void
 dynparam_parameter_boolean_changed(
   void * instance_ui_context,
   void * parameter_ui_context,
@@ -127,5 +139,12 @@ dynparam_parameter_boolean_change(
   lv2dynparam_host_instance instance,
   lv2dynparam_host_parameter parameter_handle,
   BOOL value);
+
+/* called from ui thread, to change boolean parameter value */
+void
+dynparam_parameter_float_change(
+  lv2dynparam_host_instance instance,
+  lv2dynparam_host_parameter parameter_handle,
+  float value);
 
 #endif /* #ifndef DYNPARAM_H__5090F477_0BE7_439F_BF1D_F2EB78822760__INCLUDED */

@@ -44,6 +44,12 @@ lv2dynparam_host_map_type_uri(
     parameter_ptr->type = LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN;
     return;
   }
+
+  if (strcmp(parameter_ptr->type_uri, LV2DYNPARAM_PARAMETER_TYPE_FLOAT_URI) == 0)
+  {
+    parameter_ptr->type = LV2DYNPARAM_PARAMETER_TYPE_FLOAT;
+    return;
+  }
 }
 
 static struct lv2dynparam_host_callbacks g_lv2dynparam_host_callbacks =
@@ -158,8 +164,9 @@ lv2dynparam_host_notify_parameter_appeared(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_parameter * parameter_ptr)
 {
-  if (parameter_ptr->type == LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN)
+  switch (parameter_ptr->type)
   {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
     dynparam_parameter_boolean_appeared(
       parameter_ptr,
       instance_ptr->instance_ui_context,
@@ -167,6 +174,18 @@ lv2dynparam_host_notify_parameter_appeared(
       parameter_ptr->name,
       parameter_ptr->value.boolean,
       &parameter_ptr->ui_context);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    dynparam_parameter_float_appeared(
+      parameter_ptr,
+      instance_ptr->instance_ui_context,
+      parameter_ptr->group_ptr->ui_context,
+      parameter_ptr->name,
+      parameter_ptr->value.fpoint,
+      parameter_ptr->min.fpoint,
+      parameter_ptr->max.fpoint,
+      &parameter_ptr->ui_context);
+    break;
   }
 
   parameter_ptr->gui_referenced = TRUE;
@@ -207,7 +226,7 @@ lv2dynparam_host_notify(
   list_for_each(node_ptr, &group_ptr->child_params)
   {
     parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
-    LOG_DEBUG("host notify - parameter");
+    LOG_DEBUG("host notify - parameter \"%s\"", parameter_ptr->name);
 
     if (!parameter_ptr->gui_referenced)
     {
@@ -251,6 +270,9 @@ lv2dynparam_host_realtime_run(
       {
       case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
         *((unsigned char *)parameter_ptr->value_ptr) = parameter_ptr->value.boolean ? 1 : 0;
+        break;
+      case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+        *((float *)parameter_ptr->value_ptr) = parameter_ptr->value.fpoint;
         break;
       default:
         LOG_ERROR("Parameter change for parameter of unknown type %u received", message_ptr->message_type);
@@ -372,6 +394,31 @@ dynparam_parameter_boolean_change(
   message_ptr = lv2dynparam_get_unused_message_may_block();
 
   parameter_ptr->value.boolean = value;
+
+  message_ptr->message_type = LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE;
+
+  message_ptr->context.parameter = parameter_ptr;
+
+  list_add_tail(&message_ptr->siblings, &instance_ptr->ui_to_realtime_queue);
+
+  audiolock_leave_ui(instance_ptr->lock);
+}
+
+void
+dynparam_parameter_float_change(
+  lv2dynparam_host_instance instance,
+  lv2dynparam_host_parameter parameter_handle,
+  float value)
+{
+  struct lv2dynparam_host_message * message_ptr;
+
+  audiolock_enter_ui(instance_ptr->lock);
+
+  LOG_DEBUG("\"%s\" changed to %f", parameter_ptr->name, value);
+
+  message_ptr = lv2dynparam_get_unused_message_may_block();
+
+  parameter_ptr->value.fpoint = value;
 
   message_ptr->message_type = LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE;
 
