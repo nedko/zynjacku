@@ -23,7 +23,7 @@ import zynjacku
 import gtk
 import gtk.glade
 import gobject
-import gc
+import phat
 
 group_shadow = gtk.SHADOW_ETCHED_OUT
 
@@ -66,16 +66,20 @@ class ZynjackuHost:
         frame = gtk.Frame(group_name)
         frame.set_shadow_type(group_shadow)
 
-        frame.vbox = gtk.VBox()
-        frame.hbox = gtk.HBox()
-        frame.vbox.pack_start(frame.hbox, False, False)
-        frame.add(frame.vbox)
-        frame.hbox.set_spacing(10)
+        frame.box_params = gtk.VBox()
+        frame.box_top = gtk.HBox()
+        frame.box_top.pack_start(frame.box_params, False, False)
+        frame.add(frame.box_top)
+        #frame.box_top.set_spacing(10)
+
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(3, 10, 10, 10)
+        align.add(frame)
 
         if parent:
-            parent.vbox.add(frame)
+            parent.box_top.pack_start(align, True, True)
         else:
-            synth.ui_win.add(frame)
+            synth.ui_win.add(align)
 
         frame.context = context
         return frame
@@ -88,9 +92,12 @@ class ZynjackuHost:
         print "value: %s" % repr(value)
         print "context: %s" % repr(context)
 
-        widget = gtk.ToggleButton(name)
-        widget.changed_connect_id  = widget.connect("toggled", self.on_bool_toggled, synth)
-        parent.hbox.pack_start(widget, False, False)
+        widget = gtk.CheckButton(name)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 10, 10, 10)
+        align.add(widget)
+        widget.connect("toggled", self.on_bool_toggled, synth)
+        parent.box_params.pack_start(align, False, False)
 
         widget.context = context
         return widget
@@ -105,19 +112,21 @@ class ZynjackuHost:
         print "value: %s" % repr(max)
         print "context: %s" % repr(context)
 
-        vbox = gtk.VBox()
-        spinbutton = gtk.SpinButton()
-        spinbutton.set_range(min, max)
-        spinbutton.set_value(value)
-        spinbutton.set_increments(1, 10)
-        vbox.pack_start(spinbutton, False, False)
-        label = gtk.Label(name)
-        vbox.pack_start(label, False, False)
-        spinbutton.changed_connect_id  = spinbutton.connect("value-changed", self.on_float_value_changed, synth)
-        parent.hbox.pack_start(vbox, False, False)
+        box = gtk.VBox()
+        adjustment = gtk.Adjustment(value, min, max, 1, 19)
+        knob = phat.Knob(adjustment)
+        align = gtk.Alignment(0.5, 0.5)
+        align.add(knob)
+        box.pack_start(gtk.Label(name), False, False)
+        box.pack_start(align, False, False)
+        adjustment.connect("value-changed", self.on_float_value_changed, synth)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 10, 10, 10)
+        align.add(box)
+        parent.box_params.pack_start(align, False, False)
 
-        spinbutton.context = context
-        return spinbutton
+        knob.context = context
+        return knob
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
