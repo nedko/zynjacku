@@ -68,7 +68,7 @@ class ZynjackuHost:
 
         frame.vbox = gtk.VBox()
         frame.hbox = gtk.HBox()
-        frame.vbox.add(frame.hbox)
+        frame.vbox.pack_start(frame.hbox, False, False)
         frame.add(frame.vbox)
 
         if parent:
@@ -89,7 +89,7 @@ class ZynjackuHost:
 
         widget = gtk.ToggleButton(name)
         widget.changed_connect_id  = widget.connect("toggled", self.on_bool_toggled, synth)
-        parent.hbox.add(widget)
+        parent.hbox.pack_start(widget, False, False)
 
         widget.context = context
         return widget
