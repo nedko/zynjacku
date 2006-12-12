@@ -119,8 +119,8 @@ struct lv2dynparam_host_instance
 
   BOOL ui;
 
-  struct list_head realtime_to_ui_queue;
-  struct list_head ui_to_realtime_queue;
+  struct list_head realtime_to_ui_queue; /* protected by the audiolock */
+  struct list_head ui_to_realtime_queue; /* protected by the audiolock */
 };
 
 #define LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR              1
