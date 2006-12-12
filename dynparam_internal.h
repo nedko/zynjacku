@@ -132,69 +132,8 @@ struct lv2dynparam_host_instance
 #define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_DISAPPEAR         7
 #define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_EXECUTE           8
 
-BOOL
-lv2dynparam_host_group_appear(
-  void * instance_host_context,
-  void * parent_group_host_context,
-  lv2dynparam_group_handle group,
-  void ** host_context);
-
 void
-lv2dynparam_host_group_disappear(
-  void * instance_host_context,
-  void * group_host_context);
-
-BOOL
-lv2dynparam_host_parameter_appear(
-  void * instance_host_context,
-  void * group_host_context,
-  lv2dynparam_parameter_handle parameter,
-  void ** parameter_host_context);
-
-void
-lv2dynparam_host_parameter_disappear(
-  void * instance_host_context,
-  void * parameter_host_context);
-
-void
-lv2dynparam_host_parameter_change(
-  void * instance_host_context,
-  void * parameter_host_context);
-
-BOOL
-lv2dynparam_host_command_appear(
-  void * instance_host_context,
-  void * group_host_context,
-  lv2dynparam_command_handle command,
-  void ** command_context);
-
-void
-lv2dynparam_host_command_disappear(
-  void * instance_host_context,
-  void * command_host_context);
-
-void
-lv2dynparam_preallocate();
-
-struct lv2dynparam_host_group *
-lv2dynparam_get_unused_group();
-
-void
-lv2dynparam_put_unused_group(
-  struct lv2dynparam_host_group * group_ptr);
-
-struct lv2dynparam_host_parameter *
-lv2dynparam_get_unused_parameter();
-
-void
-lv2dynparam_put_unused_parameter(
+lv2dynparam_host_map_type_uri(
   struct lv2dynparam_host_parameter * parameter_ptr);
-
-struct lv2dynparam_host_message *
-lv2dynparam_get_unused_message();
-
-void
-lv2dynparam_put_unused_message(
-  struct lv2dynparam_host_message * message_ptr);
 
 #endif /* #ifndef DYNPARAM_INTERNAL_H__86778596_B1A9_4BD7_A14A_BECBD5589468__INCLUDED */

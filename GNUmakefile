@@ -32,7 +32,7 @@ GENDEP_C = set -e; gcc -MM $(CFLAGS) $< | sed $(GENDEP_SED_EXPR) > $@; [ -s $@ ]
 
 .PHONY: run test install uninstall
 
-SOURCES = dynparam_preallocate.c dynparam.c audiolock.c engine.c synth.c slv2.c log.c zynjacku_wrap.c zynjackumodule.c
+SOURCES = dynparam_preallocate.c dynparam.c audiolock.c engine.c synth.c slv2.c log.c zynjacku_wrap.c zynjackumodule.c dynparam_host_callbacks.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
 # The path to the GTK+ python types

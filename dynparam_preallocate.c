@@ -28,12 +28,14 @@
 #include "audiolock.h"
 #include "dynparam.h"
 #include "dynparam_internal.h"
+#include "dynparam_preallocate.h"
 
 #define LV2DYNPARAM_GROUPS_PREALLOCATE      1024
 #define LV2DYNPARAM_PARAMETERS_PREALLOCATE  1024
 #define LV2DYNPARAM_MESSAGES_PREALLOCATE    1024
 
 /* these are protected by all audiolocks */
+/* !!!!!!!!!!!!! not really, global mutex or per-plugin handle is required */
 LIST_HEAD(g_unused_groups);
 unsigned int g_unused_groups_count;
 LIST_HEAD(g_unused_parameters);
