@@ -86,6 +86,12 @@ zynjacku_synth_bool_set(
   gchar * context,
   gboolean value);
 
+void
+zynjacku_synth_float_set(
+  ZynjackuSynth * obj_ptr,
+  gchar * context,
+  gfloat value);
+
 G_END_DECLS
 
 #endif /* #ifndef SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */

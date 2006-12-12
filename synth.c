@@ -45,7 +45,8 @@
 #define ZYNJACKU_SYNTH_SIGNAL_TEST             0
 #define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED   1
 #define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED    2
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT           3
+#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED   3
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT           4
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -253,7 +254,7 @@ zynjacku_synth_class_init(
 
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED] =
     g_signal_new(
-      "bool-appeared",         /* signal_name */
+      "bool-appeared",          /* signal_name */
       ZYNJACKU_SYNTH_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
@@ -266,6 +267,25 @@ zynjacku_synth_class_init(
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
       G_TYPE_BOOLEAN,           /* value */
+      G_TYPE_STRING);           /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED] =
+    g_signal_new(
+      "float-appeared",         /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      6,                        /* n_params */
+      G_TYPE_OBJECT,            /* parent */
+      G_TYPE_STRING,            /* parameter name */
+      G_TYPE_FLOAT,             /* value */
+      G_TYPE_FLOAT,             /* min */
+      G_TYPE_FLOAT,             /* max */
       G_TYPE_STRING);           /* context */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
@@ -814,6 +834,65 @@ zynjacku_synth_bool_set(
   LOG_DEBUG("zynjacku_synth_bool_set() called, context %p", context);
 
   dynparam_parameter_boolean_change(
+    synth_ptr->dynparams,
+    (lv2dynparam_host_parameter)context,
+    value);
+}
+
+void
+dynparam_parameter_float_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  const char * parameter_name,
+  float value,
+  float min,
+  float max,
+  void ** parameter_ui_context)
+{
+  GObject * ret_obj_ptr;
+
+  LOG_NOTICE(
+    "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
+    parameter_name,
+    value,
+    min,
+    max,
+    parameter_handle);
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
+    0,
+    group_ui_context,
+    parameter_name,
+    (gfloat)value,
+    (gfloat)min,
+    (gfloat)max,
+    zynjacku_synth_context_to_string(parameter_handle),
+    &ret_obj_ptr);
+
+  LOG_NOTICE("float-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  *parameter_ui_context = ret_obj_ptr;
+}
+
+void
+zynjacku_synth_float_set(
+  ZynjackuSynth * synth_obj_ptr,
+  gchar * string_context,
+  gfloat value)
+{
+  void * context;
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  context = zynjacku_synth_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_synth_float_set() called, context %p", context);
+
+  dynparam_parameter_float_change(
     synth_ptr->dynparams,
     (lv2dynparam_host_parameter)context,
     value);
