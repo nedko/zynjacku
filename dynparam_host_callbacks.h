@@ -1,3 +1,4 @@
+/* -*- Mode: C ; c-basic-offset: 2 -*- */
 /*****************************************************************************
  *
  *   Declarations of lv2dynparam host callbacks, the ones called by plugin
