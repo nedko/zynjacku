@@ -79,12 +79,11 @@ class ZynjackuHost:
         if parent:
            frame.add(frame.box_top)
            frame.set_label_align(0.5, 0.5)
-           #frame.box_top.set_spacing(0)
 
            align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-           align.set_padding(3, 10, 10, 10)
+           align.set_padding(0, 10, 10, 10)
            align.add(frame)
-           parent.box_top.pack_start(align)
+           parent.box_top.pack_start(align, False, True) # False, False
         else:
             scrolled_window.add_with_viewport(group.box_top)
             synth.ui_win.add(scrolled_window)
@@ -101,10 +100,13 @@ class ZynjackuHost:
         print "context: %s" % repr(context)
 
         widget = gtk.CheckButton(name)
+
+        widget.connect("toggled", self.on_bool_toggled, synth)
+
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         align.set_padding(10, 10, 10, 10)
         align.add(widget)
-        widget.connect("toggled", self.on_bool_toggled, synth)
+
         parent.box_params.pack_start(align, False, False)
 
         widget.context = context
@@ -137,7 +139,12 @@ class ZynjackuHost:
         box.pack_start(align, False, False)
 
         adjustment.connect("value-changed", self.on_float_value_changed, synth)
-        parent.box_params.pack_start(box, False, False)
+
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 10, 10, 10)
+        align.add(box)
+
+        parent.box_params.pack_start(align, False, False)
 
         adjustment.context = context
         return knob
