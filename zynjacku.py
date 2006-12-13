@@ -25,36 +25,62 @@ import gtk.glade
 import gobject
 import phat
 
-group_shadow = gtk.SHADOW_ETCHED_OUT
+# Synth window abstraction
+class SynthWindow(gobject.GObject):
 
-class ZynjackuHost:
-    def __init__(self, client_name):
-        print "ZynjackuHost constructor called."
+    __gsignals__ = {
+        'destroy':                      # signal name
+        (
+            gobject.SIGNAL_RUN_LAST,    # signal flags, when class closure is invoked
+            gobject.TYPE_NONE,          # return type
+            ()                          # parameter types
+        )}
 
-        self.engine = zynjacku.Engine()
+    def __init__(self, synth):
+        gobject.GObject.__init__(self)
+        self.synth = synth
 
-        if not self.engine.start_jack(client_name):
-            print "Failed to initialize zynjacku engine"
-            sys.exit(1)
+    def show(self):
+        '''Show synth window'''
 
-    def __del__(self):
-        print "ZynjackuHost destructor called."
+# Generic/Universal window UI, as opposed to custom UI privided by synth itself
+class SynthWindowUniversal(SynthWindow):
+    def __init__(self, synth, group_shadow_type):
+        SynthWindow.__init__(self, synth)
 
-        self.engine.stop_jack()
+        self.group_shadow_type = group_shadow_type
 
-    def ui_run(self):
-        self.engine.ui_run()
-        return True
+        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_title(synth.get_name())
+        self.window.set_role("zynjacku_synth_ui")
 
-    def run(self):
-        ui_run_callback_id = gobject.timeout_add(100, self.ui_run)
-        gtk.main()
-        gobject.source_remove(ui_run_callback_id)
+        self.window.connect("destroy", self.on_window_destroy)
 
-    def create_synth_window(self, synth):
-        synth.ui_win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        synth.ui_win.set_title(synth.get_name())
-        synth.ui_win.set_role("zynjacku_synth_ui")
+    def on_window_destroy(self, window):
+        self.synth.disconnect(self.float_appeared_connect_id)
+        self.synth.disconnect(self.bool_appeared_connect_id)
+        self.synth.disconnect(self.group_appeared_connect_id)
+
+        self.emit('destroy')
+
+    def show(self):
+        '''Show synth window'''
+
+        self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
+        self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
+        self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
+
+        self.synth.ui_on()
+
+        self.window.show_all()
+
+    def on_bool_toggled(self, widget, synth):
+        print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
+        synth.bool_set(widget.context, widget.get_active())
+
+    def on_float_value_changed(self, widget, synth):
+        print "Float changed. ... set to %f" % widget.get_value()
+        synth.float_set(widget.context, widget.get_value())
 
     def on_group_appeared(self, synth, parent, group_name, context):
         print "-------------- Group appeared"
@@ -65,7 +91,7 @@ class ZynjackuHost:
 
         if parent:
             frame = gtk.Frame(group_name)
-            frame.set_shadow_type(group_shadow)
+            frame.set_shadow_type(self.group_shadow_type)
             group = frame
         else:
             scrolled_window = gtk.ScrolledWindow()
@@ -86,7 +112,7 @@ class ZynjackuHost:
            parent.box_top.pack_start(align, False, True) # False, False
         else:
             scrolled_window.add_with_viewport(group.box_top)
-            synth.ui_win.add(scrolled_window)
+            self.window.add(scrolled_window)
 
         group.context = context
         return group
@@ -126,7 +152,6 @@ class ZynjackuHost:
         box.pack_start(gtk.Label(name), False, False)
         adjustment = gtk.Adjustment(value, min, max, 1, 19)
 
-
         hbox = gtk.HBox()
         knob = phat.Knob(adjustment)
         align = gtk.Alignment(0.5, 0.5)
@@ -149,18 +174,43 @@ class ZynjackuHost:
         adjustment.context = context
         return knob
 
+class SynthWindowFactory:
+    def __init__(self):
+        self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
+
+    def create_synth_window(self, synth):
+        synth.ui_win = SynthWindowUniversal(synth, self. group_shadow_type)
+
+class ZynjackuHost(SynthWindowFactory):
+    def __init__(self, client_name):
+        print "ZynjackuHost constructor called."
+
+        SynthWindowFactory.__init__(self)
+
+        self.engine = zynjacku.Engine()
+
+        if not self.engine.start_jack(client_name):
+            print "Failed to initialize zynjacku engine"
+            sys.exit(1)
+
+    def __del__(self):
+        print "ZynjackuHost destructor called."
+
+        self.engine.stop_jack()
+
+    def ui_run(self):
+        self.engine.ui_run()
+        return True
+
+    def run(self):
+        ui_run_callback_id = gobject.timeout_add(100, self.ui_run)
+        gtk.main()
+        gobject.source_remove(ui_run_callback_id)
+
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
         print repr(obj2)
-
-    def on_bool_toggled(self, widget, synth):
-        print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
-        synth.bool_set(widget.context, widget.get_active())
-
-    def on_float_value_changed(self, widget, synth):
-        print "Float changed. ... set to %f" % widget.get_value()
-        synth.float_set(widget.context, widget.get_value())
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
@@ -263,20 +313,13 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def run(self):
         if (self.synth):
-            test_connect_id =self.synth.connect("test", self.on_test)
-            group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
-            bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
-            float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
-            self.synth.ui_on()
-            self.synth.ui_win.show_all()
+            test_connect_id = self.synth.connect("test", self.on_test)
+            self.synth.ui_win.show()
             self.synth.ui_win.connect("destroy", gtk.main_quit)
 
         ZynjackuHost.run(self)
 
         if (self.synth):
-            self.synth.disconnect(float_appeared_connect_id)
-            self.synth.disconnect(bool_appeared_connect_id)
-            self.synth.disconnect(group_appeared_connect_id)
             self.synth.disconnect(test_connect_id)
 
     def __del__(self):
@@ -303,6 +346,9 @@ def main():
     #print 'Loading glade from "%s"' % glade_file
 
     glade_xml = gtk.glade.XML(glade_file)
+
+    gobject.type_register(SynthWindow)
+    gobject.type_register(SynthWindowUniversal)
 
     if len(sys.argv) == 2:
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
