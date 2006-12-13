@@ -45,10 +45,16 @@ class SynthWindow(gobject.GObject):
 
 # Generic/Universal window UI, as opposed to custom UI privided by synth itself
 class SynthWindowUniversal(SynthWindow):
-    def __init__(self, synth, group_shadow_type):
+
+    # enum for layout types
+    layout_type_vertical = 0
+    layout_type_horizontal = 1
+
+    def __init__(self, synth, group_shadow_type, layout_type):
         SynthWindow.__init__(self, synth)
 
         self.group_shadow_type = group_shadow_type
+        self.layout_type = layout_type
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title(synth.get_name())
@@ -98,13 +104,20 @@ class SynthWindowUniversal(SynthWindow):
             scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             group = scrolled_window
 
-        group.box_params = gtk.VBox()
-        group.box_top = gtk.HBox()
+        if self.layout_type == SynthWindowUniversal.layout_type_horizontal:
+            group.box_params = gtk.VBox()
+            group.box_top = gtk.HBox()
+        else:
+            group.box_params = gtk.HBox()
+            group.box_top = gtk.VBox()
+
         group.box_top.pack_start(group.box_params, False, False)
 
         if parent:
            frame.add(frame.box_top)
-           frame.set_label_align(0.5, 0.5)
+
+           if self.layout_type == SynthWindowUniversal.layout_type_horizontal:
+               frame.set_label_align(0.5, 0.5)
 
            align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
            align.set_padding(0, 10, 10, 10)
@@ -177,9 +190,10 @@ class SynthWindowUniversal(SynthWindow):
 class SynthWindowFactory:
     def __init__(self):
         self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
+        self.layout_type = SynthWindowUniversal.layout_type_horizontal
 
     def create_synth_window(self, synth):
-        synth.ui_win = SynthWindowUniversal(synth, self. group_shadow_type)
+        synth.ui_win = SynthWindowUniversal(synth, self. group_shadow_type, self.layout_type)
 
 class ZynjackuHost(SynthWindowFactory):
     def __init__(self, client_name):
