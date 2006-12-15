@@ -140,6 +140,7 @@ class SynthWindowUniversal(SynthWindow):
 
         widget = gtk.CheckButton(name)
 
+        widget.set_active(value)
         widget.connect("toggled", self.on_bool_toggled, synth)
 
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
