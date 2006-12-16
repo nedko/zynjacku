@@ -62,21 +62,25 @@ class SynthWindowUniversal(SynthWindow):
 
         self.window.connect("destroy", self.on_window_destroy)
 
+        self.ui_enabled = False
+
     def on_window_destroy(self, window):
-        self.synth.disconnect(self.float_appeared_connect_id)
-        self.synth.disconnect(self.bool_appeared_connect_id)
-        self.synth.disconnect(self.group_appeared_connect_id)
+        if self.ui_enabled:
+            self.synth.disconnect(self.float_appeared_connect_id)
+            self.synth.disconnect(self.bool_appeared_connect_id)
+            self.synth.disconnect(self.group_appeared_connect_id)
 
         self.emit('destroy')
 
     def show(self):
         '''Show synth window'''
 
-        self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
-        self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
-        self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
+        if not self.ui_enabled:
+            self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
+            self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
+            self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
 
-        self.synth.ui_on()
+            self.synth.ui_on()
 
         self.window.show_all()
 
@@ -240,7 +244,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         for uri in uris:
             print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
-            synth.connect("group-appeared", self.on_group_appeared)
             if not synth.construct(self.engine):
                 print"Failed to construct %s" % uri
             else:
@@ -304,13 +307,12 @@ class ZynjackuHostMulti(ZynjackuHost):
     def on_ui_visible_toggled(self, cell, path, model):
         if model[path][0]:
             model[path][4].ui_win.hide_all()
-            model[path][4].ui_off()
+            #model[path][4].ui_off()
             model[path][0] = False
         else:
             if not model[path][4].ui_win:
                 self.create_synth_window(model[path][4], model[path])
-            model[path][4].ui_on()
-            model[path][4].ui_win.show_all()
+            model[path][4].ui_win.show()
             model[path][0] = True
 
 class ZynjackuHostOne(ZynjackuHost):
