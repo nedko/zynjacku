@@ -66,9 +66,9 @@ class SynthWindowUniversal(SynthWindow):
 
     def on_window_destroy(self, window):
         if self.ui_enabled:
-            self.synth.disconnect(self.float_appeared_connect_id)
-            self.synth.disconnect(self.bool_appeared_connect_id)
-            self.synth.disconnect(self.group_appeared_connect_id)
+            self.hide()
+
+        self.synth.ui_off()
 
         self.emit('destroy')
 
@@ -82,7 +82,21 @@ class SynthWindowUniversal(SynthWindow):
 
             self.synth.ui_on()
 
+            self.ui_enabled = True
+
         self.window.show_all()
+
+    def hide(self):
+        if not self.ui_enabled:
+            return
+
+        self.synth.disconnect(self.float_appeared_connect_id)
+        self.synth.disconnect(self.bool_appeared_connect_id)
+        self.synth.disconnect(self.group_appeared_connect_id)
+
+        self.window.hide_all()
+
+        self.ui_enabled = False
 
     def on_bool_toggled(self, widget, synth):
         print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
@@ -305,9 +319,9 @@ class ZynjackuHostMulti(ZynjackuHost):
         synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
 
     def on_ui_visible_toggled(self, cell, path, model):
+        print "on_ui_visible_toggled() called."
         if model[path][0]:
-            model[path][4].ui_win.hide_all()
-            #model[path][4].ui_off()
+            model[path][4].ui_win.hide()
             model[path][0] = False
         else:
             if not model[path][4].ui_win:
