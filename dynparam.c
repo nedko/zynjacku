@@ -160,6 +160,36 @@ lv2dynparam_host_notify_group_appeared(
 }
 
 void
+lv2dynparam_host_notify_group_disappeared(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_group * group_ptr)
+{
+  void * parent_group_ui_context;
+
+  LOG_DEBUG("lv2dynparam_host_notify_group_disappeared() called.");
+
+  if (group_ptr->parent_group_ptr)
+  {
+    parent_group_ui_context = group_ptr->parent_group_ptr->ui_context;
+  }
+  else
+  {
+    /* Master Yoda says: The root group it is */
+    parent_group_ui_context = NULL;
+  }
+
+  /* C block because this is the last of not implemented yet if statements for vairous group types */
+  {
+    dynparam_generic_group_disappeared(
+      instance_ptr->instance_ui_context,
+      parent_group_ui_context,
+      group_ptr->ui_context);
+  }
+
+  group_ptr->gui_referenced = TRUE;
+}
+
+void
 lv2dynparam_host_notify_parameter_appeared(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_parameter * parameter_ptr)
@@ -185,6 +215,30 @@ lv2dynparam_host_notify_parameter_appeared(
       parameter_ptr->min.fpoint,
       parameter_ptr->max.fpoint,
       &parameter_ptr->ui_context);
+    break;
+  }
+
+  parameter_ptr->gui_referenced = TRUE;
+}
+
+void
+lv2dynparam_host_notify_parameter_disappeared(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_parameter * parameter_ptr)
+{
+  switch (parameter_ptr->type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+    dynparam_parameter_boolean_disappeared(
+      instance_ptr->instance_ui_context,
+      parameter_ptr->group_ptr->ui_context,
+      parameter_ptr->ui_context);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    dynparam_parameter_float_disappeared(
+      instance_ptr->instance_ui_context,
+      parameter_ptr->group_ptr->ui_context,
+      parameter_ptr->ui_context);
     break;
   }
 
@@ -237,6 +291,52 @@ lv2dynparam_host_notify(
   }
 
   LOG_DEBUG("Iterating \"%s\" params end", group_ptr->name);
+}
+
+void
+lv2dynparam_host_group_hide(
+  struct lv2dynparam_host_instance * instance_ptr,
+  struct lv2dynparam_host_group * group_ptr)
+{
+  struct list_head * node_ptr;
+  struct lv2dynparam_host_group * child_group_ptr;
+  struct lv2dynparam_host_parameter * parameter_ptr;
+
+  if (!child_group_ptr->gui_referenced)
+  {
+    /* UI does not know about this group and thus cannot know about its childred too */
+    return;
+  }
+
+  list_for_each(node_ptr, &group_ptr->child_params)
+  {
+    parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
+
+    if (parameter_ptr->gui_referenced)
+    {
+      lv2dynparam_host_notify_parameter_disappeared(
+        instance_ptr,
+        parameter_ptr);
+    }
+  }
+
+  list_for_each(node_ptr, &group_ptr->child_groups)
+  {
+    child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
+
+    lv2dynparam_host_group_hide(
+      instance_ptr,
+      child_group_ptr);
+  }
+
+  if (child_group_ptr->gui_referenced)
+  {
+    lv2dynparam_host_notify_group_disappeared(
+    instance_ptr,
+    child_group_ptr);
+
+    child_group_ptr->gui_referenced = FALSE;
+  }
 }
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance)
@@ -373,7 +473,19 @@ void
 lv2dynparam_host_ui_off(
   lv2dynparam_host_instance instance)
 {
+  return;                       /* disable it until it is working */
+
   audiolock_enter_ui(instance_ptr->lock);
+
+  LOG_DEBUG("UI off - removing known things.");
+
+  if (instance_ptr->root_group_ptr != NULL)
+  {
+    lv2dynparam_host_group_hide(
+      instance_ptr,
+      instance_ptr->root_group_ptr);
+  }
+
   audiolock_leave_ui(instance_ptr->lock);
 }
 

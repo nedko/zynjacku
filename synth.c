@@ -787,6 +787,30 @@ dynparam_generic_group_appeared(
 }
 
 void
+dynparam_generic_group_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * group_ui_context)
+{
+}
+
+void
+dynparam_parameter_boolean_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context)
+{
+}
+
+void
+dynparam_parameter_float_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context)
+{
+}
+
+void
 dynparam_parameter_boolean_appeared(
   lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,

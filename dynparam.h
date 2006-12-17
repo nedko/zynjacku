@@ -97,6 +97,13 @@ dynparam_generic_group_appeared(
 
 /* callback called from ui thread */
 void
+dynparam_generic_group_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * group_ui_context);
+
+/* callback called from ui thread */
+void
 dynparam_command_appeared(
   lv2dynparam_host_command command_handle,
   void * instance_ui_context,
@@ -116,6 +123,13 @@ dynparam_parameter_boolean_appeared(
 
 /* callback called from ui thread */
 void
+dynparam_parameter_boolean_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context);
+
+/* callback called from ui thread */
+void
 dynparam_parameter_float_appeared(
   lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,
@@ -125,6 +139,13 @@ dynparam_parameter_float_appeared(
   float min,
   float max,
   void ** parameter_ui_context);
+
+/* callback called from ui thread */
+void
+dynparam_parameter_float_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context);
 
 /* callback called from ui thread */
 void
