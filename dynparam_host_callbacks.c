@@ -33,7 +33,7 @@
 #include "dynparam_host_callbacks.h"
 #include "dynparam_preallocate.h"
 
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance_host_context)
