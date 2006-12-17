@@ -191,7 +191,7 @@ zynjacku_plugin_lookup_by_uri_list(const char * uri)
   return NULL;
 }
 
-/* Nasty hack until we strart using real plugin list */
+/* Nasty hack until we start using real plugin list */
 SLV2Plugin *
 zynjacku_plugin_lookup_by_uri(const char * uri)
 {
@@ -204,10 +204,16 @@ zynjacku_plugin_lookup_by_uri(const char * uri)
   plugin_ptr = slv2_list_get_plugin_by_uri(plugins, uri);
   if (plugin_ptr == NULL)
   {
+    slv2_list_free(plugins);
     return NULL;
   }
 
-  return slv2_plugin_duplicate(plugin_ptr);
+  /* yup, overwrite old plugin_ptr value - we don't need it anyway after the dup */
+  plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
+
+  slv2_list_free(plugins);
+
+  return plugin_ptr;
 }
 
 void
