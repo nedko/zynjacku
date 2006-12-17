@@ -32,7 +32,7 @@
 #include "dynparam_host_callbacks.h"
 #include "dynparam_preallocate.h"
 
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 void
@@ -186,7 +186,7 @@ lv2dynparam_host_notify_group_disappeared(
       group_ptr->ui_context);
   }
 
-  group_ptr->gui_referenced = TRUE;
+  group_ptr->gui_referenced = FALSE;
 }
 
 void
@@ -242,7 +242,7 @@ lv2dynparam_host_notify_parameter_disappeared(
     break;
   }
 
-  parameter_ptr->gui_referenced = TRUE;
+  parameter_ptr->gui_referenced = FALSE;
 }
 
 void
@@ -302,11 +302,13 @@ lv2dynparam_host_group_hide(
   struct lv2dynparam_host_group * child_group_ptr;
   struct lv2dynparam_host_parameter * parameter_ptr;
 
-  if (!child_group_ptr->gui_referenced)
+  if (!group_ptr->gui_referenced)
   {
     /* UI does not know about this group and thus cannot know about its childred too */
     return;
   }
+
+  LOG_DEBUG("Hidding group \"%s\" group", group_ptr->name);
 
   list_for_each(node_ptr, &group_ptr->child_params)
   {
@@ -314,6 +316,9 @@ lv2dynparam_host_group_hide(
 
     if (parameter_ptr->gui_referenced)
     {
+
+      LOG_DEBUG("Hidding parameter \"%s\" group", parameter_ptr->name);
+
       lv2dynparam_host_notify_parameter_disappeared(
         instance_ptr,
         parameter_ptr);
@@ -329,14 +334,9 @@ lv2dynparam_host_group_hide(
       child_group_ptr);
   }
 
-  if (child_group_ptr->gui_referenced)
-  {
-    lv2dynparam_host_notify_group_disappeared(
+  lv2dynparam_host_notify_group_disappeared(
     instance_ptr,
-    child_group_ptr);
-
-    child_group_ptr->gui_referenced = FALSE;
-  }
+    group_ptr);
 }
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance)
@@ -473,8 +473,6 @@ void
 lv2dynparam_host_ui_off(
   lv2dynparam_host_instance instance)
 {
-  return;                       /* disable it until it is working */
-
   audiolock_enter_ui(instance_ptr->lock);
 
   LOG_DEBUG("UI off - removing known things.");
