@@ -43,6 +43,9 @@ class SynthWindow(gobject.GObject):
     def show(self):
         '''Show synth window'''
 
+    def hide(self):
+        '''Hide synth window'''
+
 # Generic/Universal window UI, as opposed to custom UI privided by synth itself
 class SynthWindowUniversal(SynthWindow):
 
@@ -87,6 +90,7 @@ class SynthWindowUniversal(SynthWindow):
         self.window.show_all()
 
     def hide(self):
+        '''Hide synth window'''
         if not self.ui_enabled:
             return
 
@@ -212,7 +216,14 @@ class SynthWindowFactory:
         self.layout_type = SynthWindowUniversal.layout_type_horizontal
 
     def create_synth_window(self, synth):
+        if not self.synth_window_available(synth):
+            return False
+
         synth.ui_win = SynthWindowUniversal(synth, self. group_shadow_type, self.layout_type)
+        return True
+
+    def synth_window_available(self, synth):
+        return synth.supports_generic_ui()
 
 class ZynjackuHost(SynthWindowFactory):
     def __init__(self, client_name):
@@ -315,8 +326,11 @@ class ZynjackuHostMulti(ZynjackuHost):
         row[0] = False
 
     def create_synth_window(self, synth, row):
-        ZynjackuHost.create_synth_window(self, synth)
+        if not ZynjackuHost.create_synth_window(self, synth):
+            return False
+
         synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
+        return True
 
     def on_ui_visible_toggled(self, cell, path, model):
         print "on_ui_visible_toggled() called."
@@ -325,7 +339,8 @@ class ZynjackuHostMulti(ZynjackuHost):
             model[path][0] = False
         else:
             if not model[path][4].ui_win:
-                self.create_synth_window(model[path][4], model[path])
+                if not self.create_synth_window(model[path][4], model[path]):
+                    return
             model[path][4].ui_win.show()
             model[path][0] = True
 
@@ -340,23 +355,34 @@ class ZynjackuHostOne(ZynjackuHost):
             del(self.synth)
             self.synth = None
         else:
-            ZynjackuHost.create_synth_window(self, self.synth)
+            if not ZynjackuHost.synth_window_available(self, self.synth):
+                print"Synth window not available"
+                self.synth.destruct()
+                del(self.synth)
+                self.synth = None
+            else:
+                if not ZynjackuHost.create_synth_window(self, self.synth):
+                    print"Failed to create synth window"
+                    self.synth.destruct()
+                    del(self.synth)
+                    self.synth = None
 
     def run(self):
-        if (self.synth):
-            test_connect_id = self.synth.connect("test", self.on_test)
-            self.synth.ui_win.show()
-            self.synth.ui_win.connect("destroy", gtk.main_quit)
+        if not self.synth:
+            return
+
+        test_connect_id = self.synth.connect("test", self.on_test)
+        self.synth.ui_win.show()
+        self.synth.ui_win.connect("destroy", gtk.main_quit)
 
         ZynjackuHost.run(self)
 
-        if (self.synth):
-            self.synth.disconnect(test_connect_id)
+        self.synth.disconnect(test_connect_id)
 
     def __del__(self):
         print "ZynjackuHostOne destructor called."
 
-        if (self.synth):
+        if self.synth:
             self.synth.destruct()
 
         ZynjackuHost.__del__(self)
@@ -385,6 +411,7 @@ def main():
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
     else:
         host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
+
     host.run()
 
 main()

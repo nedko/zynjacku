@@ -375,6 +375,21 @@ zynjacku_synth_get_class_uri(
   return slv2_plugin_get_uri(synth_ptr->plugin);
 }
 
+gboolean
+zynjacku_synth_supports_generic_ui(
+  ZynjackuSynth * synth_obj_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+
+  LOG_DEBUG("zynjacku_synth_supports_generic_ui() called.");
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  /* generic ui can be supported without dynparams but we don't do it atm */
+
+  return (synth_ptr->dynparams != NULL) ? TRUE : FALSE;
+}
+
 void
 zynjacku_synth_ui_on(
   ZynjackuSynth * synth_obj_ptr)

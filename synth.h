@@ -60,6 +60,10 @@ void
 zynjacku_synth_destruct(
   ZynjackuSynth * synth_obj_ptr);
 
+gboolean
+zynjacku_synth_supports_generic_ui(
+  ZynjackuSynth * synth_obj_ptr);
+
 const char *
 zynjacku_synth_get_name(
   ZynjackuSynth * obj_ptr);
