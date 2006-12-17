@@ -1,0 +1,19 @@
+/* -*- Mode: C; c-basic-offset: 2 -*- */
+%%
+headers
+#include <Python.h>
+
+#include "pygobject.h"
+
+#include "synth.h"
+#include "engine.h"
+%%
+modulename zynjacku
+%%
+import gobject.GObject as PyGObject_Type 
+%%
+ignore-glob
+  *_get_type
+  zynjacku_engine_activate_synth
+  zynjacku_engine_deactivate_synth
+%%
