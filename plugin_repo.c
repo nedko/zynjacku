@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <slv2/slv2.h>
+#include <glib-object.h>
 
 #include "list.h"
 #include "plugin_repo.h"
@@ -35,7 +36,110 @@ struct zynjacku_simple_plugin_info
   SLV2Plugin * plugin_ptr;
 };
 
-struct list_head g_available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
+struct zynjacku_plugin_repo
+{
+  gboolean dispose_has_run;
+
+  struct list_head available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
+};
+
+#define ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_REPO_TYPE, struct zynjacku_plugin_repo))
+
+static void
+zynjacku_plugin_repo_dispose(GObject * obj)
+{
+  struct zynjacku_plugin_repo * plugin_repo_ptr;
+
+  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj);
+
+  LOG_DEBUG("zynjacku_plugin_repo_dispose() called.");
+
+  if (plugin_repo_ptr->dispose_has_run)
+  {
+    /* If dispose did already run, return. */
+    LOG_DEBUG("zynjacku_plugin_repo_dispose() already run!");
+    return;
+  }
+
+  /* Make sure dispose does not run twice. */
+  plugin_repo_ptr->dispose_has_run = TRUE;
+
+  /* 
+   * In dispose, you are supposed to free all types referenced from this
+   * object which might themselves hold a reference to self. Generally,
+   * the most simple solution is to unref all members on which you own a 
+   * reference.
+   */
+
+  /* Chain up to the parent class */
+  G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
+}
+
+static void
+zynjacku_plugin_repo_finalize(GObject * obj)
+{
+//  struct zynjacku_plugin_repo * self = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj);
+
+  LOG_DEBUG("zynjacku_plugin_repo_finalize() called.");
+
+  /*
+   * Here, complete object destruction.
+   * You might not need to do much...
+   */
+  //g_free(self->private);
+
+  /* Chain up to the parent class */
+  G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->finalize(obj);
+}
+
+static void
+zynjacku_plugin_repo_class_init(
+  gpointer class_ptr,
+  gpointer class_data_ptr)
+{
+  LOG_DEBUG("zynjacku_plugin_repo_class() called.");
+
+  G_OBJECT_CLASS(class_ptr)->dispose = zynjacku_plugin_repo_dispose;
+  G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_plugin_repo_finalize;
+
+  g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_plugin_repo));
+}
+
+static void
+zynjacku_plugin_repo_init(
+  GTypeInstance * instance,
+  gpointer g_class)
+{
+  struct zynjacku_plugin_repo * plugin_repo_ptr;
+
+  LOG_DEBUG("zynjacku_plugin_repo_init() called.");
+
+  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(instance);
+}
+
+GType zynjacku_plugin_repo_get_type()
+{
+  static GType type = 0;
+  if (type == 0)
+  {
+    type = g_type_register_static_simple(
+      G_TYPE_OBJECT,
+      "zynjacku_plugin_repo_type",
+      sizeof(ZynjackuPluginRepoClass),
+      zynjacku_plugin_repo_class_init,
+      sizeof(ZynjackuPluginRepo),
+      zynjacku_plugin_repo_init,
+      0);
+  }
+
+  return type;
+}
+
+ZynjackuPluginRepo *
+zynjacku_plugin_repo_get()
+{
+  return NULL;
+}
 
 void
 zynjacku_find_simple_plugins()
@@ -172,7 +276,7 @@ zynjacku_find_all_plugins()
 }
 
 SLV2Plugin *
-zynjacku_plugin_lookup_by_uri_list(const char * uri)
+zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
 {
   struct list_head * node_ptr;
   const char * current_uri;
@@ -193,7 +297,7 @@ zynjacku_plugin_lookup_by_uri_list(const char * uri)
 
 /* Nasty hack until we start using real plugin list */
 SLV2Plugin *
-zynjacku_plugin_lookup_by_uri(const char * uri)
+zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
   SLV2Plugin * plugin_ptr;
   SLV2List plugins;

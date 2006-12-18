@@ -40,7 +40,7 @@ DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 
 default: zynjacku.so
 
-zynjacku.defs: engine.h synth.h
+zynjacku.defs: engine.h synth.h plugin_repo.h
 	python /usr/share/pygtk/2.0/codegen/h2def.py $^ > $@
 
 # Generate the C wrapper from the defs and our override file

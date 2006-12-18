@@ -75,6 +75,9 @@ struct zynjacku_engine
   LV2_MIDI lv2_midi_buffer;
 };
 
+SLV2Plugin *
+zynjacku_plugin_repo_lookup_by_uri(const char * uri);
+
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
 
 #define ZYNJACKU_SYNTH_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_SYNTH_TYPE, struct zynjacku_synth))

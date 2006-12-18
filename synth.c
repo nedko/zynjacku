@@ -31,7 +31,6 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
-#include "plugin_repo.h"
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "dynparam.h"
@@ -602,7 +601,7 @@ zynjacku_synth_construct(
     goto fail;
   }
 
-  synth_ptr->plugin = zynjacku_plugin_lookup_by_uri(synth_ptr->uri);
+  synth_ptr->plugin = zynjacku_plugin_repo_lookup_by_uri(synth_ptr->uri);
   if (synth_ptr->plugin == NULL)
   {
     LOG_ERROR("Failed to find plugin <%s>", synth_ptr->uri);
