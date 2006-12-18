@@ -26,7 +26,7 @@
 #include <slv2/slv2.h>
 
 #include "list.h"
-#include "slv2.h"
+#include "plugin_repo.h"
 #include "log.h"
 
 struct zynjacku_simple_plugin_info

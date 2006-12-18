@@ -30,7 +30,6 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
-#include "slv2.h"
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "dynparam.h"
