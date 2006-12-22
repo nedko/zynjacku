@@ -43,6 +43,8 @@ struct zynjacku_plugin_repo
   struct list_head available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
 };
 
+struct list_head g_available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
+
 #define ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_REPO_TYPE, struct zynjacku_plugin_repo))
 
 static void
