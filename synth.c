@@ -31,7 +31,7 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "dynparam.h"
 
@@ -68,7 +68,7 @@ zynjacku_synth_context_to_string(
 
   sprintf(string_context, "%p", void_context);
 
-  LOG_ERROR("Context %p converted to \"%s\"", void_context, string_context);
+  LOG_DEBUG("Context %p converted to \"%s\"", void_context, string_context);
 
   return string_context;
 }
@@ -85,7 +85,7 @@ zynjacku_synth_context_from_string(
     return NULL;
   }
 
-  LOG_ERROR("String context \"%s\" converted to %p", string_context, void_context);
+  LOG_DEBUG("String context \"%s\" converted to %p", string_context, void_context);
 
   return void_context;
 }
@@ -784,7 +784,7 @@ dynparam_generic_group_appeared(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
 
-  LOG_NOTICE("Generic group \"%s\" appeared, handle %p", group_name, group_handle);
+  LOG_DEBUG("Generic group \"%s\" appeared, handle %p", group_name, group_handle);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
@@ -795,7 +795,7 @@ dynparam_generic_group_appeared(
     zynjacku_synth_context_to_string(group_handle),
     &ret_obj_ptr);
 
-  LOG_NOTICE("group-appeared signal returned object ptr is %p", ret_obj_ptr);
+  LOG_DEBUG("group-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   *group_ui_context = ret_obj_ptr;
 }
@@ -806,6 +806,7 @@ dynparam_generic_group_disappeared(
   void * parent_group_ui_context,
   void * group_ui_context)
 {
+  g_object_unref(group_ui_context);
 }
 
 void
@@ -814,6 +815,7 @@ dynparam_parameter_boolean_disappeared(
   void * parent_group_ui_context,
   void * parameter_ui_context)
 {
+  g_object_unref(parameter_ui_context);
 }
 
 void
@@ -822,6 +824,7 @@ dynparam_parameter_float_disappeared(
   void * parent_group_ui_context,
   void * parameter_ui_context)
 {
+  g_object_unref(parameter_ui_context);
 }
 
 void
@@ -835,7 +838,7 @@ dynparam_parameter_boolean_appeared(
 {
   GObject * ret_obj_ptr;
 
-  LOG_NOTICE(
+  LOG_DEBUG(
     "Boolean parameter \"%s\" appeared, value %s, handle %p",
     parameter_name,
     value ? "TRUE" : "FALSE",
@@ -851,7 +854,7 @@ dynparam_parameter_boolean_appeared(
     zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
-  LOG_NOTICE("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
+  LOG_DEBUG("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   *parameter_ui_context = ret_obj_ptr;
 }
@@ -890,7 +893,7 @@ dynparam_parameter_float_appeared(
 {
   GObject * ret_obj_ptr;
 
-  LOG_NOTICE(
+  LOG_DEBUG(
     "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
     parameter_name,
     value,
@@ -910,7 +913,7 @@ dynparam_parameter_float_appeared(
     zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
-  LOG_NOTICE("float-appeared signal returned object ptr is %p", ret_obj_ptr);
+  LOG_DEBUG("float-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   *parameter_ui_context = ret_obj_ptr;
 }
