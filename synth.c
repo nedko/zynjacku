@@ -31,7 +31,7 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 #include "dynparam.h"
 
