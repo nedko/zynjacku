@@ -111,11 +111,11 @@ class SynthWindowUniversal(SynthWindow):
         synth.float_set(widget.context, widget.get_value())
 
     def on_group_appeared(self, synth, parent, group_name, context):
-        print "-------------- Group appeared"
-        print "synth: %s" % repr(synth)
-        print "parent: %s" % repr(parent)
-        print "group_name: %s" % group_name
-        print "context: %s" % repr(context)
+        #print "-------------- Group appeared"
+        #print "synth: %s" % repr(synth)
+        #print "parent: %s" % repr(parent)
+        #print "group_name: %s" % group_name
+        #print "context: %s" % repr(context)
 
         if parent:
             frame = gtk.Frame(group_name)
@@ -153,12 +153,12 @@ class SynthWindowUniversal(SynthWindow):
         return group
 
     def on_bool_appeared(self, synth, parent, name, value, context):
-        print "-------------- Bool appeared"
-        print "synth: %s" % repr(synth)
-        print "parent: %s" % repr(parent)
-        print "name: %s" % name
-        print "value: %s" % repr(value)
-        print "context: %s" % repr(context)
+        #print "-------------- Bool appeared"
+        #print "synth: %s" % repr(synth)
+        #print "parent: %s" % repr(parent)
+        #print "name: %s" % name
+        #print "value: %s" % repr(value)
+        #print "context: %s" % repr(context)
 
         widget = gtk.CheckButton(name)
 
@@ -175,14 +175,14 @@ class SynthWindowUniversal(SynthWindow):
         return widget
 
     def on_float_appeared(self, synth, parent, name, value, min, max, context):
-        print "-------------- Float appeared"
-        print "synth: %s" % repr(synth)
-        print "parent: %s" % repr(parent)
-        print "name: %s" % name
-        print "value: %s" % repr(value)
-        print "value: %s" % repr(min)
-        print "value: %s" % repr(max)
-        print "context: %s" % repr(context)
+        #print "-------------- Float appeared"
+        #print "synth: %s" % repr(synth)
+        #print "parent: %s" % repr(parent)
+        #print "name: %s" % name
+        #print "value: %s" % repr(value)
+        #print "value: %s" % repr(min)
+        #print "value: %s" % repr(max)
+        #print "context: %s" % repr(context)
 
         box = gtk.VBox()
         box.pack_start(gtk.Label(name), False, False)
