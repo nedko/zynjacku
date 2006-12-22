@@ -227,7 +227,7 @@ class SynthWindowFactory:
 
 class ZynjackuHost(SynthWindowFactory):
     def __init__(self, client_name):
-        print "ZynjackuHost constructor called."
+        #print "ZynjackuHost constructor called."
 
         SynthWindowFactory.__init__(self)
 
@@ -238,7 +238,7 @@ class ZynjackuHost(SynthWindowFactory):
             sys.exit(1)
 
     def __del__(self):
-        print "ZynjackuHost destructor called."
+        #print "ZynjackuHost destructor called."
 
         self.engine.stop_jack()
 
@@ -258,7 +258,7 @@ class ZynjackuHost(SynthWindowFactory):
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uris):
-        print "ZynjackuHostMulti constructor called."
+        #print "ZynjackuHostMulti constructor called."
         ZynjackuHost.__init__(self, client_name)
         
         self.synths = []
@@ -303,7 +303,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window.connect("destroy", gtk.main_quit)
 
     def __del__(self):
-        print "ZynjackuHostMulti destructor called."
+        #print "ZynjackuHostMulti destructor called."
 
         self.store.clear()
 
@@ -346,7 +346,7 @@ class ZynjackuHostMulti(ZynjackuHost):
 
 class ZynjackuHostOne(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uri):
-        print "ZynjackuHostOne constructor called."
+        #print "ZynjackuHostOne constructor called."
         ZynjackuHost.__init__(self, client_name)
 
         self.synth = zynjacku.Synth(uri=uri)
@@ -380,7 +380,7 @@ class ZynjackuHostOne(ZynjackuHost):
         self.synth.disconnect(test_connect_id)
 
     def __del__(self):
-        print "ZynjackuHostOne destructor called."
+        #print "ZynjackuHostOne destructor called."
 
         if self.synth:
             self.synth.destruct()
