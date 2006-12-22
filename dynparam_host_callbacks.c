@@ -241,6 +241,7 @@ lv2dynparam_host_parameter_disappear(
   void * instance_host_context,
   void * parameter_host_context)
 {
+  LOG_DEBUG("Parameter disappear");
   return TRUE;
 }
 
