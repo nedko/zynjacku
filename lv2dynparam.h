@@ -411,6 +411,7 @@ struct lv2dynparam_plugin_callbacks
 };
 
 #define LV2DYNPARAM_GROUP_TYPE_GENERIC_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/group_generic"
+#define LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/group_togglefloat"
 #define LV2DYNPARAM_GROUP_TYPE_ADSR_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/group_adsr"
 #define LV2DYNPARAM_PARAMETER_TYPE_FLOAT_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/parameter_float"
 #define LV2DYNPARAM_PARAMETER_TYPE_INT_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/parameter_int"
