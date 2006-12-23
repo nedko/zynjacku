@@ -46,6 +46,23 @@ class SynthWindow(gobject.GObject):
     def hide(self):
         '''Hide synth window'''
 
+class SynthWindowUniversalGroup(gobject.GObject):
+    def __init__(self):
+        gobject.GObject.__init__(self)
+
+class SynthWindowUniversalParameter(gobject.GObject):
+    def __init__(self, parent_group, name, context):
+        gobject.GObject.__init__(self)
+        self.parent_group = parent_group
+        self.parameter_name = name
+        self.context = context
+
+    def get_top_widget(self):
+        return None
+
+    def remove(self):
+        self.parent_group.parameter_remove(self)
+
 # Generic/Universal window UI, as opposed to custom UI privided by synth itself
 class SynthWindowUniversal(SynthWindow):
 
@@ -116,43 +133,10 @@ class SynthWindowUniversal(SynthWindow):
         #print "group_type: %s" % group_type
         #print "context: %s" % repr(context)
 
-        if parent:
-            frame = gtk.Frame(group_name)
-            frame.set_shadow_type(self.group_shadow_type)
-            group = frame
+        if group_type == zynjacku.DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
+            return SynthWindowUniversalGroupGeneric(self, synth, parent, group_name, group_type, context)
         else:
-            scrolled_window = gtk.ScrolledWindow()
-            scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-            group = scrolled_window
-
-        if self.layout_type == SynthWindowUniversal.layout_type_horizontal:
-            group.box_params = gtk.VBox()
-            group.box_top = gtk.HBox()
-        else:
-            group.box_params = gtk.HBox()
-            group.box_top = gtk.VBox()
-
-        group.box_top.pack_start(group.box_params, False, False)
-
-        if parent:
-           frame.add(frame.box_top)
-
-           if self.layout_type == SynthWindowUniversal.layout_type_horizontal:
-               frame.set_label_align(0.5, 0.5)
-
-           align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-           align.set_padding(0, 10, 10, 10)
-           align.add(frame)
-           parent.box_top.pack_start(align, False, True) # False, False
-        else:
-            scrolled_window.add_with_viewport(group.box_top)
-            self.window.add(scrolled_window)
-
-        if self.ui_enabled:
-            self.window.show_all()
-
-        group.context = context
-        return group
+            return SynthWindowUniversalGroupGeneric(self, synth, parent, group_name, group_type, context)
 
     def on_group_disappeared(self, synth, object):
         print "-------------- Group disappeared"
@@ -165,29 +149,13 @@ class SynthWindowUniversal(SynthWindow):
         #print "value: %s" % repr(value)
         #print "context: %s" % repr(context)
 
-        widget = gtk.CheckButton(name)
-
-        widget.set_active(value)
-        widget.connect("toggled", self.on_bool_toggled, synth)
-
-        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(10, 10, 10, 10)
-        align.add(widget)
-
-        parent.box_params.pack_start(align, False, False)
-
-        if self.ui_enabled:
-            self.window.show_all()
-
-        widget.context = context
-        return widget
-
-    def on_bool_toggled(self, widget, synth):
-        #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
-        synth.bool_set(widget.context, widget.get_active())
+        parameter = SynthWindowUniversalParameterBool(self, synth, parent, name, value, context)
+        parent.parameter_add(parameter)
+        return parameter
 
     def on_bool_disappeared(self, synth, object):
-        print "-------------- Bool disappeared"
+        #print "-------------- Bool disappeared"
+        obj.remove()
 
     def on_float_appeared(self, synth, parent, name, value, min, max, context):
         #print "-------------- Float appeared"
@@ -198,6 +166,78 @@ class SynthWindowUniversal(SynthWindow):
         #print "value: %s" % repr(min)
         #print "value: %s" % repr(max)
         #print "context: %s" % repr(context)
+
+        parameter = SynthWindowUniversalParameterFloat(self, synth, parent, name, value, min, max, context)
+        parent.parameter_add(parameter)
+        return parameter
+
+    def on_float_disappeared(self, synth, obj):
+        #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
+        #print repr(self.parent)
+        #print repr(obj)
+        obj.remove()
+
+class SynthWindowUniversalGroupGeneric(gobject.GObject):
+    def __init__(self, window, synth, parent, group_name, group_type, context):
+        gobject.GObject.__init__(self)
+
+        self.window = window
+        self.group_name = group_name
+        self.parent = parent
+
+        if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+            self.box_params = gtk.VBox()
+            self.box_top = gtk.HBox()
+        else:
+            self.box_params = gtk.HBox()
+            self.box_top = gtk.VBox()
+
+        self.box_top.pack_start(self.box_params, False, False)
+
+        if parent:
+            frame = gtk.Frame(group_name)
+            frame.set_shadow_type(self.window.group_shadow_type)
+
+            frame.add(self.box_top)
+
+            if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+                frame.set_label_align(0.5, 0.5)
+
+            align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+            align.set_padding(0, 10, 10, 10)
+            align.add(frame)
+            parent.box_top.pack_start(align, False, True)
+        else:
+            self.scrolled_window = gtk.ScrolledWindow()
+            self.scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+            self.scrolled_window.add_with_viewport(self.box_top)
+            self.window.window.add(self.scrolled_window)
+
+        if window.ui_enabled:
+            window.window.show_all()
+
+        self.context = context
+
+        #print "Generic group \"%s\" created: %s" % (group_name, repr(self))
+
+    def parameter_add(self, obj):
+        #print "parameter_add %s for group \"%s\"" % (repr(obj), self.group_name)
+        self.box_params.pack_start(obj.get_top_widget(), False, False)
+
+        if self.window.ui_enabled:
+            self.window.window.show_all()
+
+    def parameter_remove(self, obj):
+        #print "parameter_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        if self.parent:
+            self.box_params.remove(obj.get_top_widget())
+        else:
+            self.window.window.remove(self.scrolled_window)
+
+class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
+    def __init__(self, window, synth, parent_group, name, value, min, max, context):
+        SynthWindowUniversalParameter.__init__(self, parent_group, name, context)
 
         box = gtk.VBox()
         box.pack_start(gtk.Label(name), False, False)
@@ -214,31 +254,40 @@ class SynthWindowUniversal(SynthWindow):
         align.add(hbox)
         box.pack_start(align, False, False)
 
-        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(10, 10, 10, 10)
-        align.add(box)
+        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        self.align.set_padding(10, 10, 10, 10)
+        self.align.add(box)
 
-        obj = align
-        obj.adjustment = adjustment
-        obj.parameter_name = name
+        self.adjustment = adjustment
 
-        adjustment.connect("value-changed", self.on_float_value_changed, synth, obj)
+        adjustment.connect("value-changed", self.on_value_changed, synth)
 
-        parent.box_params.pack_start(obj, False, False)
+    def get_top_widget(self):
+        return self.align
 
-        if self.ui_enabled:
-            self.window.show_all()
-
-        obj.context = context
-        return align
-
-    def on_float_value_changed(self, adjustment, synth, obj):
+    def on_value_changed(self, adjustment, synth):
         #print "Float changed. \"%s\" set to %f" % (obj.parameter_name, adjustment.get_value())
-        synth.float_set(obj.context, adjustment.get_value())
+        synth.float_set(self.context, adjustment.get_value())
 
-    def on_float_disappeared(self, synth, obj):
-        #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
-        obj.get_parent().remove(obj)
+class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
+    def __init__(self, window, synth, parent_group, name, value, context):
+        SynthWindowUniversalParameter.__init__(self, parent_group, name, context)
+
+        widget = gtk.CheckButton(name)
+
+        widget.set_active(value)
+        widget.connect("toggled", self.on_toggled, synth)
+
+        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        self.align.set_padding(10, 10, 10, 10)
+        self.align.add(widget)
+
+    def get_top_widget(self):
+        return self.align
+
+    def on_toggled(self, widget, synth):
+        #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
+        synth.bool_set(self.context, widget.get_active())
 
 class SynthWindowFactory:
     def __init__(self):
@@ -451,6 +500,9 @@ def main():
 
     gobject.type_register(SynthWindow)
     gobject.type_register(SynthWindowUniversal)
+    gobject.type_register(SynthWindowUniversalGroupGeneric)
+    gobject.type_register(SynthWindowUniversalParameterFloat)
+    gobject.type_register(SynthWindowUniversalParameterBool)
 
     if len(sys.argv) == 2:
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
