@@ -41,11 +41,14 @@
 #include "zynjacku.h"
 
 /* signals */
-#define ZYNJACKU_SYNTH_SIGNAL_TEST             0
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED   1
-#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED    2
-#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED   3
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT           4
+#define ZYNJACKU_SYNTH_SIGNAL_TEST                0
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED      1
+#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED       2
+#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED      3
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED   4
+#define ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED    5
+#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED   6
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT              7
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -286,6 +289,48 @@ zynjacku_synth_class_init(
       G_TYPE_FLOAT,             /* min */
       G_TYPE_FLOAT,             /* max */
       G_TYPE_STRING);           /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
+    g_signal_new(
+      "group-disappeared",      /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED] =
+    g_signal_new(
+      "bool-disappeared",       /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED] =
+    g_signal_new(
+      "float-disappeared",      /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
@@ -806,6 +851,14 @@ dynparam_generic_group_disappeared(
   void * parent_group_ui_context,
   void * group_ui_context)
 {
+  LOG_DEBUG("dynparam_generic_group_disappeared() called.");
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED],
+    0,
+    group_ui_context);
+
   g_object_unref(group_ui_context);
 }
 
@@ -815,6 +868,14 @@ dynparam_parameter_boolean_disappeared(
   void * parent_group_ui_context,
   void * parameter_ui_context)
 {
+  LOG_DEBUG("dynparam_parameter_boolean_disappeared() called.");
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED],
+    0,
+    parameter_ui_context);
+
   g_object_unref(parameter_ui_context);
 }
 
@@ -824,6 +885,14 @@ dynparam_parameter_float_disappeared(
   void * parent_group_ui_context,
   void * parameter_ui_context)
 {
+  LOG_DEBUG("dynparam_parameter_float_disappeared() called.");
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED],
+    0,
+    parameter_ui_context);
+
   g_object_unref(parameter_ui_context);
 }
 

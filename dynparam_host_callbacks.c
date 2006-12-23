@@ -23,6 +23,8 @@
  *****************************************************************************/
 
 #include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 
 #include "lv2.h"
 #include "lv2dynparam.h"
@@ -33,7 +35,7 @@
 #include "dynparam_host_callbacks.h"
 #include "dynparam_preallocate.h"
 
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance_host_context)
@@ -47,74 +49,54 @@ lv2dynparam_host_group_appear(
 {
   struct lv2dynparam_host_group * group_ptr;
   struct lv2dynparam_host_group * parent_group_ptr;
-  struct lv2dynparam_host_message * message_ptr;
-
-  LOG_DEBUG("Group appeared.");
 
   parent_group_ptr = (struct lv2dynparam_host_group *)parent_group_host_context;
+
+  if (parent_group_ptr == NULL &&
+      instance_ptr->root_group_ptr != NULL)
+  {
+    /* Top level groups cannot disappear */
+    LOG_ERROR("Plugin tried to create two top level groups");
+    goto fail;
+  }
 
   group_ptr = lv2dynparam_get_unused_group();
   if (group_ptr == NULL)
   {
+    /* we are not lucky enough, plugin will retry later */
     goto fail;
   }
 
   group_ptr->parent_group_ptr = parent_group_ptr;
+
   group_ptr->group_handle = group;
+
   INIT_LIST_HEAD(&group_ptr->child_groups);
   INIT_LIST_HEAD(&group_ptr->child_params);
   INIT_LIST_HEAD(&group_ptr->child_commands);
-  group_ptr->gui_referenced = FALSE;
 
-  if (!instance_ptr->callbacks_ptr->group_get_name(
-        group_ptr->group_handle,
-        group_ptr->name,
-        LV2DYNPARAM_MAX_STRING_SIZE))
-  {
-    LOG_ERROR("lv2dynparam get_group_name() failed.");
-    goto fail_put_group;
-  }
+  instance_ptr->callbacks_ptr->group_get_name(group, group_ptr->name);
+  instance_ptr->callbacks_ptr->group_get_type_uri(group, group_ptr->type_uri);
 
-  LOG_DEBUG("Group name is \"%s\"", group_ptr->name);
-
-  if (!instance_ptr->callbacks_ptr->group_get_type_uri(
-        group_ptr->group_handle,
-        group_ptr->type,
-        LV2DYNPARAM_MAX_STRING_SIZE))
-  {
-    LOG_ERROR("lv2dynparam get_group_type_uri() failed.");
-    goto fail_put_group;
-  }
-
-  LOG_DEBUG("Group type is \"%s\"", group_ptr->type);
-
-  message_ptr = lv2dynparam_get_unused_message();
-  if (message_ptr == NULL)
-  {
-    goto fail_put_group;
-  }
+  group_ptr->pending_state = LV2DYNPARAM_PENDING_APPEAR;
+  group_ptr->pending_childern_count = 0;
 
   if (parent_group_ptr == NULL)
   {
-    LOG_DEBUG("The top level group.");
+    LOG_DEBUG("The top level group \"%s\" of type \"%s\" appeared", group_ptr->name, group_ptr->type_uri);
     instance_ptr->root_group_ptr = group_ptr;
   }
   else
   {
-    LOG_DEBUG("Parent is \"%s\".", parent_group_ptr->name);
+    LOG_DEBUG("Group \"%s\" of type \"%s\" with parent \"%s\" appeared.", group_ptr->name, group_ptr->type_uri, parent_group_ptr->name);
     list_add_tail(&group_ptr->siblings, &parent_group_ptr->child_groups);
-  }
 
-  message_ptr->message_type = LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR;
-  message_ptr->context.group = group_ptr;
-  list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
+    lv2dynparam_host_group_pending_children_count_increment(parent_group_ptr);
+  }
 
   *group_host_context = group_ptr;
 
   return TRUE;
-
-fail_put_group:
-  lv2dynparam_put_unused_group(group_ptr);
 
 fail:
   return FALSE;
@@ -138,11 +120,7 @@ lv2dynparam_host_parameter_appear(
   struct lv2dynparam_host_parameter * param_ptr;
   struct lv2dynparam_host_group * group_ptr;
 
-  LOG_DEBUG("Parameter appeared.");
-
   group_ptr = (struct lv2dynparam_host_group *)group_host_context;
-
-  LOG_DEBUG("Parent is \"%s\".", group_ptr->name);
 
   param_ptr = lv2dynparam_get_unused_parameter();
   if (param_ptr == NULL)
@@ -151,29 +129,15 @@ lv2dynparam_host_parameter_appear(
   }
 
   param_ptr->param_handle = parameter;
-  param_ptr->gui_referenced = FALSE;
 
-  if (!instance_ptr->callbacks_ptr->parameter_get_name(
-        param_ptr->param_handle,
-        param_ptr->name,
-        LV2DYNPARAM_MAX_STRING_SIZE))
-  {
-    LOG_ERROR("lv2dynparam get_param_name() failed.");
-    goto fail_put;
-  }
+  /* Add parameter as child of its group */
+  param_ptr->group_ptr = group_ptr;
+  list_add_tail(&param_ptr->siblings, &group_ptr->child_params);
 
-  LOG_DEBUG("Parameter name is \"%s\"", param_ptr->name);
+  instance_ptr->callbacks_ptr->parameter_get_name(parameter, param_ptr->name);
+  instance_ptr->callbacks_ptr->parameter_get_type_uri(parameter, param_ptr->type_uri);
 
-  if (!instance_ptr->callbacks_ptr->parameter_get_type_uri(
-        param_ptr->param_handle,
-        param_ptr->type_uri,
-        LV2DYNPARAM_MAX_STRING_SIZE))
-  {
-    LOG_ERROR("lv2dynparam get_parameter_type_uri() failed.");
-    goto fail_put;
-  }
-
-  LOG_DEBUG("Parameter type is \"%s\"", param_ptr->type_uri);
+  LOG_DEBUG("Parameter \"%s\" of type \"%s\" with parent \"%s\" appeared.", param_ptr->name, param_ptr->type_uri, group_ptr->name);
 
   lv2dynparam_host_map_type_uri(param_ptr);
 
@@ -221,27 +185,29 @@ lv2dynparam_host_parameter_appear(
     break;
   }
 
-  /* Add parameter as child of its group */
-  param_ptr->group_ptr = group_ptr;
-  list_add_tail(&param_ptr->siblings, &group_ptr->child_params);
+  param_ptr->pending_state = LV2DYNPARAM_PENDING_APPEAR;
+  lv2dynparam_host_group_pending_children_count_increment(group_ptr);
 
-  //list_add_tail(&message_ptr->siblings, &instance_ptr->realtime_to_ui_queue);
+  *parameter_host_context = param_ptr;
 
   return TRUE;
-
-fail_put:
-  lv2dynparam_put_unused_parameter(param_ptr);
 
 fail:
   return FALSE;
 }
+
+#define param_ptr ((struct lv2dynparam_host_parameter *)parameter_host_context)
 
 unsigned char
 lv2dynparam_host_parameter_disappear(
   void * instance_host_context,
   void * parameter_host_context)
 {
-  LOG_DEBUG("Parameter disappear");
+  LOG_DEBUG("Parameter %s disappeared.", param_ptr->name);
+
+  param_ptr->pending_state = LV2DYNPARAM_PENDING_DISAPPEAR;
+  lv2dynparam_host_group_pending_children_count_increment(param_ptr->group_ptr);
+
   return TRUE;
 }
 

@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "lv2.h"
 #include "lv2dynparam.h"
@@ -32,7 +33,7 @@
 #include "dynparam_host_callbacks.h"
 #include "dynparam_preallocate.h"
 
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 void
@@ -128,13 +129,39 @@ fail:
 }
 
 void
+lv2dynparam_host_group_pending_children_count_increment(
+  struct lv2dynparam_host_group * group_ptr)
+{
+  group_ptr->pending_childern_count++;
+
+  if (group_ptr->parent_group_ptr != NULL)
+  {
+    lv2dynparam_host_group_pending_children_count_increment(group_ptr->parent_group_ptr);
+  }
+}
+
+void
+lv2dynparam_host_group_pending_children_count_decrement(
+  struct lv2dynparam_host_group * group_ptr)
+{
+  assert(group_ptr->pending_childern_count != 0);
+
+  group_ptr->pending_childern_count--;
+
+  if (group_ptr->parent_group_ptr != NULL)
+  {
+    lv2dynparam_host_group_pending_children_count_decrement(group_ptr->parent_group_ptr);
+  }
+}
+
+void
 lv2dynparam_host_notify_group_appeared(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_group * group_ptr)
 {
   void * parent_group_ui_context;
 
-  LOG_DEBUG("lv2dynparam_host_notify_group_appeared() called.");
+  //LOG_DEBUG("lv2dynparam_host_notify_group_appeared() called.");
 
   if (group_ptr->parent_group_ptr)
   {
@@ -155,8 +182,6 @@ lv2dynparam_host_notify_group_appeared(
       group_ptr->name,
       &group_ptr->ui_context);
   }
-
-  group_ptr->gui_referenced = TRUE;
 }
 
 void
@@ -166,7 +191,7 @@ lv2dynparam_host_notify_group_disappeared(
 {
   void * parent_group_ui_context;
 
-  LOG_DEBUG("lv2dynparam_host_notify_group_disappeared() called.");
+  //LOG_DEBUG("lv2dynparam_host_notify_group_disappeared() called.");
 
   if (group_ptr->parent_group_ptr)
   {
@@ -185,8 +210,6 @@ lv2dynparam_host_notify_group_disappeared(
       parent_group_ui_context,
       group_ptr->ui_context);
   }
-
-  group_ptr->gui_referenced = FALSE;
 }
 
 void
@@ -194,6 +217,8 @@ lv2dynparam_host_notify_parameter_appeared(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_parameter * parameter_ptr)
 {
+  LOG_DEBUG("lv2dynparam_host_notify_group_appeared() called for \"%s\".", parameter_ptr->name);
+
   switch (parameter_ptr->type)
   {
   case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
@@ -217,8 +242,6 @@ lv2dynparam_host_notify_parameter_appeared(
       &parameter_ptr->ui_context);
     break;
   }
-
-  parameter_ptr->gui_referenced = TRUE;
 }
 
 void
@@ -241,32 +264,48 @@ lv2dynparam_host_notify_parameter_disappeared(
       parameter_ptr->ui_context);
     break;
   }
-
-  parameter_ptr->gui_referenced = FALSE;
 }
 
+/* called when ui is shown */
 void
 lv2dynparam_host_notify(
   struct lv2dynparam_host_instance * instance_ptr,
   struct lv2dynparam_host_group * group_ptr)
 {
   struct list_head * node_ptr;
+  struct list_head * temp_node_ptr;
   struct lv2dynparam_host_group * child_group_ptr;
   struct lv2dynparam_host_parameter * parameter_ptr;
 
-  LOG_DEBUG("Iterating \"%s\" groups begin", group_ptr->name);
+  //LOG_DEBUG("Iterating \"%s\" groups begin", group_ptr->name);
+
+  assert(instance_ptr->ui);
 
   list_for_each(node_ptr, &group_ptr->child_groups)
   {
-    child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
-    LOG_DEBUG("host notify - group \"%s\"", child_group_ptr->name);
-
-    if (!child_group_ptr->gui_referenced)
+    if (group_ptr->pending_childern_count == 0)
     {
+      break;
+    }
+
+    child_group_ptr = list_entry(node_ptr, struct lv2dynparam_host_group, siblings);
+    //LOG_DEBUG("host notify - group \"%s\"", child_group_ptr->name);
+
+    switch (child_group_ptr->pending_state)
+    {
+    case LV2DYNPARAM_PENDING_APPEAR:
       /* UI knows nothing about this group - notify it */
       lv2dynparam_host_notify_group_appeared(
         instance_ptr,
         child_group_ptr);
+      child_group_ptr->pending_state = LV2DYNPARAM_PENDING_NOTHING;
+      lv2dynparam_host_group_pending_children_count_decrement(group_ptr);
+      break;
+    case LV2DYNPARAM_PENDING_NOTHING:
+      break;
+    default:
+      LOG_ERROR("unknown pending_state %u of group \"%s\"", child_group_ptr->pending_state, child_group_ptr->name);
+      assert(0);
     }
 
     lv2dynparam_host_notify(
@@ -274,25 +313,48 @@ lv2dynparam_host_notify(
       child_group_ptr);
   }
 
-  LOG_DEBUG("Iterating \"%s\" groups end", group_ptr->name);
-  LOG_DEBUG("Iterating \"%s\" params begin", group_ptr->name);
+  //LOG_DEBUG("Iterating \"%s\" groups end", group_ptr->name);
+  //LOG_DEBUG("Iterating \"%s\" params begin", group_ptr->name);
 
-  list_for_each(node_ptr, &group_ptr->child_params)
+  list_for_each_safe(node_ptr, temp_node_ptr, &group_ptr->child_params)
   {
-    parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
-    LOG_DEBUG("host notify - parameter \"%s\"", parameter_ptr->name);
-
-    if (!parameter_ptr->gui_referenced)
+    if (group_ptr->pending_childern_count == 0)
     {
+      break;
+    }
+
+    parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
+    //LOG_DEBUG("host notify - parameter \"%s\"", parameter_ptr->name);
+
+    switch (parameter_ptr->pending_state)
+    {
+    case LV2DYNPARAM_PENDING_APPEAR:
       lv2dynparam_host_notify_parameter_appeared(
         instance_ptr,
         parameter_ptr);
+      parameter_ptr->pending_state = LV2DYNPARAM_PENDING_NOTHING;
+      lv2dynparam_host_group_pending_children_count_decrement(group_ptr);
+      break;
+    case LV2DYNPARAM_PENDING_NOTHING:
+      break;
+    case LV2DYNPARAM_PENDING_DISAPPEAR:
+      lv2dynparam_host_notify_parameter_disappeared(
+        instance_ptr,
+        parameter_ptr);
+      parameter_ptr->pending_state = LV2DYNPARAM_PENDING_NOTHING;
+      lv2dynparam_host_group_pending_children_count_decrement(group_ptr);
+      list_del(&parameter_ptr->siblings);
+      break;
+    default:
+      LOG_ERROR("unknown pending_state %u of parameter \"%s\"", parameter_ptr->pending_state, parameter_ptr->name);
+      assert(0);
     }
   }
 
-  LOG_DEBUG("Iterating \"%s\" params end", group_ptr->name);
+  //LOG_DEBUG("Iterating \"%s\" params end", group_ptr->name);
 }
 
+/* called when ui going off */
 void
 lv2dynparam_host_group_hide(
   struct lv2dynparam_host_instance * instance_ptr,
@@ -302,26 +364,30 @@ lv2dynparam_host_group_hide(
   struct lv2dynparam_host_group * child_group_ptr;
   struct lv2dynparam_host_parameter * parameter_ptr;
 
-  if (!group_ptr->gui_referenced)
+  assert(!instance_ptr->ui);
+
+  if (group_ptr->pending_state == LV2DYNPARAM_PENDING_APPEAR)
   {
     /* UI does not know about this group and thus cannot know about its childred too */
     return;
   }
 
-  LOG_DEBUG("Hidding group \"%s\" group", group_ptr->name);
+  //LOG_DEBUG("Hidding group \"%s\" group", group_ptr->name);
 
   list_for_each(node_ptr, &group_ptr->child_params)
   {
     parameter_ptr = list_entry(node_ptr, struct lv2dynparam_host_parameter, siblings);
 
-    if (parameter_ptr->gui_referenced)
+    if (parameter_ptr->pending_state != LV2DYNPARAM_PENDING_APPEAR)
     {
-
-      LOG_DEBUG("Hidding parameter \"%s\" group", parameter_ptr->name);
+      //LOG_DEBUG("Hidding parameter \"%s\" group", parameter_ptr->name);
 
       lv2dynparam_host_notify_parameter_disappeared(
         instance_ptr,
         parameter_ptr);
+
+      parameter_ptr->pending_state = LV2DYNPARAM_PENDING_APPEAR;
+      lv2dynparam_host_group_pending_children_count_increment(group_ptr);
     }
   }
 
@@ -332,11 +398,15 @@ lv2dynparam_host_group_hide(
     lv2dynparam_host_group_hide(
       instance_ptr,
       child_group_ptr);
+
+    lv2dynparam_host_group_pending_children_count_increment(group_ptr);
   }
 
   lv2dynparam_host_notify_group_disappeared(
     instance_ptr,
     group_ptr);
+
+  group_ptr->pending_state = LV2DYNPARAM_PENDING_APPEAR;
 }
 
 #define instance_ptr ((struct lv2dynparam_host_instance *)instance)
@@ -394,52 +464,29 @@ void
 lv2dynparam_host_ui_run(
   lv2dynparam_host_instance instance)
 {
-  struct list_head * node_ptr;
-  struct lv2dynparam_host_message * message_ptr;
-/*   struct lv2dynparam_host_command * command_ptr; */
-/*   struct lv2dynparam_host_parameter * parameter_ptr; */
-  struct lv2dynparam_host_group * group_ptr;
-
   //LOG_DEBUG("lv2dynparam_host_ui_run() called.");
 
   audiolock_enter_ui(instance_ptr->lock);
 
-  while (!list_empty(&instance_ptr->realtime_to_ui_queue))
+  if (instance_ptr->ui)         /* we have nothing to do if there is no ui shown */
   {
-    node_ptr = instance_ptr->realtime_to_ui_queue.next;
-    list_del(node_ptr);
-    message_ptr = list_entry(node_ptr, struct lv2dynparam_host_message, siblings);
+    /* At this point we should have the root group appeared and gui-referenced,
+       because it appears and host attach that is called before lv2dynparam_host_ui_on()
+       and because lv2dynparam_host_ui_on() will gui-reference it. */
+    assert(instance_ptr->root_group_ptr != NULL);
+    assert(instance_ptr->root_group_ptr->pending_state == LV2DYNPARAM_PENDING_NOTHING);
+    //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
 
-    if (instance_ptr->ui)
+    if (instance_ptr->root_group_ptr->pending_childern_count != 0)
     {
-      switch (message_ptr->message_type)
-      {
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR:
-        lv2dynparam_host_notify_group_appeared(
-          instance_ptr,
-          message_ptr->context.group);
+      lv2dynparam_host_notify(
+        instance_ptr,
+        instance_ptr->root_group_ptr);
 
-        group_ptr->gui_referenced = TRUE;
-
-        break;
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_DISAPPEAR:
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_APPEAR:
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_DISAPPEAR:
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE:
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_APPEAR:
-      case LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_DISAPPEAR:
-      default:
-        LOG_ERROR("Message of unknown type %u received", message_ptr->message_type);
-      }
+      assert(instance_ptr->root_group_ptr->pending_childern_count == 0);
     }
-    else
-    {
-      LOG_DEBUG("ignoring message of type %u because UI is off.", message_ptr->message_type);
-    }
-
-    lv2dynparam_put_unused_message(message_ptr);
   }
-  
+
   audiolock_leave_ui(instance_ptr->lock);
 }
 
@@ -449,21 +496,29 @@ lv2dynparam_host_ui_on(
 {
   audiolock_enter_ui(instance_ptr->lock);
 
-  LOG_DEBUG("UI on - notifying for new things.");
-
-  if (instance_ptr->root_group_ptr != NULL)
+  if (!instance_ptr->ui)
   {
-    if (!instance_ptr->root_group_ptr->gui_referenced)
-    {
-      /* UI knows nothing about this group - notify it */
-      lv2dynparam_host_notify_group_appeared(
-        instance_ptr,
-        instance_ptr->root_group_ptr);
-    }
+    assert(instance_ptr->root_group_ptr != NULL); /* root group appears on host_attach */
+
+    LOG_DEBUG("UI on - notifying for new things.");
+    //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
+
+    instance_ptr->ui = TRUE;
+
+    /* UI knows nothing about root group - notify it */
+    //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
+    assert(instance_ptr->root_group_ptr->pending_state == LV2DYNPARAM_PENDING_APPEAR);
+    lv2dynparam_host_notify_group_appeared(
+      instance_ptr,
+      instance_ptr->root_group_ptr);
+    instance_ptr->root_group_ptr->pending_state = LV2DYNPARAM_PENDING_NOTHING;
 
     lv2dynparam_host_notify(
       instance_ptr,
       instance_ptr->root_group_ptr);
+
+    //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
+    assert(instance_ptr->root_group_ptr->pending_childern_count == 0);
   }
 
   audiolock_leave_ui(instance_ptr->lock);
@@ -476,13 +531,17 @@ lv2dynparam_host_ui_off(
   audiolock_enter_ui(instance_ptr->lock);
 
   LOG_DEBUG("UI off - removing known things.");
+  //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
 
-  if (instance_ptr->root_group_ptr != NULL)
-  {
-    lv2dynparam_host_group_hide(
-      instance_ptr,
-      instance_ptr->root_group_ptr);
-  }
+  instance_ptr->ui = FALSE;
+
+  assert(instance_ptr->root_group_ptr != NULL); /* root group appears on host_attach */
+
+  lv2dynparam_host_group_hide(
+    instance_ptr,
+    instance_ptr->root_group_ptr);
+
+  //LOG_DEBUG("pending_childern_count is %u", instance_ptr->root_group_ptr->pending_childern_count);
 
   audiolock_leave_ui(instance_ptr->lock);
 }

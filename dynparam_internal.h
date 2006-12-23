@@ -23,8 +23,6 @@
 #ifndef DYNPARAM_INTERNAL_H__86778596_B1A9_4BD7_A14A_BECBD5589468__INCLUDED
 #define DYNPARAM_INTERNAL_H__86778596_B1A9_4BD7_A14A_BECBD5589468__INCLUDED
 
-#define LV2DYNPARAM_MAX_STRING_SIZE 1024
-
 #define LV2DYNPARAM_GROUP_TYPE_GENERIC   0
 #define LV2DYNPARAM_GROUP_TYPE_GENERIC_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/group_generic"
 #define LV2DYNPARAM_GROUP_TYPE_ADSR      1
@@ -44,6 +42,10 @@
 #define LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN   6
 #define LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam/parameter_boolean"
 
+#define LV2DYNPARAM_PENDING_NOTHING    0 /* nothing pending */
+#define LV2DYNPARAM_PENDING_APPEAR     1 /* pending appear */
+#define LV2DYNPARAM_PENDING_DISAPPEAR  2 /* pending disappear */
+
 struct lv2dynparam_host_group
 {
   struct list_head siblings;
@@ -55,9 +57,11 @@ struct lv2dynparam_host_group
   struct list_head child_commands;
 
   char name[LV2DYNPARAM_MAX_STRING_SIZE];
-  char type[LV2DYNPARAM_MAX_STRING_SIZE];
+  char type_uri[LV2DYNPARAM_MAX_STRING_SIZE];
 
-  BOOL gui_referenced;
+  unsigned int pending_state;
+  unsigned int pending_childern_count;
+
   void * ui_context;
 };
 
@@ -90,7 +94,8 @@ struct lv2dynparam_host_parameter
     float fpoint;
   } max;
 
-  BOOL gui_referenced;
+  unsigned int pending_state;
+
   void * ui_context;
 };
 
@@ -104,6 +109,9 @@ struct lv2dynparam_host_command
   BOOL gui_referenced;
   void * ui_context;
 };
+
+#define LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE          0
+#define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_EXECUTE           1
 
 struct lv2dynparam_host_message
 {
@@ -134,17 +142,16 @@ struct lv2dynparam_host_instance
   struct list_head ui_to_realtime_queue; /* protected by the audiolock */
 };
 
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_APPEAR              1
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_GROUP_DISAPPEAR           2
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_APPEAR          3
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_DISAPPEAR       4
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_PARAMETER_CHANGE          5
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_APPEAR            6
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_DISAPPEAR         7
-#define LV2DYNPARAM_HOST_MESSAGE_TYPE_COMMAND_EXECUTE           8
-
 void
 lv2dynparam_host_map_type_uri(
   struct lv2dynparam_host_parameter * parameter_ptr);
+
+void
+lv2dynparam_host_group_pending_children_count_increment(
+  struct lv2dynparam_host_group * group_ptr);
+
+void
+lv2dynparam_host_group_pending_children_count_decrement(
+  struct lv2dynparam_host_group * group_ptr);
 
 #endif /* #ifndef DYNPARAM_INTERNAL_H__86778596_B1A9_4BD7_A14A_BECBD5589468__INCLUDED */

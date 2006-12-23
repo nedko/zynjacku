@@ -131,6 +131,9 @@ extern "C" {
 /* URI of the LV2 extension defined in this file */
 #define LV2DYNPARAM_URI "http://nedko.arnaudov.name/soft/zyn/lv2dynparam.h"
 
+/* max size of name and type_uri buffers, including terminating zero char */
+#define LV2DYNPARAM_MAX_STRING_SIZE 1024
+
 typedef void * lv2dynparam_parameter_handle;
 typedef void * lv2dynparam_group_handle;
 typedef void * lv2dynparam_command_handle;
@@ -293,76 +296,52 @@ struct lv2dynparam_plugin_callbacks
    * Plugin implementation must not suspend execution (sleep/lock).
    *
    * @param group Group handle, as supplied by plugin
-   * @param buffer Pointer to buffer where ASCIIZ string containing
-   * type URI of the group will be stored,
-   * @param buffer_size size of buffer pointer by the @c buffer
-   * parameter
-   *
-   * @return Success status
-   * @retval Non-zero - success
-   * @retval Zero - error, buffer too small
+   * @param buffer Pointer to buffer with size of
+   * LV2DYNPARAM_MAX_STRING_SIZE bytes, where ASCIIZ string containing
+   * type URI of the group will be stored.
    */
-  unsigned char (*group_get_type_uri)(
+  void (*group_get_type_uri)(
     lv2dynparam_group_handle group,
-    char * buffer,
-    size_t buffer_size);
+    char * buffer);
 
   /**
    * This function is called by host to retrieve name of group
    * Plugin implementation must not suspend execution (sleep/lock).
    *
    * @param group Group handle, as supplied by plugin
-   * @param buffer Pointer to buffer where ASCIIZ string containing
-   * name of the group will be stored,
-   * @param buffer_size size of buffer pointer by the @c buffer
-   * parameter
-   *
-   * @return Success status
-   * @retval Non-zero - success
-   * @retval Zero - error, buffer too small
+   * @param buffer Pointer to buffer with size of
+   * LV2DYNPARAM_MAX_STRING_SIZE bytes, where ASCIIZ string containing
+   * name of the group will be stored.
    */
-  unsigned char (*group_get_name)(
+  void (*group_get_name)(
     lv2dynparam_group_handle group,
-    char * buffer,
-    size_t buffer_size);
+    char * buffer);
 
   /**
    * This function is called by host to retrieve type URI of parameter
    * Plugin implementation must not suspend execution (sleep/lock).
    *
    * @param parameter Parameter handle, as supplied by plugin
-   * @param buffer Pointer to buffer where ASCIIZ string containing
-   * type URI of the parameter will be stored,
-   * @param buffer_size size of buffer pointer by the @c buffer
-   * parameter
-   *
-   * @return Success status
-   * @retval Non-zero - success
-   * @retval Zero - error, buffer too small
+   * @param buffer Pointer to buffer with size of
+   * LV2DYNPARAM_MAX_STRING_SIZE bytes, where ASCIIZ string containing
+   * type URI of the parameter will be stored.
    */
-  unsigned char (*parameter_get_type_uri)(
+  void (*parameter_get_type_uri)(
     lv2dynparam_parameter_handle parameter,
-    char * buffer,
-    size_t buffer_size);
+    char * buffer);
 
   /**
    * This function is called by host to retrieve name of parameter
    * Plugin implementation must not suspend execution (sleep/lock).
    *
    * @param parameter Parameter handle, as supplied by plugin
-   * @param buffer Pointer to buffer where ASCIIZ string containing
-   * name of the parameter will be stored,
-   * @param buffer_size size of buffer pointer by the @c buffer
-   * parameter
-   *
-   * @return Success status
-   * @retval Non-zero - success
-   * @retval Zero - error, buffer too small
+   * @param buffer Pointer to buffer with size of
+   * LV2DYNPARAM_MAX_STRING_SIZE bytes, where ASCIIZ string containing
+   * name of the parameter will be stored.
    */
-  unsigned char (*parameter_get_name)(
+  void (*parameter_get_name)(
     lv2dynparam_parameter_handle parameter,
-    char * buffer,
-    size_t buffer_size);
+    char * buffer);
 
   /**
    * This funtion is called by host to retrieve pointer to memory
@@ -404,26 +383,21 @@ struct lv2dynparam_plugin_callbacks
    *
    * @param parameter Parameter handle, as supplied by plugin
    */
-  void (*parameter_change)(lv2dynparam_parameter_handle parameter);
+  void (*parameter_change)(
+    lv2dynparam_parameter_handle parameter);
 
   /**
    * This function is called by host to retrieve name of command
    * Plugin implementation must not suspend execution (sleep/lock).
    *
    * @param command Command handle, as supplied by plugin
-   * @param buffer Pointer to buffer where ASCIIZ string containing
-   * name of the command will be stored,
-   * @param buffer_size size of buffer pointer by the @c buffer
-   * parameter
-   *
-   * @return Success status
-   * @retval Non-zero - success
-   * @retval Zero - error, buffer too small
+   * @param buffer Pointer to buffer with size of
+   * LV2DYNPARAM_MAX_STRING_SIZE bytes, where ASCIIZ string containing
+   * name of the command will be stored.
    */
-  unsigned char (*command_get_name)(
+  void (*command_get_name)(
     lv2dynparam_command_handle command,
-    char * buffer,
-    size_t buffer_size);
+    char * buffer);
 
   /**
    * This function is called by host to execute command defined by

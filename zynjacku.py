@@ -82,6 +82,9 @@ class SynthWindowUniversal(SynthWindow):
             self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
             self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
             self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
+            self.group_disappeared_connect_id = self.synth.connect("group-disappeared", self.on_group_disappeared)
+            self.bool_disappeared_connect_id = self.synth.connect("bool-disappeared", self.on_bool_disappeared)
+            self.float_disappeared_connect_id = self.synth.connect("float-disappeared", self.on_float_disappeared)
 
             self.synth.ui_on()
 
@@ -94,6 +97,9 @@ class SynthWindowUniversal(SynthWindow):
         if not self.ui_enabled:
             return
 
+        self.synth.disconnect(self.float_disappeared_connect_id)
+        self.synth.disconnect(self.bool_disappeared_connect_id)
+        self.synth.disconnect(self.group_disappeared_connect_id)
         self.synth.disconnect(self.float_appeared_connect_id)
         self.synth.disconnect(self.bool_appeared_connect_id)
         self.synth.disconnect(self.group_appeared_connect_id)
@@ -101,14 +107,6 @@ class SynthWindowUniversal(SynthWindow):
         self.window.hide_all()
 
         self.ui_enabled = False
-
-    def on_bool_toggled(self, widget, synth):
-        print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
-        synth.bool_set(widget.context, widget.get_active())
-
-    def on_float_value_changed(self, widget, synth):
-        print "Float changed. ... set to %f" % widget.get_value()
-        synth.float_set(widget.context, widget.get_value())
 
     def on_group_appeared(self, synth, parent, group_name, context):
         #print "-------------- Group appeared"
@@ -149,8 +147,14 @@ class SynthWindowUniversal(SynthWindow):
             scrolled_window.add_with_viewport(group.box_top)
             self.window.add(scrolled_window)
 
+        if self.ui_enabled:
+            self.window.show_all()
+
         group.context = context
         return group
+
+    def on_group_disappeared(self, synth, object):
+        print "-------------- Group disappeared"
 
     def on_bool_appeared(self, synth, parent, name, value, context):
         #print "-------------- Bool appeared"
@@ -171,8 +175,18 @@ class SynthWindowUniversal(SynthWindow):
 
         parent.box_params.pack_start(align, False, False)
 
+        if self.ui_enabled:
+            self.window.show_all()
+
         widget.context = context
         return widget
+
+    def on_bool_toggled(self, widget, synth):
+        #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
+        synth.bool_set(widget.context, widget.get_active())
+
+    def on_bool_disappeared(self, synth, object):
+        print "-------------- Bool disappeared"
 
     def on_float_appeared(self, synth, parent, name, value, min, max, context):
         #print "-------------- Float appeared"
@@ -199,16 +213,31 @@ class SynthWindowUniversal(SynthWindow):
         align.add(hbox)
         box.pack_start(align, False, False)
 
-        adjustment.connect("value-changed", self.on_float_value_changed, synth)
-
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         align.set_padding(10, 10, 10, 10)
         align.add(box)
 
-        parent.box_params.pack_start(align, False, False)
+        obj = align
+        obj.adjustment = adjustment
+        obj.parameter_name = name
 
-        adjustment.context = context
-        return knob
+        adjustment.connect("value-changed", self.on_float_value_changed, synth, obj)
+
+        parent.box_params.pack_start(obj, False, False)
+
+        if self.ui_enabled:
+            self.window.show_all()
+
+        obj.context = context
+        return align
+
+    def on_float_value_changed(self, adjustment, synth, obj):
+        #print "Float changed. \"%s\" set to %f" % (obj.parameter_name, adjustment.get_value())
+        synth.float_set(obj.context, adjustment.get_value())
+
+    def on_float_disappeared(self, synth, obj):
+        #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
+        obj.get_parent().remove(obj)
 
 class SynthWindowFactory:
     def __init__(self):
@@ -267,7 +296,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window.set_title(client_name)
 
         for uri in uris:
-            print "Loading %s" % uri
+            #print "Loading %s" % uri
             synth = zynjacku.Synth(uri=uri)
             if not synth.construct(self.engine):
                 print"Failed to construct %s" % uri
@@ -333,7 +362,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         return True
 
     def on_ui_visible_toggled(self, cell, path, model):
-        print "on_ui_visible_toggled() called."
+        #print "on_ui_visible_toggled() called."
         if model[path][0]:
             model[path][4].ui_win.hide()
             model[path][0] = False
@@ -371,6 +400,21 @@ class ZynjackuHostOne(ZynjackuHost):
         if not self.synth:
             return
 
+        if False:                       # test code
+            self.synth.ui_win.show()
+
+            self.synth.ui_win.hide()
+            self.synth.ui_off()
+            del(self.synth.ui_win)
+
+            if not ZynjackuHost.create_synth_window(self, self.synth):
+                print"Failed to create synth window"
+                return
+
+            self.synth.ui_win.show()
+
+            return
+        
         test_connect_id = self.synth.connect("test", self.on_test)
         self.synth.ui_win.show()
         self.synth.ui_win.connect("destroy", gtk.main_quit)
