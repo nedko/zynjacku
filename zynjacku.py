@@ -177,9 +177,9 @@ class SynthWindowUniversal(SynthWindow):
         #print repr(obj)
         obj.remove()
 
-class SynthWindowUniversalGroupGeneric(gobject.GObject):
+class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
     def __init__(self, window, synth, parent, group_name, group_type, context):
-        gobject.GObject.__init__(self)
+        SynthWindowUniversalGroup.__init__(self)
 
         self.window = window
         self.group_name = group_name
