@@ -108,11 +108,12 @@ class SynthWindowUniversal(SynthWindow):
 
         self.ui_enabled = False
 
-    def on_group_appeared(self, synth, parent, group_name, context):
+    def on_group_appeared(self, synth, parent, group_name, group_type, context):
         #print "-------------- Group appeared"
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "group_name: %s" % group_name
+        #print "group_type: %s" % group_type
         #print "context: %s" % repr(context)
 
         if parent:

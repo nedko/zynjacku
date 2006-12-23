@@ -88,16 +88,17 @@ lv2dynparam_host_ui_off(
 
 /* callback called from ui thread */
 void
-dynparam_generic_group_appeared(
+dynparam_group_appeared(
   lv2dynparam_host_group group_handle,
   void * instance_ui_context,
   void * parent_group_ui_context,
   const char * group_name,
+  const char * group_type_uri,
   void ** group_ui_context);
 
 /* callback called from ui thread */
 void
-dynparam_generic_group_disappeared(
+dynparam_group_disappeared(
   void * instance_ui_context,
   void * parent_group_ui_context,
   void * group_ui_context);

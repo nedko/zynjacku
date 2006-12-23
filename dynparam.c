@@ -173,15 +173,13 @@ lv2dynparam_host_notify_group_appeared(
     parent_group_ui_context = NULL;
   }
 
-  /* C block because this is the last of not implemented yet if statements for vairous group types */
-  {
-    dynparam_generic_group_appeared(
-      group_ptr,
-      instance_ptr->instance_ui_context,
-      parent_group_ui_context,
-      group_ptr->name,
-      &group_ptr->ui_context);
-  }
+  dynparam_group_appeared(
+    group_ptr,
+    instance_ptr->instance_ui_context,
+    parent_group_ui_context,
+    group_ptr->name,
+    group_ptr->type_uri,
+    &group_ptr->ui_context);
 }
 
 void
@@ -203,13 +201,10 @@ lv2dynparam_host_notify_group_disappeared(
     parent_group_ui_context = NULL;
   }
 
-  /* C block because this is the last of not implemented yet if statements for vairous group types */
-  {
-    dynparam_generic_group_disappeared(
-      instance_ptr->instance_ui_context,
-      parent_group_ui_context,
-      group_ptr->ui_context);
-  }
+  dynparam_group_disappeared(
+    instance_ptr->instance_ui_context,
+    parent_group_ui_context,
+    group_ptr->ui_context);
 }
 
 void
