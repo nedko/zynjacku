@@ -43,6 +43,11 @@ default: zynjacku.so
 zynjacku.defs: engine.h synth.h plugin_repo.h
 	python /usr/share/pygtk/2.0/codegen/h2def.py $^ > $@
 
+zynjackumodule.c: init_py_constants.c
+
+init_py_constants.c: lv2dynparam.h
+	grep 'LV2[^ ]*URI' lv2dynparam.h | sed 's/#define  *LV2\([^ ]*URI\)  *\"\(.*\)\"/PyModule_AddObject(m, "\1", PyString_FromString("\2"));/' > init_py_constants.c
+
 # Generate the C wrapper from the defs and our override file
 zynjacku_wrap.c: zynjacku.defs zynjacku.override
 	pygtk-codegen-2.0 --prefix zynjacku \
