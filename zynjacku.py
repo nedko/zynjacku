@@ -47,12 +47,17 @@ class SynthWindow(gobject.GObject):
         '''Hide synth window'''
 
 class SynthWindowUniversalGroup(gobject.GObject):
-    def __init__(self):
+    def __init__(self, window, parent_group, name, context):
         gobject.GObject.__init__(self)
+        self.window = window
+        self.parent_group = parent_group
+        self.group_name = name
+        self.context = context
 
 class SynthWindowUniversalParameter(gobject.GObject):
-    def __init__(self, parent_group, name, context):
+    def __init__(self, window, parent_group, name, context):
         gobject.GObject.__init__(self)
+        self.window = window
         self.parent_group = parent_group
         self.parameter_name = name
         self.context = context
@@ -134,9 +139,9 @@ class SynthWindowUniversal(SynthWindow):
         #print "context: %s" % repr(context)
 
         if group_type == zynjacku.DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
-            return SynthWindowUniversalGroupGeneric(self, synth, parent, group_name, group_type, context)
+            return SynthWindowUniversalGroupGeneric(self, parent, group_name, context)
         else:
-            return SynthWindowUniversalGroupGeneric(self, synth, parent, group_name, group_type, context)
+            return SynthWindowUniversalGroupGeneric(self, parent, group_name, context)
 
     def on_group_disappeared(self, synth, object):
         print "-------------- Group disappeared"
@@ -149,7 +154,7 @@ class SynthWindowUniversal(SynthWindow):
         #print "value: %s" % repr(value)
         #print "context: %s" % repr(context)
 
-        parameter = SynthWindowUniversalParameterBool(self, synth, parent, name, value, context)
+        parameter = SynthWindowUniversalParameterBool(self, parent, name, value, context)
         parent.parameter_add(parameter)
         return parameter
 
@@ -167,7 +172,7 @@ class SynthWindowUniversal(SynthWindow):
         #print "value: %s" % repr(max)
         #print "context: %s" % repr(context)
 
-        parameter = SynthWindowUniversalParameterFloat(self, synth, parent, name, value, min, max, context)
+        parameter = SynthWindowUniversalParameterFloat(self, parent, name, value, min, max, context)
         parent.parameter_add(parameter)
         return parameter
 
@@ -178,8 +183,8 @@ class SynthWindowUniversal(SynthWindow):
         obj.remove()
 
 class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
-    def __init__(self, window, synth, parent, group_name, group_type, context):
-        SynthWindowUniversalGroup.__init__(self)
+    def __init__(self, window, parent, group_name, context):
+        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, context)
 
         self.window = window
         self.group_name = group_name
@@ -236,8 +241,8 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
             self.window.window.remove(self.scrolled_window)
 
 class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
-    def __init__(self, window, synth, parent_group, name, value, min, max, context):
-        SynthWindowUniversalParameter.__init__(self, parent_group, name, context)
+    def __init__(self, window, parent_group, name, value, min, max, context):
+        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
 
         box = gtk.VBox()
         box.pack_start(gtk.Label(name), False, False)
@@ -260,23 +265,23 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
 
         self.adjustment = adjustment
 
-        adjustment.connect("value-changed", self.on_value_changed, synth)
+        adjustment.connect("value-changed", self.on_value_changed)
 
     def get_top_widget(self):
         return self.align
 
-    def on_value_changed(self, adjustment, synth):
+    def on_value_changed(self, adjustment):
         #print "Float changed. \"%s\" set to %f" % (obj.parameter_name, adjustment.get_value())
-        synth.float_set(self.context, adjustment.get_value())
+        self.window.synth.float_set(self.context, adjustment.get_value())
 
 class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
-    def __init__(self, window, synth, parent_group, name, value, context):
-        SynthWindowUniversalParameter.__init__(self, parent_group, name, context)
+    def __init__(self, window, parent_group, name, value, context):
+        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
 
         widget = gtk.CheckButton(name)
 
         widget.set_active(value)
-        widget.connect("toggled", self.on_toggled, synth)
+        widget.connect("toggled", self.on_toggled)
 
         self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         self.align.set_padding(10, 10, 10, 10)
@@ -285,9 +290,9 @@ class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
     def get_top_widget(self):
         return self.align
 
-    def on_toggled(self, widget, synth):
+    def on_toggled(self, widget):
         #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
-        synth.bool_set(self.context, widget.get_active())
+        self.window.synth.bool_set(self.context, widget.get_active())
 
 class SynthWindowFactory:
     def __init__(self):
