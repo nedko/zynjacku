@@ -345,7 +345,7 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
         return self.align
 
     def on_value_changed(self, adjustment):
-        print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
+        #print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
         self.window.synth.float_set(self.context, adjustment.get_value())
 
     def set_sensitive(self, sensitive):
