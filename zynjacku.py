@@ -24,6 +24,7 @@ import gtk
 import gtk.glade
 import gobject
 import phat
+import re
 
 # Synth window abstraction
 class SynthWindow(gobject.GObject):
@@ -277,6 +278,15 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
 
         self.top = self.align
 
+        m = re.match(r"([^:]+):(.*)", group_name)
+
+        self.bool = SynthWindowUniversalParameterBool(self.window, self, m.group(1), False, None)
+        self.child_add(self.bool)
+
+        self.float = SynthWindowUniversalParameterFloat(self.window, self, m.group(2), 300, -1000, 1000, None)
+        self.float.set_sensitive(False)
+        self.child_add(self.float)
+
         #print "Toggle float group \"%s\" created: %s" % (group_name, repr(self))
 
     def child_add(self, obj):
@@ -288,61 +298,64 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
 
     def child_remove(self, obj):
         #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
-        if obj == self.bool:
-            self.box.remove(obj.get_top_widget())
-        elif obj == self.float:
+        if obj == self.float:
             self.float.set_sensitive(False)
 
     def get_top_widget(self):
         return self.top
 
     def on_bool_appeared(self, window, name, value, context):
-        self.bool = SynthWindowUniversalParameterBool(self.window, self, name, value, context)
-        self.child_add(self.bool)
+        self.bool.context = context
         return self.bool
 
     def on_float_appeared(self, window, name, value, min, max, context):
-        if self.float:
-            self.float.set_sensitive(True)
-            #self.float.set(value, min, max)
-            return self.float
-
-        self.float = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
-        self.child_add(self.float)
+        self.float.context = context
+        self.float.set_sensitive(True)
+        self.float.set(name, value, min, max)
         return self.float
 
 class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
     def __init__(self, window, parent_group, name, value, min, max, context):
         SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
 
-        box = gtk.VBox()
-        box.pack_start(gtk.Label(name), False, False)
+        self.box = gtk.VBox()
+
+        self.label = gtk.Label(name)
+        align = gtk.Alignment(0, 0)
+        align.add(self.label)
+        self.box.pack_start(align, False, False)
+
         adjustment = gtk.Adjustment(value, min, max, 1, 19)
 
         hbox = gtk.HBox()
-        self.knob = phat.Knob(adjustment)
-        align = gtk.Alignment(0.5, 0.5)
-        align.add(self.knob)
-        hbox.pack_start(align, False, False)
+        self.knob = phat.HFanSlider()
+        self.knob.set_adjustment(adjustment)
+        #align = gtk.Alignment(0.5, 0.5)
+        #align.add(self.knob)
+        hbox.pack_start(self.knob, True, True)
         self.spin = gtk.SpinButton(adjustment)
+        #align = gtk.Alignment(0.5, 0.5)
+        #align.add(self.spin)
         hbox.pack_start(self.spin, False, False)
 
-        align = gtk.Alignment(0.5, 0.5)
-        align.add(hbox)
-        box.pack_start(align, False, False)
+        #align = gtk.Alignment(0.5, 0.5)
+        #align.add(hbox)
+        self.box.pack_start(hbox, True, True)
 
         self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         self.align.set_padding(10, 10, 10, 10)
-        self.align.add(box)
+        self.align.add(self.box)
+
+        self.top = self.align
 
         self.adjustment = adjustment
 
-        adjustment.connect("value-changed", self.on_value_changed)
+        self.cid = adjustment.connect("value-changed", self.on_value_changed)
 
         #print "Float \"%s\" created: %s" % (name, repr(self))
 
     def get_top_widget(self):
-        return self.align
+        return self.top
 
     def on_value_changed(self, adjustment):
         #print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
@@ -352,10 +365,13 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
         self.knob.set_sensitive(sensitive)
         self.spin.set_sensitive(sensitive)
 
-    def set(self, value, min, max):
+    def set(self, name, value, min, max):
+        self.adjustment.disconnect(self.cid)
+        self.label.set_text(name)
         self.adjustment = gtk.Adjustment(value, min, max, 1, 19)
-        self.spin.set_adjustment(adjustment)
-        self.knob.set_adjustment(adjustment)
+        self.spin.set_adjustment(self.adjustment)
+        self.knob.set_adjustment(self.adjustment)
+        self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
 
 class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
     def __init__(self, window, parent_group, name, value, context):
