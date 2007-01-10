@@ -283,7 +283,7 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
         self.bool = SynthWindowUniversalParameterBool(self.window, self, m.group(1), False, None)
         self.child_add(self.bool)
 
-        self.float = SynthWindowUniversalParameterFloat(self.window, self, m.group(2), 300, -1000, 1000, None)
+        self.float = SynthWindowUniversalParameterFloat(self.window, self, m.group(2), 0, 0, 1, None)
         self.float.set_sensitive(False)
         self.child_add(self.float)
 
