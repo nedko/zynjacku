@@ -22,8 +22,9 @@ INSTALL_PREFIX=/usr
 INSTALL_GCONF_SCHEMAS_DIR=/etc/gconf/schemas
 
 CFLAGS := -g -I/usr/include/python2.4 -Wall -Werror -D_GNU_SOURCE -fPIC
-CFLAGS += $(strip $(shell pkg-config --cflags gtk+-2.0 pygtk-2.0 libslv2 jack))
-LDFLAGS := $(strip $(shell pkg-config --libs gtk+-2.0 pygtk-2.0 libslv2 jack))
+CFLAGS += $(strip $(shell pkg-config --cflags gtk+-2.0 pygtk-2.0 libslv2 jack lv2dynparamhost-1))
+LDFLAGS := $(strip $(shell pkg-config --libs gtk+-2.0 pygtk-2.0 libslv2 jack lv2dynparamhost-1))
+LV2DYNPARAM_INCLUDEDIR := $(strip $(shell pkg-config --variable=includedir lv2dynparamhost-1))
 
 CC = gcc -c 
 
@@ -32,7 +33,7 @@ GENDEP_C = set -e; gcc -MM $(CFLAGS) $< | sed $(GENDEP_SED_EXPR) > $@; [ -s $@ ]
 
 .PHONY: run test install uninstall
 
-SOURCES = dynparam_preallocate.c dynparam.c audiolock.c engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c dynparam_host_callbacks.c
+SOURCES = engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
 # The path to the GTK+ python types
@@ -45,8 +46,11 @@ zynjacku.defs: engine.h synth.h plugin_repo.h
 
 zynjackumodule.c: init_py_constants.c
 
-init_py_constants.c: lv2dynparam.h
-	grep 'LV2[^ ]*URI' lv2dynparam.h | sed 's/#define  *LV2\([^ ]*URI\)  *\"\(.*\)\"/PyModule_AddObject(m, "\1", PyString_FromString("\2"));/' > init_py_constants.c
+init_py_constants.c::
+	@echo "Regenerating $@"
+	@./gen_py_constants.py $(LV2DYNPARAM_INCLUDEDIR) '^LV2DYNPARAM_URI$$' > init_py_constants.c
+	@./gen_py_constants.py $(LV2DYNPARAM_INCLUDEDIR) '^LV2DYNPARAM_PARAMETER_' >> init_py_constants.c
+	@./gen_py_constants.py $(LV2DYNPARAM_INCLUDEDIR) '^LV2DYNPARAM_GROUP_' >> init_py_constants.c
 
 # Generate the C wrapper from the defs and our override file
 zynjacku_wrap.c: zynjacku.defs zynjacku.override

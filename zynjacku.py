@@ -243,7 +243,7 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
             self.window.window.remove(self.scrolled_window)
 
     def on_child_group_appeared(self, group_name, group_type, context):
-        if group_type == zynjacku.DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
+        if group_type == zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
             group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
             self.window.defered.append(group)
             return group

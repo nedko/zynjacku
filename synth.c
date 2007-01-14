@@ -33,7 +33,8 @@
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
-#include "dynparam.h"
+#include "lv2dynparam/lv2dynparam.h"
+#include "lv2dynparam/host.h"
 
 #include "synth.h"
 #include "engine.h"
@@ -432,6 +433,7 @@ zynjacku_synth_supports_generic_ui(
 
   /* generic ui can be supported without dynparams but we don't do it atm */
 
+/*   LOG_DEBUG("%p", synth_ptr->dynparams); */
   return (synth_ptr->dynparams != NULL) ? TRUE : FALSE;
 }
 

@@ -32,7 +32,7 @@
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
-#include "dynparam.h"
+#include "lv2dynparam/host.h"
 
 #include "synth.h"
 #include "engine.h"
