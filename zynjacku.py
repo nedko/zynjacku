@@ -100,8 +100,15 @@ class SynthWindowUniversal(SynthWindow):
     def on_window_destroy(self, window):
         if self.ui_enabled:
             self.hide()
-
-        self.synth.ui_off()
+            self.synth.ui_off()
+            self.synth.disconnect(self.float_disappeared_connect_id)
+            self.synth.disconnect(self.bool_disappeared_connect_id)
+            self.synth.disconnect(self.group_disappeared_connect_id)
+            self.synth.disconnect(self.float_appeared_connect_id)
+            self.synth.disconnect(self.bool_appeared_connect_id)
+            self.synth.disconnect(self.group_appeared_connect_id)
+        else:
+            self.synth.ui_off()
 
         self.emit('destroy')
 
@@ -129,13 +136,6 @@ class SynthWindowUniversal(SynthWindow):
         '''Hide synth window'''
         if not self.ui_enabled:
             return
-
-        self.synth.disconnect(self.float_disappeared_connect_id)
-        self.synth.disconnect(self.bool_disappeared_connect_id)
-        self.synth.disconnect(self.group_disappeared_connect_id)
-        self.synth.disconnect(self.float_appeared_connect_id)
-        self.synth.disconnect(self.bool_appeared_connect_id)
-        self.synth.disconnect(self.group_appeared_connect_id)
 
         self.window.hide_all()
 
@@ -186,7 +186,7 @@ class SynthWindowUniversal(SynthWindow):
 
     def on_float_disappeared(self, synth, obj):
         #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
-        #print repr(self.parent)
+        #print repr(self.parent_group)
         #print repr(obj)
         obj.remove()
 
@@ -236,11 +236,8 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
             self.window.window.show_all()
 
     def child_remove(self, obj):
-        #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
-        if self.parent:
-            self.box_params.remove(obj.get_top_widget())
-        else:
-            self.window.window.remove(self.scrolled_window)
+        print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        self.box_params.remove(obj.get_top_widget())
 
     def on_child_group_appeared(self, group_name, group_type, context):
         if group_type == zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
