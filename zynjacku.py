@@ -236,7 +236,7 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
             self.window.window.show_all()
 
     def child_remove(self, obj):
-        print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box_params.remove(obj.get_top_widget())
 
     def on_child_group_appeared(self, group_name, group_type, context):
