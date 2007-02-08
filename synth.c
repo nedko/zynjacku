@@ -748,17 +748,17 @@ zynjacku_synth_construct(
 
   slv2_value = slv2_plugin_get_required_features(synth_ptr->plugin);
 
-  LOG_DEBUG("Plugin has %u required features", (unsigned int)slv2_value->num_values);
+  LOG_NOTICE("Plugin has %u required features", (unsigned int)slv2_value->num_values);
   for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
   {
-    LOG_DEBUG("\"%s\"", slv2_value->values[value_index]);
+    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
     if (strcmp(LV2DYNPARAM_URI, slv2_value->values[value_index]) == 0)
     {
       dynparams_supported = TRUE;
     }
     else
     {
-      LOG_DEBUG("Plugin requires unsupported feature \"%s\"", slv2_value->values[value_index]);
+      LOG_ERROR("Plugin requires unsupported feature \"%s\"", slv2_value->values[value_index]);
       slv2_value_free(slv2_value);
       goto fail;
     }
@@ -868,6 +868,17 @@ zynjacku_synth_construct(
 
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
+
+  slv2_value = slv2_plugin_get_value(synth_ptr->plugin, "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>");
+
+  LOG_NOTICE("Plugin has %u custom GUIs", (unsigned int)slv2_value->num_values);
+  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
+  {
+    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
+    LOG_ERROR("Cannot find dynamic library implementing \"%s\" because libslv2 is not mature enough yet.", slv2_value->values[value_index]);
+  }
+
+  slv2_value_free(slv2_value);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
