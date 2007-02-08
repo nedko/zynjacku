@@ -39,16 +39,23 @@ struct zynjacku_synth_port
   uint32_t index;               /* LV2 port index within owning plugin */
   union
   {
-    float parameter;            /* for PORT_TYPE_PARAMETER */
+    struct
+    {
+      float value;
+      float min;
+      float max;
+    } parameter;                /* for PORT_TYPE_PARAMETER */
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
   } data;
+
+  GObject * ui_context;
 };
 
 struct zynjacku_synth
 {
   gboolean dispose_has_run;
 
-  GObject * ui_context;
+  GObject * root_group_ui_context;
   GObject * engine_object_ptr;
   gchar * uri;
 

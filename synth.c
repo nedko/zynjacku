@@ -368,6 +368,8 @@ zynjacku_synth_init(
 
   synth_ptr->instance = NULL;
   synth_ptr->uri = NULL;
+
+  synth_ptr->root_group_ui_context = NULL;
 }
 
 GType zynjacku_synth_get_type()
@@ -421,6 +423,99 @@ zynjacku_synth_get_class_uri(
   return slv2_plugin_get_uri(synth_ptr->plugin);
 }
 
+void
+zynjacku_synth_generic_lv2_ui_on(
+  ZynjackuSynth * synth_obj_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_synth_port * port_ptr;
+  char * symbol;
+
+  LOG_DEBUG("zynjacku_synth_generic_lv2_ui_on() called.");
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  if (synth_ptr->root_group_ui_context != NULL)
+  {
+    LOG_DEBUG("ui on ignored - already shown");
+    return;                     /* already shown */
+  }
+
+  g_signal_emit(
+    synth_obj_ptr,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED],
+    0,
+    NULL,
+    synth_ptr->id,
+    LV2DYNPARAM_GROUP_TYPE_GENERIC_URI,
+    zynjacku_synth_context_to_string(NULL),
+    &synth_ptr->root_group_ui_context);
+
+  list_for_each(node_ptr, &synth_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+
+    symbol = slv2_port_get_symbol(synth_ptr->plugin, slv2_port_by_index(port_ptr->index));
+
+    g_signal_emit(
+      synth_obj_ptr,
+      g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
+      0,
+      synth_ptr->root_group_ui_context,
+      symbol,
+      port_ptr->data.parameter.value,
+      port_ptr->data.parameter.min,
+      port_ptr->data.parameter.max,
+      zynjacku_synth_context_to_string(NULL),
+      &port_ptr->ui_context);
+
+    free(symbol);
+  }
+}
+
+void
+zynjacku_synth_generic_lv2_ui_off(
+  ZynjackuSynth * synth_obj_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_synth_port * port_ptr;
+
+  LOG_DEBUG("zynjacku_synth_generic_lv2_ui_off() called.");
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  if (synth_ptr->root_group_ui_context == NULL)
+  {
+    LOG_DEBUG("ui off ignored - not shown");
+    return;                     /* not shown */
+  }
+
+  list_for_each(node_ptr, &synth_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+
+    g_signal_emit(
+      synth_obj_ptr,
+      g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED],
+      0,
+      port_ptr->ui_context);
+
+    g_object_unref(port_ptr->ui_context);
+    port_ptr->ui_context = NULL;
+  }
+
+  g_signal_emit(
+    synth_obj_ptr,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED],
+    0,
+    synth_ptr->root_group_ui_context);
+
+  g_object_unref(synth_ptr->root_group_ui_context);
+  synth_ptr->root_group_ui_context = NULL;
+}
+
 gboolean
 zynjacku_synth_supports_generic_ui(
   ZynjackuSynth * synth_obj_ptr)
@@ -434,7 +529,8 @@ zynjacku_synth_supports_generic_ui(
   /* generic ui can be supported without dynparams but we don't do it atm */
 
 /*   LOG_DEBUG("%p", synth_ptr->dynparams); */
-  return (synth_ptr->dynparams != NULL) ? TRUE : FALSE;
+//  return (synth_ptr->dynparams != NULL) ? TRUE : FALSE;
+  return TRUE;
 }
 
 void
@@ -451,21 +547,29 @@ zynjacku_synth_ui_on(
   {
     lv2dynparam_host_ui_on(synth_ptr->dynparams);
   }
+  else
+  {
+    zynjacku_synth_generic_lv2_ui_on(synth_obj_ptr);
+  }
 }
 
 void
 zynjacku_synth_ui_off(
-  ZynjackuSynth * obj_ptr)
+  ZynjackuSynth * synth_obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;
 
   LOG_DEBUG("zynjacku_synth_ui_off() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
   if (synth_ptr->dynparams)
   {
     lv2dynparam_host_ui_off(synth_ptr->dynparams);
+  }
+  else
+  {
+    zynjacku_synth_generic_lv2_ui_off(synth_obj_ptr);
   }
 }
 
@@ -492,7 +596,9 @@ create_port(
     port_ptr = malloc(sizeof(struct zynjacku_synth_port));
     port_ptr->type = PORT_TYPE_PARAMETER;
     port_ptr->index = port_index;
-    port_ptr->data.parameter = slv2_port_get_default_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
+    port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
+    port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
+    port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
     slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
     list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
@@ -989,8 +1095,11 @@ zynjacku_synth_float_set(
 
   LOG_DEBUG("zynjacku_synth_float_set() called, context %p", context);
 
-  dynparam_parameter_float_change(
-    synth_ptr->dynparams,
-    (lv2dynparam_host_parameter)context,
-    value);
+  if (synth_ptr->dynparams != NULL)
+  {
+    dynparam_parameter_float_change(
+      synth_ptr->dynparams,
+      (lv2dynparam_host_parameter)context,
+      value);
+  }
 }
