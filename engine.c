@@ -74,6 +74,8 @@ zynjacku_engine_dispose(GObject * obj)
     zynjacku_engine_stop_jack(ZYNJACKU_ENGINE(obj));
   }
 
+  slv2_finish();
+
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
 }
@@ -120,6 +122,8 @@ zynjacku_engine_init(
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(instance);
 
   engine_ptr->jack_client = NULL;
+
+  slv2_init();
 }
 
 GType zynjacku_engine_get_type()

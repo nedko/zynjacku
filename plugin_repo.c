@@ -155,7 +155,6 @@ zynjacku_find_simple_plugins()
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
   enum SLV2PortClass class;
-  char * type;
   char * name;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
@@ -169,68 +168,55 @@ zynjacku_find_simple_plugins()
 
     name = slv2_plugin_get_name(plugin_ptr);
 
-    if (!slv2_plugin_verify(plugin_ptr))
-    {
-      LOG_DEBUG("Skipping slv2 verify failed \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
-      goto next_plugin;
-    }
-
     ports_count = slv2_plugin_get_num_ports(plugin_ptr);
     audio_out_ports_count = 0;
     midi_in_ports_count = 0;
 
     for (port_index = 0 ; port_index < ports_count ; port_index++)
     {
-      class = slv2_port_get_class(plugin_ptr, port_index);
-      type = slv2_port_get_data_type(plugin_ptr, port_index);
+      class = slv2_port_get_class(plugin_ptr, slv2_port_by_index(port_index));
 
-      if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
+      if (class == SLV2_CONTROL_RATE_INPUT)
       {
-        if (class == SLV2_CONTROL_RATE_INPUT)
-        {
-        }
-        else if (class == SLV2_AUDIO_RATE_OUTPUT)
-        {
-          if (audio_out_ports_count == 2)
-          {
-            LOG_DEBUG("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
-            goto next_plugin;
-          }
-
-          audio_out_ports_count++;
-        }
-        else if (class == SLV2_AUDIO_RATE_INPUT)
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with audio input port", name, slv2_plugin_get_uri(plugin_ptr));
-          goto next_plugin;
-        }
-        else
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with control (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
-          goto next_plugin;
-        }
       }
-      else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
+      else if (class == SLV2_AUDIO_RATE_OUTPUT)
       {
-        if (class == SLV2_CONTROL_RATE_INPUT)
+        if (audio_out_ports_count == 2)
         {
-          if (midi_in_ports_count == 1)
-          {
-            LOG_DEBUG("Skipping \"%s\" %s, plugin with more than one MIDI input port", name, slv2_plugin_get_uri(plugin_ptr));
-            goto next_plugin;
-          }
-
-          midi_in_ports_count++;
-        }
-        else
-        {
-          LOG_DEBUG("Skipping \"%s\" %s, plugin with MIDI (output?) port", name, slv2_plugin_get_uri(plugin_ptr));
+          LOG_DEBUG("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
           goto next_plugin;
         }
+
+        audio_out_ports_count++;
+      }
+      else if (class == SLV2_AUDIO_RATE_INPUT)
+      {
+        LOG_DEBUG("Skipping \"%s\" %s, plugin with audio input port", name, slv2_plugin_get_uri(plugin_ptr));
+        goto next_plugin;
+      }
+      else if (class == SLV2_MIDI_INPUT)
+      {
+        if (midi_in_ports_count == 1)
+        {
+          LOG_DEBUG("Skipping \"%s\" %s, plugin with more than one MIDI input port", name, slv2_plugin_get_uri(plugin_ptr));
+          goto next_plugin;
+        }
+
+        midi_in_ports_count++;
+      }
+      else if (class == SLV2_MIDI_OUTPUT)
+      {
+        LOG_DEBUG("Skipping \"%s\" %s, plugin with MIDI output port", name, slv2_plugin_get_uri(plugin_ptr));
+        goto next_plugin;
+      }
+      else if (class == SLV2_CONTROL_RATE_OUTPUT)
+      {
+        LOG_DEBUG("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
+        goto next_plugin;
       }
       else
       {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin unknown type \"%s\" port", name, slv2_plugin_get_uri(plugin_ptr), type);
+        LOG_DEBUG("Skipping \"%s\" %s, plugin with port of unknown class", name, slv2_plugin_get_uri(plugin_ptr));
         goto next_plugin;
       }
     }

@@ -482,93 +482,75 @@ create_port(
   gboolean ret;
 
   /* Get the 'class' of the port (control input, audio output, etc) */
-  class = slv2_port_get_class(plugin_ptr->plugin, port_index);
-
-  type = slv2_port_get_data_type(plugin_ptr->plugin, port_index);
+  class = slv2_port_get_class(plugin_ptr->plugin, slv2_port_by_index(port_index));
 
   /* Get the port symbol (label) for console printing */
-  symbol = slv2_port_get_symbol(plugin_ptr->plugin, port_index);
+  symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_port_by_index(port_index));
 
-  if (strcmp(type, SLV2_DATA_TYPE_FLOAT) == 0)
+  if (class == SLV2_CONTROL_RATE_INPUT)
   {
-    if (class == SLV2_CONTROL_RATE_INPUT)
-    {
-      port_ptr = malloc(sizeof(struct zynjacku_synth_port));
-      port_ptr->type = PORT_TYPE_PARAMETER;
-      port_ptr->index = port_index;
-      port_ptr->data.parameter = slv2_port_get_default_value(plugin_ptr->plugin, port_index);
-      slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
-      LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
-      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
-    }
-    else if (class == SLV2_AUDIO_RATE_OUTPUT)
-    {
-      if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->audio_out_left_port;
-      }
-      else if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->audio_out_right_port;
-      }
-      else
-      {
-        LOG_ERROR("Maximum two audio output ports are supported.");
-        goto fail;
-      }
-
-      port_ptr->type = PORT_TYPE_AUDIO;
-      port_ptr->index = port_index;
-    }
-    else if (class == SLV2_AUDIO_RATE_INPUT)
-    {
-      LOG_ERROR("audio input ports are not supported.");
-      goto fail;
-    }
-    else if (class == SLV2_CONTROL_RATE_OUTPUT)
-    {
-      LOG_ERROR("control rate float output ports are not supported.");
-      goto fail;
-    }
-    else
-    {
-      LOG_ERROR("unrecognized port.");
-      goto fail;
-    }
+    port_ptr = malloc(sizeof(struct zynjacku_synth_port));
+    port_ptr->type = PORT_TYPE_PARAMETER;
+    port_ptr->index = port_index;
+    port_ptr->data.parameter = slv2_port_get_default_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
+    slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
+    LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
+    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
   }
-  else if (strcmp(type, SLV2_DATA_TYPE_MIDI) == 0)
+  else if (class == SLV2_AUDIO_RATE_OUTPUT)
   {
-    if (class == SLV2_CONTROL_RATE_INPUT)
+    if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
     {
-      if (plugin_ptr->midi_in_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->midi_in_port;
-      }
-      else
-      {
-        LOG_ERROR("maximum one midi input port is supported.");
-        goto fail;
-      }
-
-      port_ptr->type = PORT_TYPE_MIDI;
-      port_ptr->index = port_index;
-      slv2_instance_connect_port(plugin_ptr->instance, port_index, &engine_ptr->lv2_midi_buffer);
-      list_add_tail(&port_ptr->port_type_siblings, &engine_ptr->midi_ports);
+      port_ptr = &plugin_ptr->audio_out_left_port;
     }
-    else if (class == SLV2_CONTROL_RATE_OUTPUT)
+    else if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
     {
-      LOG_ERROR("midi output ports are not supported.");
-      goto fail;
+      port_ptr = &plugin_ptr->audio_out_right_port;
     }
     else
     {
-      LOG_ERROR("unrecognized port.");
+      LOG_ERROR("Maximum two audio output ports are supported.");
       goto fail;
     }
+
+    port_ptr->type = PORT_TYPE_AUDIO;
+    port_ptr->index = port_index;
+  }
+  else if (class == SLV2_AUDIO_RATE_INPUT)
+  {
+    LOG_ERROR("audio input ports are not supported.");
+    goto fail;
+  }
+  else if (class == SLV2_CONTROL_RATE_OUTPUT)
+  {
+    LOG_ERROR("control rate float output ports are not supported.");
+    goto fail;
+  }
+  else if (class == SLV2_MIDI_INPUT)
+  {
+    if (plugin_ptr->midi_in_port.type == PORT_TYPE_INVALID)
+    {
+      port_ptr = &plugin_ptr->midi_in_port;
+    }
+    else
+    {
+      LOG_ERROR("maximum one midi input port is supported.");
+      goto fail;
+    }
+
+    port_ptr->type = PORT_TYPE_MIDI;
+    port_ptr->index = port_index;
+    slv2_instance_connect_port(plugin_ptr->instance, port_index, &engine_ptr->lv2_midi_buffer);
+    list_add_tail(&port_ptr->port_type_siblings, &engine_ptr->midi_ports);
+  }
+  else if (class == SLV2_MIDI_OUTPUT)
+  {
+    LOG_ERROR("midi output ports are not supported.");
+    goto fail;
   }
   else
   {
-    LOG_ERROR("unrecognized data type.");
+    LOG_ERROR("unrecognized port.");
     goto fail;
   }
 
@@ -636,7 +618,7 @@ zynjacku_synth_construct(
   struct zynjacku_synth * synth_ptr;
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
-  SLV2Property slv2_property;
+  SLV2Value slv2_value;
   size_t value_index;
   gboolean dynparams_supported;
 
@@ -658,39 +640,39 @@ zynjacku_synth_construct(
 
   dynparams_supported = FALSE;
 
-  slv2_property = slv2_plugin_get_required_features(synth_ptr->plugin);
+  slv2_value = slv2_plugin_get_required_features(synth_ptr->plugin);
 
-  LOG_DEBUG("Plugin has %u required features", (unsigned int)slv2_property->num_values);
-  for (value_index = 0 ; value_index < slv2_property->num_values ; value_index++)
+  LOG_DEBUG("Plugin has %u required features", (unsigned int)slv2_value->num_values);
+  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
   {
-    LOG_DEBUG("\"%s\"", slv2_property->values[value_index]);
-    if (strcmp(LV2DYNPARAM_URI, slv2_property->values[value_index]) == 0)
+    LOG_DEBUG("\"%s\"", slv2_value->values[value_index]);
+    if (strcmp(LV2DYNPARAM_URI, slv2_value->values[value_index]) == 0)
     {
       dynparams_supported = TRUE;
     }
     else
     {
-      LOG_DEBUG("Plugin requires unsupported feature \"%s\"", slv2_property->values[value_index]);
-      slv2_property_free(slv2_property);
+      LOG_DEBUG("Plugin requires unsupported feature \"%s\"", slv2_value->values[value_index]);
+      slv2_value_free(slv2_value);
       goto fail;
     }
   }
 
-  slv2_property_free(slv2_property);
+  slv2_value_free(slv2_value);
 
-  slv2_property = slv2_plugin_get_optional_features(synth_ptr->plugin);
+  slv2_value = slv2_plugin_get_optional_features(synth_ptr->plugin);
 
-  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_property->num_values);
-  for (value_index = 0 ; value_index < slv2_property->num_values ; value_index++)
+  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_value->num_values);
+  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_property->values[value_index]);
-    if (strcmp(LV2DYNPARAM_URI, slv2_property->values[value_index]) == 0)
+    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
+    if (strcmp(LV2DYNPARAM_URI, slv2_value->values[value_index]) == 0)
     {
       dynparams_supported = TRUE;
     }
   }
 
-  slv2_property_free(slv2_property);
+  slv2_value_free(slv2_value);
 
   sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
 
