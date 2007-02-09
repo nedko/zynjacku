@@ -579,7 +579,7 @@ create_port(
   struct zynjacku_synth * plugin_ptr,
   uint32_t port_index)
 {
-  enum SLV2PortClass class;
+  SLV2PortClass class;
   char * type;
   char * symbol;
   struct zynjacku_synth_port * port_ptr;
@@ -591,7 +591,7 @@ create_port(
   /* Get the port symbol (label) for console printing */
   symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_port_by_index(port_index));
 
-  if (class == SLV2_CONTROL_RATE_INPUT)
+  if (class == SLV2_CONTROL_INPUT)
   {
     port_ptr = malloc(sizeof(struct zynjacku_synth_port));
     port_ptr->type = PORT_TYPE_PARAMETER;
@@ -603,7 +603,7 @@ create_port(
     LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
     list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
   }
-  else if (class == SLV2_AUDIO_RATE_OUTPUT)
+  else if (class == SLV2_AUDIO_OUTPUT)
   {
     if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
     {
@@ -622,12 +622,12 @@ create_port(
     port_ptr->type = PORT_TYPE_AUDIO;
     port_ptr->index = port_index;
   }
-  else if (class == SLV2_AUDIO_RATE_INPUT)
+  else if (class == SLV2_AUDIO_INPUT)
   {
     LOG_ERROR("audio input ports are not supported.");
     goto fail;
   }
-  else if (class == SLV2_CONTROL_RATE_OUTPUT)
+  else if (class == SLV2_CONTROL_OUTPUT)
   {
     LOG_ERROR("control rate float output ports are not supported.");
     goto fail;

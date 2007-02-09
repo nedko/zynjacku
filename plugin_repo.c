@@ -154,7 +154,7 @@ zynjacku_find_simple_plugins()
   size_t plugins_count;
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
-  enum SLV2PortClass class;
+  SLV2PortClass class;
   char * name;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
@@ -176,10 +176,10 @@ zynjacku_find_simple_plugins()
     {
       class = slv2_port_get_class(plugin_ptr, slv2_port_by_index(port_index));
 
-      if (class == SLV2_CONTROL_RATE_INPUT)
+      if (class == SLV2_CONTROL_INPUT)
       {
       }
-      else if (class == SLV2_AUDIO_RATE_OUTPUT)
+      else if (class == SLV2_AUDIO_OUTPUT)
       {
         if (audio_out_ports_count == 2)
         {
@@ -189,7 +189,7 @@ zynjacku_find_simple_plugins()
 
         audio_out_ports_count++;
       }
-      else if (class == SLV2_AUDIO_RATE_INPUT)
+      else if (class == SLV2_AUDIO_INPUT)
       {
         LOG_DEBUG("Skipping \"%s\" %s, plugin with audio input port", name, slv2_plugin_get_uri(plugin_ptr));
         goto next_plugin;
@@ -209,7 +209,7 @@ zynjacku_find_simple_plugins()
         LOG_DEBUG("Skipping \"%s\" %s, plugin with MIDI output port", name, slv2_plugin_get_uri(plugin_ptr));
         goto next_plugin;
       }
-      else if (class == SLV2_CONTROL_RATE_OUTPUT)
+      else if (class == SLV2_CONTROL_OUTPUT)
       {
         LOG_DEBUG("Skipping \"%s\" %s, plugin with control output port", name, slv2_plugin_get_uri(plugin_ptr));
         goto next_plugin;
