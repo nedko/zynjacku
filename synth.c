@@ -1001,6 +1001,15 @@ dynparam_parameter_float_disappeared(
 }
 
 void
+dynparam_parameter_enum_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context)
+{
+  LOG_DEBUG("dynparam_parameter_enum_disappeared() called.");
+}
+
+void
 dynparam_parameter_boolean_appeared(
   lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,
@@ -1112,5 +1121,30 @@ zynjacku_synth_float_set(
       synth_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
+  }
+}
+
+void
+dynparam_parameter_enum_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  const char * parameter_name,
+  unsigned int selected_value,
+  const char * const * values,
+  unsigned int values_count,
+  void ** parameter_ui_context)
+{
+  unsigned int i;
+
+  LOG_DEBUG(
+    "Enum parameter \"%s\" appeared, %u possible values, handle %p",
+    parameter_name,
+    values_count,
+    parameter_handle);
+
+  for (i = 0 ; i < values_count ; i++)
+  {
+    LOG_DEBUG("\"%s\"%s", values[i], selected_value == i ? " [SELECTED]" : "");
   }
 }
