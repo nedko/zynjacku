@@ -168,7 +168,7 @@ class SynthWindowUniversal(SynthWindow):
 
         return parent.on_bool_appeared(self.window, name, value, context)
 
-    def on_bool_disappeared(self, synth, object):
+    def on_bool_disappeared(self, synth, obj):
         #print "-------------- Bool disappeared"
         obj.remove()
 
