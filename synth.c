@@ -1203,7 +1203,7 @@ dynparam_parameter_enum_appeared(
     0,
     group_ui_context,
     parameter_name,
-    (guint)0,
+    (guint)selected_value,
     enum_ptr,
     zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
