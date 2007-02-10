@@ -195,20 +195,20 @@ class SynthWindowUniversal(SynthWindow):
         obj.remove()
 
     def on_enum_appeared(self, synth, parent, name, selected_value_index, valid_values, context):
-        print "-------------- Enum \"%s\" appeared" % name
-        print "synth: %s" % repr(synth)
-        print "parent: %s" % repr(parent)
-        print "name: %s" % name
-        print "selected value index: %s" % repr(selected_value_index)
-        print "valid values: %s" % repr(valid_values)
-        print "valid values count: %s" % valid_values.get_count()
-        for i in range(valid_values.get_count()):
-            print valid_values.get_at_index(i)
-        print "context: %s" % repr(context)
-        return parent.on_bool_appeared(self.window, "enum", True, context)
+        #print "-------------- Enum \"%s\" appeared" % name
+        #print "synth: %s" % repr(synth)
+        #print "parent: %s" % repr(parent)
+        #print "name: %s" % name
+        #print "selected value index: %s" % repr(selected_value_index)
+        #print "valid values: %s" % repr(valid_values)
+        #print "valid values count: %s" % valid_values.get_count()
+        #for i in range(valid_values.get_count()):
+        #    print valid_values.get_at_index(i)
+        #print "context: %s" % repr(context)
+        return parent.on_enum_appeared(self.window, name, selected_value_index, valid_values, context)
 
     def on_enum_disappeared(self, synth, obj):
-        print "-------------- Enum \"%s\" disappeared" % obj.parameter_name
+        #print "-------------- Enum \"%s\" disappeared" % obj.parameter_name
         obj.remove()
 
 class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
@@ -275,6 +275,11 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
 
     def on_float_appeared(self, window, name, value, min, max, context):
         parameter = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
+        self.child_add(parameter)
+        return parameter
+
+    def on_enum_appeared(self, window, name, selected_value_index, valid_values, context):
+        parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
         self.child_add(parameter)
         return parameter
 
@@ -410,6 +415,31 @@ class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
     def on_toggled(self, widget):
         #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
         self.window.synth.bool_set(self.context, widget.get_active())
+
+class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
+    def __init__(self, window, parent_group, name, selected_value_index, valid_values, context):
+        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+
+        widget = gtk.CheckButton(name)
+
+        self.liststore = gtk.ListStore(gobject.TYPE_STRING)
+        self.combobox = gtk.ComboBox(self.liststore)
+        self.cell = gtk.CellRendererText()
+        self.combobox.pack_start(self.cell, True)
+        self.combobox.add_attribute(self.cell, 'text', 0)
+
+        for i in range(valid_values.get_count()):
+            row = valid_values.get_at_index(i),
+            self.liststore.append(row)
+
+        self.combobox.set_active(selected_value_index)
+
+        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        self.align.set_padding(10, 10, 10, 10)
+        self.align.add(self.combobox)
+
+    def get_top_widget(self):
+        return self.align
 
 class SynthWindowFactory:
     def __init__(self):
