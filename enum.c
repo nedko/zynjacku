@@ -25,7 +25,7 @@
 
 #include "enum.h"
 
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 struct zynjacku_enum
