@@ -38,18 +38,21 @@
 
 #include "synth.h"
 #include "engine.h"
+#include "enum.h"
 
 #include "zynjacku.h"
 
 /* signals */
 #define ZYNJACKU_SYNTH_SIGNAL_TEST                0
 #define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED      1
-#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED       2
-#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED      3
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED   4
-#define ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED    5
+#define ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED   2
+#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED       3
+#define ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED    4
+#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED      5
 #define ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED   6
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT              7
+#define ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED       7
+#define ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED    8
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT              9
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -256,6 +259,20 @@ zynjacku_synth_class_init(
       G_TYPE_STRING,            /* group type URI */
       G_TYPE_STRING);           /* context */
 
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
+    g_signal_new(
+      "group-disappeared",      /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
+
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED] =
     g_signal_new(
       "bool-appeared",          /* signal_name */
@@ -272,6 +289,20 @@ zynjacku_synth_class_init(
       G_TYPE_STRING,            /* parameter name */
       G_TYPE_BOOLEAN,           /* value */
       G_TYPE_STRING);           /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED] =
+    g_signal_new(
+      "bool-disappeared",       /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
 
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED] =
     g_signal_new(
@@ -292,37 +323,41 @@ zynjacku_synth_class_init(
       G_TYPE_FLOAT,             /* max */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
-    g_signal_new(
-      "group-disappeared",      /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      1,                        /* n_params */
-      G_TYPE_OBJECT);           /* object */
-
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED] =
-    g_signal_new(
-      "bool-disappeared",       /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      1,                        /* n_params */
-      G_TYPE_OBJECT);           /* object */
-
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED] =
     g_signal_new(
       "float-disappeared",      /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED] =
+    g_signal_new(
+      "enum-appeared",          /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      5,                        /* n_params */
+      G_TYPE_OBJECT,            /* parent */
+      G_TYPE_STRING,            /* parameter name */
+      G_TYPE_UINT,              /* selected value index */
+      G_TYPE_OBJECT,            /* valid values (ZynjackuEnum) */
+      G_TYPE_STRING);           /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED] =
+    g_signal_new(
+      "enum-disappeared",       /* signal_name */
       ZYNJACKU_SYNTH_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
@@ -1007,6 +1042,14 @@ dynparam_parameter_enum_disappeared(
   void * parameter_ui_context)
 {
   LOG_DEBUG("dynparam_parameter_enum_disappeared() called.");
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED],
+    0,
+    parameter_ui_context);
+
+  g_object_unref(parameter_ui_context);
 }
 
 void
@@ -1136,6 +1179,8 @@ dynparam_parameter_enum_appeared(
   void ** parameter_ui_context)
 {
   unsigned int i;
+  GObject * ret_obj_ptr;
+  ZynjackuEnum * enum_ptr;
 
   LOG_DEBUG(
     "Enum parameter \"%s\" appeared, %u possible values, handle %p",
@@ -1147,4 +1192,25 @@ dynparam_parameter_enum_appeared(
   {
     LOG_DEBUG("\"%s\"%s", values[i], selected_value == i ? " [SELECTED]" : "");
   }
+
+  enum_ptr = g_object_new(ZYNJACKU_ENUM_TYPE, NULL);
+
+  zynjacku_enum_set(enum_ptr, values, values_count);
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED],
+    0,
+    group_ui_context,
+    parameter_name,
+    (guint)0,
+    enum_ptr,
+    zynjacku_synth_context_to_string(parameter_handle),
+    &ret_obj_ptr);
+
+  LOG_DEBUG("enum-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(enum_ptr);
+
+  *parameter_ui_context = ret_obj_ptr;
 }

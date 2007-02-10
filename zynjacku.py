@@ -101,11 +101,13 @@ class SynthWindowUniversal(SynthWindow):
         if self.ui_enabled:
             self.hide()
             self.synth.ui_off()
+            self.synth.disconnect(self.enum_disappeared_connect_id)
+            self.synth.disconnect(self.enum_appeared_connect_id)
             self.synth.disconnect(self.float_disappeared_connect_id)
-            self.synth.disconnect(self.bool_disappeared_connect_id)
-            self.synth.disconnect(self.group_disappeared_connect_id)
             self.synth.disconnect(self.float_appeared_connect_id)
+            self.synth.disconnect(self.bool_disappeared_connect_id)
             self.synth.disconnect(self.bool_appeared_connect_id)
+            self.synth.disconnect(self.group_disappeared_connect_id)
             self.synth.disconnect(self.group_appeared_connect_id)
         else:
             self.synth.ui_off()
@@ -117,11 +119,13 @@ class SynthWindowUniversal(SynthWindow):
 
         if not self.ui_enabled:
             self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
-            self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
-            self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
             self.group_disappeared_connect_id = self.synth.connect("group-disappeared", self.on_group_disappeared)
+            self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
             self.bool_disappeared_connect_id = self.synth.connect("bool-disappeared", self.on_bool_disappeared)
+            self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
             self.float_disappeared_connect_id = self.synth.connect("float-disappeared", self.on_float_disappeared)
+            self.enum_appeared_connect_id = self.synth.connect("enum-appeared", self.on_enum_appeared)
+            self.enum_disappeared_connect_id = self.synth.connect("enum-disappeared", self.on_enum_disappeared)
 
             self.synth.ui_on()
 
@@ -188,6 +192,23 @@ class SynthWindowUniversal(SynthWindow):
         #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
         #print repr(self.parent_group)
         #print repr(obj)
+        obj.remove()
+
+    def on_enum_appeared(self, synth, parent, name, selected_value_index, valid_values, context):
+        print "-------------- Enum \"%s\" appeared" % name
+        print "synth: %s" % repr(synth)
+        print "parent: %s" % repr(parent)
+        print "name: %s" % name
+        print "selected value index: %s" % repr(selected_value_index)
+        print "valid values: %s" % repr(valid_values)
+        print "valid values count: %s" % valid_values.get_count()
+        for i in range(valid_values.get_count()):
+            print valid_values.get_at_index(i)
+        print "context: %s" % repr(context)
+        return parent.on_bool_appeared(self.window, "enum", True, context)
+
+    def on_enum_disappeared(self, synth, obj):
+        print "-------------- Enum \"%s\" disappeared" % obj.parameter_name
         obj.remove()
 
 class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):

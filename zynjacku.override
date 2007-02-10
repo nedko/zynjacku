@@ -8,6 +8,7 @@ headers
 #include "synth.h"
 #include "engine.h"
 #include "plugin_repo.h"
+#include "enum.h"
 %%
 modulename zynjacku
 %%
@@ -17,4 +18,5 @@ ignore-glob
   *_get_type
   zynjacku_engine_activate_synth
   zynjacku_engine_deactivate_synth
+  zynjacku_enum_set
 %%

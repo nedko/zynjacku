@@ -33,7 +33,7 @@ GENDEP_C = set -e; gcc -MM $(CFLAGS) $< | sed $(GENDEP_SED_EXPR) > $@; [ -s $@ ]
 
 .PHONY: run test install uninstall
 
-SOURCES = engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c
+SOURCES = engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c enum.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
 # The path to the GTK+ python types
@@ -41,7 +41,7 @@ DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 
 default: zynjacku.so
 
-zynjacku.defs: engine.h synth.h plugin_repo.h
+zynjacku.defs: engine.h synth.h plugin_repo.h enum.h
 	python /usr/share/pygtk/2.0/codegen/h2def.py $^ > $@
 
 zynjackumodule.c: init_py_constants.c
