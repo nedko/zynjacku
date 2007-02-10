@@ -434,12 +434,18 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
 
         self.combobox.set_active(selected_value_index)
 
+        self.combobox.connect("changed", self.on_changed)
+
         self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         self.align.set_padding(10, 10, 10, 10)
         self.align.add(self.combobox)
 
     def get_top_widget(self):
         return self.align
+
+    def on_changed(self, adjustment):
+        #print "Enum changed. \"%s\" set to %u" % (self.parameter_name, adjustment.get_active())
+        self.window.synth.enum_set(self.context, adjustment.get_active())
 
 class SynthWindowFactory:
     def __init__(self):

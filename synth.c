@@ -1214,3 +1214,27 @@ dynparam_parameter_enum_appeared(
 
   *parameter_ui_context = ret_obj_ptr;
 }
+
+void
+zynjacku_synth_enum_set(
+  ZynjackuSynth * synth_obj_ptr,
+  gchar * string_context,
+  guint value)
+{
+  void * context;
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  context = zynjacku_synth_context_from_string(string_context);
+
+  LOG_NOTICE("zynjacku_synth_enum_set() called, context %p, value %u", context, value);
+
+  if (synth_ptr->dynparams != NULL)
+  {
+    dynparam_parameter_enum_change(
+      synth_ptr->dynparams,
+      (lv2dynparam_host_parameter)context,
+      value);
+  }
+}

@@ -96,6 +96,12 @@ zynjacku_synth_float_set(
   gchar * context,
   gfloat value);
 
+void
+zynjacku_synth_enum_set(
+  ZynjackuSynth * obj_ptr,
+  gchar * context,
+  guint value);
+
 G_END_DECLS
 
 #endif /* #ifndef SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */
