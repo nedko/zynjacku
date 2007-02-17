@@ -39,6 +39,9 @@
 
 #include "zynjacku.h"
 
+/* uncomment next line if your version of JACK does not include the latest changes. */
+//#define jack_midi_get_event_count(port_buf, nframes) jack_midi_port_get_info(port_buf, nframes)->event_count
+
 int
 jack_process_cb(
   jack_nframes_t nframes,
