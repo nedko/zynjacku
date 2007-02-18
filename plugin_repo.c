@@ -147,11 +147,11 @@ void
 zynjacku_find_simple_plugins()
 {
   SLV2Plugins plugins;
-  size_t i;
+  unsigned int index;
   uint32_t ports_count;
   uint32_t port_index;
   const SLV2Plugin * plugin_ptr;
-  size_t plugins_count;
+  unsigned int plugins_count;
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
   SLV2PortClass class;
@@ -162,9 +162,9 @@ zynjacku_find_simple_plugins()
   slv2_plugins_load_all(plugins);
   plugins_count = slv2_plugins_size(plugins);
 
-  for (i = 0 ; i < plugins_count; i++)
+  for (index = 0 ; index < plugins_count; index++)
   {
-    plugin_ptr = slv2_plugins_get_at(plugins, i);
+    plugin_ptr = slv2_plugins_get_at(plugins, index);
 
     name = slv2_plugin_get_name(plugin_ptr);
 
@@ -243,18 +243,18 @@ void
 zynjacku_find_all_plugins()
 {
   SLV2Plugins plugins;
-  size_t i;
+  unsigned int index;
   const SLV2Plugin * plugin_ptr;
-  size_t plugins_count;
+  unsigned int plugins_count;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
   plugins = slv2_plugins_new();
   slv2_plugins_load_all(plugins);
   plugins_count = slv2_plugins_size(plugins);
 
-  for (i = 0 ; i < plugins_count; i++)
+  for (index = 0 ; index < plugins_count; index++)
   {
-    plugin_ptr = slv2_plugins_get_at(plugins, i);
+    plugin_ptr = slv2_plugins_get_at(plugins, index);
     plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
     plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);

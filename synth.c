@@ -760,7 +760,7 @@ zynjacku_synth_construct(
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
   SLV2Strings slv2_strings;
-  size_t string_index;
+  unsigned int string_index;
   gboolean dynparams_supported;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
