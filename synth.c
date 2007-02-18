@@ -759,8 +759,8 @@ zynjacku_synth_construct(
   struct zynjacku_synth * synth_ptr;
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
-  SLV2Value slv2_value;
-  size_t value_index;
+  SLV2Strings slv2_strings;
+  size_t string_index;
   gboolean dynparams_supported;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
@@ -781,39 +781,39 @@ zynjacku_synth_construct(
 
   dynparams_supported = FALSE;
 
-  slv2_value = slv2_plugin_get_required_features(synth_ptr->plugin);
+  slv2_strings = slv2_plugin_get_required_features(synth_ptr->plugin);
 
-  LOG_NOTICE("Plugin has %u required features", (unsigned int)slv2_value->num_values);
-  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
+  LOG_NOTICE("Plugin has %u required features", (unsigned int)slv2_strings_size(slv2_strings));
+  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
-    if (strcmp(LV2DYNPARAM_URI, slv2_value->values[value_index]) == 0)
+    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
+    if (strcmp(LV2DYNPARAM_URI, slv2_strings_get_at(slv2_strings, string_index)) == 0)
     {
       dynparams_supported = TRUE;
     }
     else
     {
-      LOG_ERROR("Plugin requires unsupported feature \"%s\"", slv2_value->values[value_index]);
-      slv2_value_free(slv2_value);
+      LOG_ERROR("Plugin requires unsupported feature \"%s\"", slv2_strings_get_at(slv2_strings, string_index));
+      slv2_strings_free(slv2_strings);
       goto fail;
     }
   }
 
-  slv2_value_free(slv2_value);
+  slv2_strings_free(slv2_strings);
 
-  slv2_value = slv2_plugin_get_optional_features(synth_ptr->plugin);
+  slv2_strings = slv2_plugin_get_optional_features(synth_ptr->plugin);
 
-  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_value->num_values);
-  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
+  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_strings_size(slv2_strings));
+  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
-    if (strcmp(LV2DYNPARAM_URI, slv2_value->values[value_index]) == 0)
+    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
+    if (strcmp(LV2DYNPARAM_URI, slv2_strings_get_at(slv2_strings, string_index)) == 0)
     {
       dynparams_supported = TRUE;
     }
   }
 
-  slv2_value_free(slv2_value);
+  slv2_strings_free(slv2_strings);
 
   sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
 
@@ -904,16 +904,16 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  slv2_value = slv2_plugin_get_value(synth_ptr->plugin, "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>");
+  slv2_strings = slv2_plugin_get_value(synth_ptr->plugin, "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>");
 
-  LOG_NOTICE("Plugin has %u custom GUIs", (unsigned int)slv2_value->num_values);
-  for (value_index = 0 ; value_index < slv2_value->num_values ; value_index++)
+  LOG_NOTICE("Plugin has %u custom GUIs", (unsigned int)slv2_strings_size(slv2_strings));
+  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_value->values[value_index]);
-    LOG_ERROR("Cannot find dynamic library implementing \"%s\" because libslv2 is not mature enough yet.", slv2_value->values[value_index]);
+    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
+    LOG_ERROR("Cannot find dynamic library implementing \"%s\" because libslv2 is not mature enough yet.", slv2_strings_get_at(slv2_strings, string_index));
   }
 
-  slv2_value_free(slv2_value);
+  slv2_strings_free(slv2_strings);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 

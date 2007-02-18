@@ -146,7 +146,7 @@ zynjacku_plugin_repo_get()
 void
 zynjacku_find_simple_plugins()
 {
-  SLV2List plugins;
+  SLV2Plugins plugins;
   size_t i;
   uint32_t ports_count;
   uint32_t port_index;
@@ -158,13 +158,13 @@ zynjacku_find_simple_plugins()
   char * name;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
-  plugins_count = slv2_list_get_length(plugins);
+  plugins = slv2_plugins_new();
+  slv2_plugins_load_all(plugins);
+  plugins_count = slv2_plugins_size(plugins);
 
   for (i = 0 ; i < plugins_count; i++)
   {
-    plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
+    plugin_ptr = slv2_plugins_get_at(plugins, i);
 
     name = slv2_plugin_get_name(plugin_ptr);
 
@@ -236,31 +236,31 @@ zynjacku_find_simple_plugins()
     free(name);
   }
 
-  slv2_list_free(plugins);
+  slv2_plugins_free(plugins);
 }
 
 void
 zynjacku_find_all_plugins()
 {
-  SLV2List plugins;
+  SLV2Plugins plugins;
   size_t i;
   const SLV2Plugin * plugin_ptr;
   size_t plugins_count;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
-  plugins_count = slv2_list_get_length(plugins);
+  plugins = slv2_plugins_new();
+  slv2_plugins_load_all(plugins);
+  plugins_count = slv2_plugins_size(plugins);
 
   for (i = 0 ; i < plugins_count; i++)
   {
-    plugin_ptr = slv2_list_get_plugin_by_index(plugins, i);
+    plugin_ptr = slv2_plugins_get_at(plugins, i);
     plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
     plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
   }
 
-  slv2_list_free(plugins);
+  slv2_plugins_free(plugins);
 }
 
 SLV2Plugin *
@@ -288,22 +288,22 @@ SLV2Plugin *
 zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
   SLV2Plugin * plugin_ptr;
-  SLV2List plugins;
+  SLV2Plugins plugins;
 
-  plugins = slv2_list_new();
-  slv2_list_load_all(plugins);
+  plugins = slv2_plugins_new();
+  slv2_plugins_load_all(plugins);
 
-  plugin_ptr = slv2_list_get_plugin_by_uri(plugins, uri);
+  plugin_ptr = slv2_plugins_get_by_uri(plugins, uri);
   if (plugin_ptr == NULL)
   {
-    slv2_list_free(plugins);
+    slv2_plugins_free(plugins);
     return NULL;
   }
 
   /* yup, overwrite old plugin_ptr value - we don't need it anyway after the dup */
   plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
 
-  slv2_list_free(plugins);
+  slv2_plugins_free(plugins);
 
   return plugin_ptr;
 }
