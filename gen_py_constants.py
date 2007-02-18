@@ -29,4 +29,4 @@ while True:
             cfile.write("}\n")
             cfile.close()
             subprocess.call(["cc", "gen_py_constant.c", "-o", "gen_py_constant"])
-            subprocess.call(["gen_py_constant"])
+            subprocess.call(["./gen_py_constant"])
