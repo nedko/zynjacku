@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <slv2/slv2.h>
-#include <slv2/query.h>
+//#include <slv2/query.h>
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>

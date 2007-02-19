@@ -33,7 +33,7 @@
 struct zynjacku_simple_plugin_info
 {
   struct list_head siblings;
-  SLV2Plugin * plugin_ptr;
+  SLV2Plugin plugin;
 };
 
 struct zynjacku_plugin_repo
@@ -150,7 +150,7 @@ zynjacku_find_simple_plugins()
   unsigned int index;
   uint32_t ports_count;
   uint32_t port_index;
-  const SLV2Plugin * plugin_ptr;
+  SLV2Plugin plugin;
   unsigned int plugins_count;
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
@@ -164,17 +164,17 @@ zynjacku_find_simple_plugins()
 
   for (index = 0 ; index < plugins_count; index++)
   {
-    plugin_ptr = slv2_plugins_get_at(plugins, index);
+    plugin = slv2_plugins_get_at(plugins, index);
 
-    name = slv2_plugin_get_name(plugin_ptr);
+    name = slv2_plugin_get_name(plugin);
 
-    ports_count = slv2_plugin_get_num_ports(plugin_ptr);
+    ports_count = slv2_plugin_get_num_ports(plugin);
     audio_out_ports_count = 0;
     midi_in_ports_count = 0;
 
     for (port_index = 0 ; port_index < ports_count ; port_index++)
     {
-      class = slv2_port_get_class(plugin_ptr, slv2_port_by_index(port_index));
+      class = slv2_port_get_class(plugin, slv2_port_by_index(port_index));
 
       if (class == SLV2_CONTROL_INPUT)
       {
@@ -229,7 +229,7 @@ zynjacku_find_simple_plugins()
 
     LOG_DEBUG("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin_ptr));
     plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
-    plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
+    plugin_info_ptr->plugin = slv2_plugin_duplicate(plugin);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
 
   next_plugin:
@@ -244,7 +244,7 @@ zynjacku_find_all_plugins()
 {
   SLV2Plugins plugins;
   unsigned int index;
-  const SLV2Plugin * plugin_ptr;
+  SLV2Plugin plugin;
   unsigned int plugins_count;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
 
@@ -254,16 +254,16 @@ zynjacku_find_all_plugins()
 
   for (index = 0 ; index < plugins_count; index++)
   {
-    plugin_ptr = slv2_plugins_get_at(plugins, index);
+    plugin = slv2_plugins_get_at(plugins, index);
     plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
-    plugin_info_ptr->plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
+    plugin_info_ptr->plugin = slv2_plugin_duplicate(plugin);
     list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
   }
 
   slv2_plugins_free(plugins);
 }
 
-SLV2Plugin *
+SLV2Plugin
 zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
 {
   struct list_head * node_ptr;
@@ -273,10 +273,10 @@ zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
   list_for_each(node_ptr, &g_available_plugins)
   {
     plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-    current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr);
+    current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin);
     if (strcmp(current_uri, uri) == 0)
     {
-      return plugin_info_ptr->plugin_ptr;
+      return plugin_info_ptr->plugin;
     }
   }
 
@@ -284,28 +284,28 @@ zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
 }
 
 /* Nasty hack until we start using real plugin list */
-SLV2Plugin *
+SLV2Plugin
 zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
-  SLV2Plugin * plugin_ptr;
+  SLV2Plugin plugin;
   SLV2Plugins plugins;
 
   plugins = slv2_plugins_new();
   slv2_plugins_load_all(plugins);
 
-  plugin_ptr = slv2_plugins_get_by_uri(plugins, uri);
-  if (plugin_ptr == NULL)
+  plugin = slv2_plugins_get_by_uri(plugins, uri);
+  if (plugin == NULL)
   {
     slv2_plugins_free(plugins);
     return NULL;
   }
 
   /* yup, overwrite old plugin_ptr value - we don't need it anyway after the dup */
-  plugin_ptr = slv2_plugin_duplicate(plugin_ptr);
+  plugin = slv2_plugin_duplicate(plugin);
 
   slv2_plugins_free(plugins);
 
-  return plugin_ptr;
+  return plugin;
 }
 
 void
@@ -318,8 +318,8 @@ zynjacku_dump_simple_plugins()
   list_for_each(node_ptr, &g_available_plugins)
   {
     plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-    name = slv2_plugin_get_name(plugin_info_ptr->plugin_ptr);
-    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin_ptr));
+    name = slv2_plugin_get_name(plugin_info_ptr->plugin);
+    printf("\"%s\", %s\n", name, slv2_plugin_get_uri(plugin_info_ptr->plugin));
     free(name);
   }
 }
