@@ -54,7 +54,7 @@ class SynthWindowCustom(SynthWindow):
         self.synth.connect("custom-gui-off", self.on_window_destroy)
 
     def on_window_destroy(self, synth):
-        print "Custom GUI window destroy detected"
+        #print "Custom GUI window destroy detected"
         self.emit('destroy')
 
     def show(self):

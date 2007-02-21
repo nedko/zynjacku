@@ -647,7 +647,7 @@ zynjacku_gtk2gui_on_ui_destroyed(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(context_ptr);
 
-  LOG_ERROR("%s gtk2gui window destroyed", synth_ptr->id);
+  LOG_DEBUG("%s gtk2gui window destroyed", synth_ptr->id);
 
   g_signal_emit(
     (ZynjackuSynth *)context_ptr,
