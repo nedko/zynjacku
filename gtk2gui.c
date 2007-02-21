@@ -38,14 +38,17 @@
 #include "gtk2gui.h"
 #include "zynjacku.h"
 
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #define LV2GTK2GUI_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>"
 #define LV2GTK2GUI_BINARY_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary>"
 
+struct zynjacku_gtk2gui;
+
 struct zynjacku_gtk2gui_ui
 {
+  struct zynjacku_gtk2gui * gtk2gui_ptr;
   char * uri;
   char * quoted_uri;
   char * bundle_path;
@@ -63,6 +66,7 @@ struct zynjacku_gtk2gui
   struct zynjacku_gtk2gui_ui * ui_array;
   unsigned int ports_count;
   struct zynjacku_synth_port ** ports;
+  void * context_ptr;
 };
 
 char *
@@ -267,6 +271,7 @@ zynjacku_gtk2gui_ui_uninit(
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
+  void * context_ptr,
   SLV2Plugin plugin,
   const struct list_head * parameter_ports_ptr)
 {
@@ -310,6 +315,8 @@ zynjacku_gtk2gui_init(
 
     LOG_DEBUG("%s", uri);
 
+    gtk2gui_ptr->ui_array[index].gtk2gui_ptr = gtk2gui_ptr;
+
     if (!zynjacku_gtk2gui_ui_init(gtk2gui_ptr->ui_array + index, plugin, uri))
     {
       goto fail_free_array;
@@ -348,6 +355,7 @@ zynjacku_gtk2gui_init(
   }
 
   gtk2gui_ptr->ports_count = ports_count;
+  gtk2gui_ptr->context_ptr = context_ptr;
 
   return (zynjacku_gtk2gui_handle)gtk2gui_ptr;
 
@@ -377,7 +385,22 @@ zynjacku_gtk2gui_ui_destroy(
   LOG_DEBUG("window_ptr on destroy %p", ui_ptr->window_ptr);
 //  g_object_unref(ui_ptr->window_ptr);
   ui_ptr->descr_ptr->cleanup(ui_ptr->ui);
+  ui_ptr->ui = NULL;
 }
+
+#define ui_ptr ((struct zynjacku_gtk2gui_ui *)data_ptr)
+
+static void
+zynjacku_on_gtk2gui_window_destroy_internal(
+  GtkWidget * widget,
+  gpointer data_ptr)
+{
+  zynjacku_gtk2gui_ui_destroy(ui_ptr);
+  
+  zynjacku_gtk2gui_on_ui_destroyed(ui_ptr->gtk2gui_ptr->context_ptr);
+}
+
+#undef ui_ptr
 
 #define gtk2gui_ptr ((struct zynjacku_gtk2gui *)gtk2gui_handle)
 
@@ -500,6 +523,12 @@ zynjacku_gtk2gui_ui_on(
 
   /* Show the widgets */
   gtk_widget_show_all(gtk2gui_ptr->ui_array[index].window_ptr);
+
+  g_signal_connect(
+    G_OBJECT(gtk2gui_ptr->ui_array[index].window_ptr),
+    "destroy",
+    G_CALLBACK(zynjacku_on_gtk2gui_window_destroy_internal),
+    gtk2gui_ptr->ui_array + index);
 }
 
 void

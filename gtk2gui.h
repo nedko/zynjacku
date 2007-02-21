@@ -28,6 +28,7 @@ typedef void * zynjacku_gtk2gui_handle;
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
+  void * context_ptr,
   SLV2Plugin plugin,
   const struct list_head * parameter_ports_ptr);
 
@@ -53,5 +54,10 @@ void
 zynjacku_gtk2gui_ui_off(
   zynjacku_gtk2gui_handle gtk2gui_handle,
   unsigned int index);
+
+/* callback */
+void
+zynjacku_gtk2gui_on_ui_destroyed(
+  void * context_ptr);
 
 #endif /* #ifndef GTK2GUI_H__6BE36C30_2948_428C_94F3_5443FBFF32F6__INCLUDED */

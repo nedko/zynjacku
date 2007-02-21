@@ -53,7 +53,8 @@
 #define ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED   6
 #define ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED       7
 #define ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED    8
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT              9
+#define ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF       9
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT             10
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -370,6 +371,19 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF] =
+    g_signal_new(
+      "custom-gui-off",         /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      0);                       /* n_params */
+
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
 
@@ -623,6 +637,23 @@ zynjacku_synth_ui_off(
   {
     zynjacku_synth_generic_lv2_ui_off(synth_obj_ptr);
   }
+}
+
+void
+zynjacku_gtk2gui_on_ui_destroyed(
+  void * context_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(context_ptr);
+
+  LOG_ERROR("%s gtk2gui window destroyed", synth_ptr->id);
+
+  g_signal_emit(
+    (ZynjackuSynth *)context_ptr,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF],
+    0,
+    NULL);
 }
 
 gboolean
@@ -921,7 +952,7 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_ptr->plugin, &synth_ptr->parameter_ports);
+  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_obj_ptr, synth_ptr->plugin, &synth_ptr->parameter_ports);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
