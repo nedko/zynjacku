@@ -435,57 +435,55 @@ zynjacku_gtk2gui_ui_on(
 
   LOG_DEBUG("zynjacku_gtk2gui_ui_on() called.");
 
-  if (gtk2gui_ptr->ui_array[index].ui != NULL)
+  if (gtk2gui_ptr->ui_array[index].ui == NULL)
   {
-    return;
+    features[0] = NULL;
+
+    gtk2gui_ptr->ui_array[index].ui = gtk2gui_ptr->ui_array[index].descr_ptr->instantiate(
+      gtk2gui_ptr->ui_array[index].descr_ptr,
+      gtk2gui_ptr->ui_array[index].uri,
+      gtk2gui_ptr->ui_array[index].bundle_path,
+      zynjacku_gtk2gui_control, 
+      gtk2gui_ptr,
+      &gtk2gui_ptr->ui_array[index].widget_ptr, 
+      (const LV2_Host_Feature **)features);
+
+    LOG_DEBUG("ui: %p", gtk2gui_ptr->ui_array[index].ui);
+    LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
+
+    gtk2gui_ptr->ui_array[index].window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    gtk_container_add(GTK_CONTAINER(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].widget_ptr);
+
+    /* Set parameter values */
+    if (gtk2gui_ptr->ui_array[index].descr_ptr->set_control != NULL)
+    {
+      for (port_index = 0 ; port_index < gtk2gui_ptr->ports_count ; port_index++)
+      {
+        port_ptr = gtk2gui_ptr->ports[port_index];
+
+        if (port_ptr == NULL)     /* handle gaps */
+        {
+          continue;
+        }
+
+        LOG_DEBUG(
+          "parameter #%u with value %f and range %f - %f",
+          (unsigned int)port_ptr->index,
+          port_ptr->data.parameter.value,
+          port_ptr->data.parameter.min,
+          port_ptr->data.parameter.max);
+
+        gtk2gui_ptr->ui_array[index].descr_ptr->set_control(
+          gtk2gui_ptr->ui_array[index].ui,
+          port_ptr->index,
+          port_ptr->data.parameter.value);
+      }
+    }
   }
-
-  features[0] = NULL;
-
-  gtk2gui_ptr->ui_array[index].ui = gtk2gui_ptr->ui_array[index].descr_ptr->instantiate(
-    gtk2gui_ptr->ui_array[index].descr_ptr,
-    gtk2gui_ptr->ui_array[index].uri,
-    gtk2gui_ptr->ui_array[index].bundle_path,
-    zynjacku_gtk2gui_control, 
-    gtk2gui_ptr,
-    &gtk2gui_ptr->ui_array[index].widget_ptr, 
-    (const LV2_Host_Feature **)features);
-
-  LOG_DEBUG("ui: %p", gtk2gui_ptr->ui_array[index].ui);
-  LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
-
-  gtk2gui_ptr->ui_array[index].window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-
-  gtk_container_add(GTK_CONTAINER(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].widget_ptr);
 
   /* Show the widgets */
   gtk_widget_show_all(gtk2gui_ptr->ui_array[index].window_ptr);
-
-  /* Set parameter values */
-  if (gtk2gui_ptr->ui_array[index].descr_ptr->set_control != NULL)
-  {
-    for (port_index = 0 ; port_index < gtk2gui_ptr->ports_count ; port_index++)
-    {
-      port_ptr = gtk2gui_ptr->ports[port_index];
-
-      if (port_ptr == NULL)     /* handle gaps */
-      {
-        continue;
-      }
-
-      LOG_DEBUG(
-        "parameter #%u with value %f and range %f - %f",
-        (unsigned int)port_ptr->index,
-        port_ptr->data.parameter.value,
-        port_ptr->data.parameter.min,
-        port_ptr->data.parameter.max);
-
-      gtk2gui_ptr->ui_array[index].descr_ptr->set_control(
-        gtk2gui_ptr->ui_array[index].ui,
-        port_ptr->index,
-        port_ptr->data.parameter.value);
-    }
-  }
 }
 
 void
@@ -494,4 +492,12 @@ zynjacku_gtk2gui_ui_off(
   unsigned int index)
 {
   LOG_DEBUG("zynjacku_gtk2gui_ui_off() called.");
+
+  if (gtk2gui_ptr->ui_array[index].ui == NULL)
+  {
+    return;
+  }
+
+  /* Show the widgets */
+  gtk_widget_hide_all(gtk2gui_ptr->ui_array[index].window_ptr);
 }
