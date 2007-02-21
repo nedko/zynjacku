@@ -102,6 +102,7 @@ class SynthWindowUniversal(SynthWindow):
         self.layout_type = layout_type
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_size_request(600,300)
         self.window.set_title(synth.get_name())
         self.window.set_role("zynjacku_synth_ui")
 
