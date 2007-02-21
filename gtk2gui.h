@@ -28,7 +28,8 @@ typedef void * zynjacku_gtk2gui_handle;
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
-  SLV2Plugin plugin);
+  SLV2Plugin plugin,
+  const struct list_head * parameter_ports_ptr);
 
 void
 zynjacku_gtk2gui_uninit(
@@ -46,8 +47,7 @@ zynjacku_gtk2gui_get_name(
 void
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
-  unsigned int index,
-  struct list_head * parameter_ports_ptr);
+  unsigned int index);
 
 void
 zynjacku_gtk2gui_ui_off(

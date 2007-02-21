@@ -589,7 +589,7 @@ zynjacku_synth_ui_on(
 
   if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0, &synth_ptr->parameter_ports);
+    zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0);
   }
   else if (synth_ptr->dynparams)
   {
@@ -921,7 +921,7 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_ptr->plugin);
+  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_ptr->plugin, &synth_ptr->parameter_ports);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 

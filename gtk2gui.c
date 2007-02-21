@@ -51,8 +51,9 @@ struct zynjacku_gtk2gui_ui
   char * bundle_path;
   void * module;
   const LV2UI_Descriptor * descr_ptr;
-  unsigned int ports_count;
-  struct zynjacku_synth_port ** ports;
+  LV2UI_Handle ui;
+  GtkWidget * widget_ptr;
+  GtkWidget * window_ptr;
 };
 
 struct zynjacku_gtk2gui
@@ -60,6 +61,8 @@ struct zynjacku_gtk2gui
   SLV2Plugin plugin;
   unsigned int count;
   struct zynjacku_gtk2gui_ui * ui_array;
+  unsigned int ports_count;
+  struct zynjacku_synth_port ** ports;
 };
 
 char *
@@ -234,6 +237,10 @@ zynjacku_gtk2gui_ui_init(
     goto fail_dlclose;
   }
 
+  ui_ptr->ui = NULL;
+  ui_ptr->widget_ptr = NULL;
+  ui_ptr->window_ptr = NULL;
+
   LOG_DEBUG("LV2 gtk2gui descriptor found.");
 
   return TRUE;
@@ -260,13 +267,17 @@ zynjacku_gtk2gui_ui_uninit(
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
-  SLV2Plugin plugin)
+  SLV2Plugin plugin,
+  const struct list_head * parameter_ports_ptr)
 {
   SLV2Strings uris;
   unsigned int index;
   unsigned int count;
   const char * uri;
   struct zynjacku_gtk2gui * gtk2gui_ptr;
+  unsigned int ports_count;
+  struct list_head * node_ptr;
+  struct zynjacku_synth_port * port_ptr;
 
   uris = slv2_plugin_get_value(plugin, LV2GTK2GUI_URI);
 
@@ -310,6 +321,34 @@ zynjacku_gtk2gui_init(
   gtk2gui_ptr->count = count;
   gtk2gui_ptr->plugin = slv2_plugin_duplicate(plugin);
 
+  ports_count = 0;
+
+  list_for_each(node_ptr, parameter_ports_ptr)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    if (port_ptr->index >= ports_count)
+    {
+      ports_count = port_ptr->index + 1;
+    }
+  }
+
+  gtk2gui_ptr->ports = malloc(ports_count * sizeof(struct zynjacku_synth_port *));
+  if (gtk2gui_ptr->ports == NULL)
+  {
+    LOG_ERROR("malloc() failed.");
+    goto fail_free_array;
+  }
+
+  memset(gtk2gui_ptr->ports, 0, ports_count * sizeof(struct zynjacku_synth_port *));
+
+  list_for_each(node_ptr, parameter_ports_ptr)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    gtk2gui_ptr->ports[port_ptr->index] = port_ptr;
+  }
+
+  gtk2gui_ptr->ports_count = ports_count;
+
   return (zynjacku_gtk2gui_handle)gtk2gui_ptr;
 
 fail_free_array:
@@ -336,6 +375,8 @@ zynjacku_gtk2gui_uninit(
   zynjacku_gtk2gui_handle gtk2gui_handle)
 {
   unsigned int index;
+
+  free(gtk2gui_ptr->ports);
 
   slv2_plugin_free(gtk2gui_ptr->plugin);
 
@@ -364,17 +405,15 @@ zynjacku_gtk2gui_get_name(
   return "Custom GUI";
 }
 
-#define ui_ptr ((struct zynjacku_gtk2gui_ui *)controller)
-
 void
 zynjacku_gtk2gui_control(
-  LV2UI_Controller controller,
+  LV2UI_Controller gtk2gui_handle,
   uint32_t port,
   float value)
 {
   LOG_DEBUG("setting port %u to %f", (unsigned int)port, value);
 
-  if (port >= ui_ptr->ports_count || ui_ptr->ports[port] == NULL)
+  if (port >= gtk2gui_ptr->ports_count || gtk2gui_ptr->ports[port] == NULL)
   {
     LOG_WARNING(
       "Ignoring value change notification from UI for unknown port #%u",
@@ -382,84 +421,58 @@ zynjacku_gtk2gui_control(
     return;
   }
 
-  ui_ptr->ports[port]->data.parameter.value = value;
+  gtk2gui_ptr->ports[port]->data.parameter.value = value;
 }
 
-#undef ui_ptr
-
-/* FIXME: leaks, improve error handling */
 void
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
-  unsigned int index,
-  struct list_head * parameter_ports_ptr)
+  unsigned int index)
 {
-  GtkWidget * widget_ptr;
-  LV2UI_Handle ui;
-  GtkWidget * window_ptr;
   LV2_Host_Feature * features[1];
-  struct list_head * node_ptr;
   struct zynjacku_synth_port * port_ptr;
-  unsigned int ports_count;
+  unsigned int port_index;
 
   LOG_DEBUG("zynjacku_gtk2gui_ui_on() called.");
 
+  if (gtk2gui_ptr->ui_array[index].ui != NULL)
+  {
+    return;
+  }
+
   features[0] = NULL;
 
-  ui = gtk2gui_ptr->ui_array[index].descr_ptr->instantiate(
+  gtk2gui_ptr->ui_array[index].ui = gtk2gui_ptr->ui_array[index].descr_ptr->instantiate(
     gtk2gui_ptr->ui_array[index].descr_ptr,
     gtk2gui_ptr->ui_array[index].uri,
     gtk2gui_ptr->ui_array[index].bundle_path,
     zynjacku_gtk2gui_control, 
-    gtk2gui_ptr->ui_array + index,
-    &widget_ptr, 
+    gtk2gui_ptr,
+    &gtk2gui_ptr->ui_array[index].widget_ptr, 
     (const LV2_Host_Feature **)features);
 
-  LOG_DEBUG("ui: %p", ui);
-  LOG_DEBUG("widget: %p", widget_ptr);
+  LOG_DEBUG("ui: %p", gtk2gui_ptr->ui_array[index].ui);
+  LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
 
-  window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  gtk2gui_ptr->ui_array[index].window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-  gtk_container_add(GTK_CONTAINER(window_ptr), widget_ptr);
+  gtk_container_add(GTK_CONTAINER(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].widget_ptr);
 
   /* Show the widgets */
-  gtk_widget_show_all(window_ptr);
+  gtk_widget_show_all(gtk2gui_ptr->ui_array[index].window_ptr);
 
   /* Set parameter values */
   if (gtk2gui_ptr->ui_array[index].descr_ptr->set_control != NULL)
   {
-    ports_count = 0;
-
-    list_for_each(node_ptr, parameter_ports_ptr)
+    for (port_index = 0 ; port_index < gtk2gui_ptr->ports_count ; port_index++)
     {
-      port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
-      if (port_ptr->index >= ports_count)
+      port_ptr = gtk2gui_ptr->ports[port_index];
+
+      if (port_ptr == NULL)     /* handle gaps */
       {
-        ports_count = port_ptr->index + 1;
+        continue;
       }
-    }
 
-    gtk2gui_ptr->ui_array[index].ports = malloc(ports_count * sizeof(struct zynjacku_synth_port *));
-    if (gtk2gui_ptr->ui_array[index].ports == NULL)
-    {
-      LOG_ERROR("malloc() failed.");
-      return;                   /* FIXME: proper error handling */
-    }
-
-    memset(gtk2gui_ptr->ui_array[index].ports, 0, ports_count * sizeof(struct zynjacku_synth_port *));
-
-    /* we map ports early because changing port values can trigger value change callbacks (happens with azr3) */
-    list_for_each(node_ptr, parameter_ports_ptr)
-    {
-      port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
-      gtk2gui_ptr->ui_array[index].ports[port_ptr->index] = port_ptr;
-    }
-
-    gtk2gui_ptr->ui_array[index].ports_count = ports_count;
-
-    list_for_each(node_ptr, parameter_ports_ptr)
-    {
-      port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
       LOG_DEBUG(
         "parameter #%u with value %f and range %f - %f",
         (unsigned int)port_ptr->index,
@@ -468,7 +481,7 @@ zynjacku_gtk2gui_ui_on(
         port_ptr->data.parameter.max);
 
       gtk2gui_ptr->ui_array[index].descr_ptr->set_control(
-        ui,
+        gtk2gui_ptr->ui_array[index].ui,
         port_ptr->index,
         port_ptr->data.parameter.value);
     }
