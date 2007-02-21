@@ -368,6 +368,17 @@ fail:
   return ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE;
 }
 
+void
+zynjacku_gtk2gui_ui_destroy(
+  struct zynjacku_gtk2gui_ui * ui_ptr)
+{
+  assert(ui_ptr->descr_ptr->cleanup != NULL);
+
+  LOG_DEBUG("window_ptr on destroy %p", ui_ptr->window_ptr);
+//  g_object_unref(ui_ptr->window_ptr);
+  ui_ptr->descr_ptr->cleanup(ui_ptr->ui);
+}
+
 #define gtk2gui_ptr ((struct zynjacku_gtk2gui *)gtk2gui_handle)
 
 void
@@ -382,6 +393,11 @@ zynjacku_gtk2gui_uninit(
 
   for (index = 0 ; index < gtk2gui_ptr->count ; index++)
   {
+    if (gtk2gui_ptr->ui_array[index].ui != NULL)
+    {
+      zynjacku_gtk2gui_ui_destroy(gtk2gui_ptr->ui_array + index);
+    }
+
     free(gtk2gui_ptr->ui_array[index].quoted_uri);
     free(gtk2gui_ptr->ui_array[index].uri);
   }
