@@ -374,12 +374,11 @@ zynjacku_gtk2gui_control(
 {
   LOG_DEBUG("setting port %u to %f", (unsigned int)port, value);
 
-  if (port >= ui_ptr->ports_count)
+  if (port >= ui_ptr->ports_count || ui_ptr->ports[port] == NULL)
   {
     LOG_WARNING(
-      "Ignoring notification for port #%u value change from UI because total port count is %u",
-      (unsigned int)port,
-      ui_ptr->ports_count);
+      "Ignoring value change notification from UI for unknown port #%u",
+      (unsigned int)port);
     return;
   }
 
@@ -388,6 +387,7 @@ zynjacku_gtk2gui_control(
 
 #undef ui_ptr
 
+/* FIXME: leaks, improve error handling */
 void
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
@@ -401,7 +401,6 @@ zynjacku_gtk2gui_ui_on(
   struct list_head * node_ptr;
   struct zynjacku_synth_port * port_ptr;
   unsigned int ports_count;
-  unsigned int port_index;
 
   LOG_DEBUG("zynjacku_gtk2gui_ui_on() called.");
 
@@ -433,17 +432,27 @@ zynjacku_gtk2gui_ui_on(
 
     list_for_each(node_ptr, parameter_ports_ptr)
     {
-      ports_count++;
+      port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+      if (port_ptr->index >= ports_count)
+      {
+        ports_count = port_ptr->index + 1;
+      }
     }
 
     gtk2gui_ptr->ui_array[index].ports = malloc(ports_count * sizeof(struct zynjacku_synth_port *));
+    if (gtk2gui_ptr->ui_array[index].ports == NULL)
+    {
+      LOG_ERROR("malloc() failed.");
+      return;                   /* FIXME: proper error handling */
+    }
 
-    port_index = 0;
+    memset(gtk2gui_ptr->ui_array[index].ports, 0, ports_count * sizeof(struct zynjacku_synth_port *));
+
+    /* we map ports early because changing port values can trigger value change callbacks (happens with azr3) */
     list_for_each(node_ptr, parameter_ports_ptr)
     {
       port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
-      gtk2gui_ptr->ui_array[index].ports[port_index] = port_ptr;
-      port_index++;
+      gtk2gui_ptr->ui_array[index].ports[port_ptr->index] = port_ptr;
     }
 
     gtk2gui_ptr->ui_array[index].ports_count = ports_count;
