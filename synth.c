@@ -33,12 +33,13 @@
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
-#include "lv2dynparam/lv2dynparam.h"
-#include "lv2dynparam/host.h"
+#include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/host.h>
 
 #include "synth.h"
 #include "engine.h"
 #include "enum.h"
+#include "gtk2gui.h"
 
 #include "zynjacku.h"
 
@@ -555,17 +556,25 @@ gboolean
 zynjacku_synth_supports_generic_ui(
   ZynjackuSynth * synth_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+//  struct zynjacku_synth * synth_ptr;
 
   LOG_DEBUG("zynjacku_synth_supports_generic_ui() called.");
 
+//  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  /* we can generate it always */
+  return TRUE;
+}
+
+gboolean
+zynjacku_synth_supports_custom_ui(
+  ZynjackuSynth * synth_obj_ptr)
+{
+  struct zynjacku_synth * synth_ptr;
+
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  /* generic ui can be supported without dynparams but we don't do it atm */
-
-/*   LOG_DEBUG("%p", synth_ptr->dynparams); */
-//  return (synth_ptr->dynparams != NULL) ? TRUE : FALSE;
-  return TRUE;
+  return (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
 }
 
 void
@@ -578,7 +587,11 @@ zynjacku_synth_ui_on(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  if (synth_ptr->dynparams)
+  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  {
+    zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0, &synth_ptr->parameter_ports);
+  }
+  else if (synth_ptr->dynparams)
   {
     lv2dynparam_host_ui_on(synth_ptr->dynparams);
   }
@@ -598,7 +611,11 @@ zynjacku_synth_ui_off(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  if (synth_ptr->dynparams)
+  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  {
+    zynjacku_gtk2gui_ui_off(synth_ptr->gtk2gui, 0);
+  }
+  else if (synth_ptr->dynparams)
   {
     lv2dynparam_host_ui_off(synth_ptr->dynparams);
   }
@@ -904,16 +921,7 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  slv2_strings = slv2_plugin_get_value(synth_ptr->plugin, "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>");
-
-  LOG_NOTICE("Plugin has %u custom GUIs", (unsigned int)slv2_strings_size(slv2_strings));
-  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
-  {
-    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
-    LOG_ERROR("Cannot find dynamic library implementing \"%s\" because libslv2 is not mature enough yet.", slv2_strings_get_at(slv2_strings, string_index));
-  }
-
-  slv2_strings_free(slv2_strings);
+  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_ptr->plugin);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
@@ -943,6 +951,11 @@ zynjacku_synth_destruct(
   LOG_DEBUG("Destructing plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
   zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(synth_ptr->engine_object_ptr), G_OBJECT(synth_obj_ptr));
+
+  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  {
+    zynjacku_gtk2gui_uninit(synth_ptr->gtk2gui);
+  }
 
   slv2_instance_free(synth_ptr->instance);
 

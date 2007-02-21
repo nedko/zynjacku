@@ -27,15 +27,16 @@
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>
+#include <lv2dynparam/host.h>
 
 #include "lv2-miditype.h"
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
-#include "lv2dynparam/host.h"
 
 #include "synth.h"
 #include "engine.h"
+#include "gtk2gui.h"
 
 #include "zynjacku.h"
 

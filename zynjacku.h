@@ -67,6 +67,7 @@ struct zynjacku_synth
   struct zynjacku_synth_port audio_out_right_port;
   struct list_head parameter_ports;
   lv2dynparam_host_instance dynparams;
+  zynjacku_gtk2gui_handle gtk2gui;
   char * id;
 };
 

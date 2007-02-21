@@ -47,6 +47,19 @@ class SynthWindow(gobject.GObject):
     def hide(self):
         '''Hide synth window'''
 
+class SynthWindowCustom(SynthWindow):
+    def __init__(self, synth):
+        SynthWindow.__init__(self, synth)
+
+    def show(self):
+        '''Show synth window'''
+        self.synth.ui_on()
+
+    def hide(self):
+        '''Hide synth window'''
+
+        self.synth.ui_off()
+
 class SynthWindowUniversalGroup(gobject.GObject):
     def __init__(self, window, parent_group, name, context):
         gobject.GObject.__init__(self)
@@ -456,11 +469,15 @@ class SynthWindowFactory:
         if not self.synth_window_available(synth):
             return False
 
-        synth.ui_win = SynthWindowUniversal(synth, self. group_shadow_type, self.layout_type)
+        if synth.supports_custom_ui():
+            synth.ui_win = SynthWindowCustom(synth)
+        else:
+            synth.ui_win = SynthWindowUniversal(synth, self.group_shadow_type, self.layout_type)
+
         return True
 
     def synth_window_available(self, synth):
-        return synth.supports_generic_ui()
+        return synth.supports_custom_ui() or synth.supports_generic_ui()
 
 class ZynjackuHost(SynthWindowFactory):
     def __init__(self, client_name):
