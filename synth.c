@@ -875,7 +875,7 @@ zynjacku_synth_construct(
 
   if (dynparams_supported)
   {
-    if (!lv2dynparam_host_add_synth(
+    if (!lv2dynparam_host_attach(
           slv2_instance_get_descriptor(synth_ptr->instance),
           slv2_instance_get_handle(synth_ptr->instance),
           synth_obj_ptr,
