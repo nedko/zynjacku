@@ -663,7 +663,6 @@ create_port(
   uint32_t port_index)
 {
   SLV2PortClass class;
-  char * type;
   char * symbol;
   struct zynjacku_synth_port * port_ptr;
   gboolean ret;
@@ -673,10 +672,21 @@ create_port(
 
   /* Get the port symbol (label) for console printing */
   symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_port_by_index(port_index));
+  if (symbol == NULL)
+  {
+    LOG_ERROR("slv2_port_get_symbol() failed.");
+    return FALSE;
+  }
 
   if (class == SLV2_CONTROL_INPUT)
   {
     port_ptr = malloc(sizeof(struct zynjacku_synth_port));
+    if (port_ptr == NULL)
+    {
+      LOG_ERROR("malloc() failed.");
+      goto fail;
+    }
+
     port_ptr->type = PORT_TYPE_PARAMETER;
     port_ptr->index = port_index;
     port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
@@ -748,7 +758,6 @@ create_port(
 fail:
   ret = FALSE;
 exit:
-  free(type);
   free(symbol);
 
   return ret;
