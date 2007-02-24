@@ -26,6 +26,10 @@ import gobject
 import phat
 import re
 
+if not "LV2DYNPARAM_URI" in dir(zynjacku):
+    print "zynjacku library is missing lv2dynparam constants."
+    sys.exit(1)
+
 # Synth window abstraction
 class SynthWindow(gobject.GObject):
 
