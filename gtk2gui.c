@@ -45,8 +45,8 @@
 #define LV2GTK2GUI_BINARY_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary>"
 #define LV2GTK2GUI_OPTIONAL_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature>"
 #define LV2GTK2GUI_REQUIRED_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature>"
-#define LV2GTK2GUI_NOUSERRESIZE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#noUserResize>"
-#define LV2GTK2GUI_FIXEDSIZE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#fixedSize>"
+#define LV2GTK2GUI_NOUSERRESIZE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#noUserResize"
+#define LV2GTK2GUI_FIXEDSIZE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#fixedSize"
 
 struct zynjacku_gtk2gui;
 
@@ -267,7 +267,7 @@ zynjacku_gtk2gui_ui_init(
 {
   LV2UI_DescriptorFunction descr_func;
 
-  ui_ptr->resizable = FALSE;
+  ui_ptr->resizable = TRUE;
 
   ui_ptr->uri = strdup(uri);
   if (ui_ptr->uri == NULL)
