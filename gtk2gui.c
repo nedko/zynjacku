@@ -43,6 +43,10 @@
 
 #define LV2GTK2GUI_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>"
 #define LV2GTK2GUI_BINARY_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary>"
+#define LV2GTK2GUI_OPTIONAL_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature>"
+#define LV2GTK2GUI_REQUIRED_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature>"
+#define LV2GTK2GUI_NOUSERRESIZE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#noUserResize>"
+#define LV2GTK2GUI_FIXEDSIZE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#fixedSize>"
 
 struct zynjacku_gtk2gui;
 
@@ -57,6 +61,7 @@ struct zynjacku_gtk2gui_ui
   LV2UI_Handle ui;
   GtkWidget * widget_ptr;
   GtkWidget * window_ptr;
+  BOOL resizable;
 };
 
 struct zynjacku_gtk2gui
@@ -122,6 +127,22 @@ zynjacku_get_bundle_path(
   return bundle_path;
 }
 
+BOOL
+zynjacku_gtk2gui_process_feature(
+  struct zynjacku_gtk2gui_ui * ui_ptr,
+  const char * feature)
+{
+  if (strcmp(feature, LV2GTK2GUI_FIXEDSIZE_URI) == 0 ||
+      strcmp(feature, LV2GTK2GUI_NOUSERRESIZE_URI) == 0)
+  {
+    ui_ptr->resizable = FALSE;
+    return TRUE;
+  }
+
+  LOG_DEBUG("Unknown feature %s", slv2_strings_get_at(slv2_strings, string_index));
+  return FALSE;
+}
+
 void *
 zynjacku_gtk2gui_load(
   struct zynjacku_gtk2gui_ui * ui_ptr,
@@ -130,6 +151,39 @@ zynjacku_gtk2gui_load(
   SLV2Strings slv2_strings;
   void * module;
   const char * gtk2gui_binary;
+  unsigned int string_index;
+
+  slv2_strings = slv2_plugin_get_value_for_subject(
+    plugin,
+    ui_ptr->quoted_uri,
+    LV2GTK2GUI_OPTIONAL_FEATURE_URI);
+
+  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  {
+    if (!zynjacku_gtk2gui_process_feature(ui_ptr, slv2_strings_get_at(slv2_strings, string_index)))
+    {
+      LOG_WARNING("Ignoring unknown optional feature %s", slv2_strings_get_at(slv2_strings, string_index));
+    }
+  }
+
+  slv2_strings_free(slv2_strings);
+
+  slv2_strings = slv2_plugin_get_value_for_subject(
+    plugin,
+    ui_ptr->quoted_uri,
+    LV2GTK2GUI_REQUIRED_FEATURE_URI);
+
+  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  {
+    if (!zynjacku_gtk2gui_process_feature(ui_ptr, slv2_strings_get_at(slv2_strings, string_index)))
+    {
+      LOG_WARNING("Ignoring custom GUI because of unknown required feature %s", slv2_strings_get_at(slv2_strings, string_index));
+      module = NULL;
+      goto exit;
+    }
+  }
+
+  slv2_strings_free(slv2_strings);
 
   slv2_strings = slv2_plugin_get_value_for_subject(
     plugin,
@@ -212,6 +266,8 @@ zynjacku_gtk2gui_ui_init(
   const char * uri)
 {
   LV2UI_DescriptorFunction descr_func;
+
+  ui_ptr->resizable = FALSE;
 
   ui_ptr->uri = strdup(uri);
   if (ui_ptr->uri == NULL)
@@ -491,6 +547,8 @@ zynjacku_gtk2gui_ui_on(
     LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
 
     gtk2gui_ptr->ui_array[index].window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    gtk_window_set_resizable(GTK_WINDOW(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].resizable);
 
     gtk_container_add(GTK_CONTAINER(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].widget_ptr);
 
