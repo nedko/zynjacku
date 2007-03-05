@@ -255,9 +255,10 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      3,                        /* n_params */
+      4,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* group name */
+      G_TYPE_STRING,            /* group type URI */
       G_TYPE_STRING);           /* context */
 
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
@@ -1011,6 +1012,7 @@ dynparam_group_appeared(
   void * instance_ui_context,
   void * parent_group_ui_context,
   const char * group_name,
+  const char * group_type_uri,
   void ** group_ui_context)
 {
   struct zynjacku_synth * synth_ptr;
@@ -1018,7 +1020,7 @@ dynparam_group_appeared(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
 
-  LOG_DEBUG("Group \"%s\" appeared, handle %p", group_name, group_handle);
+  LOG_DEBUG("Group \"%s\" if type \"%s\" appeared, handle %p", group_name, group_type_uri, group_handle);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
@@ -1026,6 +1028,7 @@ dynparam_group_appeared(
     0,
     parent_group_ui_context,
     group_name,
+    group_type_uri,
     zynjacku_synth_context_to_string(group_handle),
     &ret_obj_ptr);
 

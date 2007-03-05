@@ -169,17 +169,18 @@ class SynthWindowUniversal(SynthWindow):
 
         self.ui_enabled = False
 
-    def on_group_appeared(self, synth, parent, group_name, context):
+    def on_group_appeared(self, synth, parent, group_name, group_type, context):
         #print "-------------- Group \"%s\" appeared" % group_name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "group_name: %s" % group_name
+        #print "group_type: %s" % group_type
         #print "context: %s" % repr(context)
 
         if not parent:
             return SynthWindowUniversalGroupGeneric(self, parent, group_name, context)
 
-        return parent.on_child_group_appeared(group_name, context)
+        return parent.on_child_group_appeared(group_name, group_type, context)
 
     def on_group_disappeared(self, synth, obj):
         #print "-------------- Group \"%s\" disappeared" % obj.group_name
@@ -283,13 +284,13 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
         #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box_params.remove(obj.get_top_widget())
 
-    def on_child_group_appeared(self, group_name, context):
-        #if group_type == zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
-        #    group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
-        #    self.window.defered.append(group)
-        #    return group
-        #else:
-        return SynthWindowUniversalGroupGeneric(self.window, self, group_name, context)
+    def on_child_group_appeared(self, group_name, group_type, context):
+        if group_type == zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
+            group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
+            self.window.defered.append(group)
+            return group
+        else:
+            return SynthWindowUniversalGroupGeneric(self.window, self, group_name, context)
 
     def on_bool_appeared(self, window, name, value, context):
         parameter = SynthWindowUniversalParameterBool(self.window, self, name, value, context)
