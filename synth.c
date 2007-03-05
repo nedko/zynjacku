@@ -485,6 +485,7 @@ zynjacku_synth_generic_lv2_ui_on(
   struct list_head * node_ptr;
   struct zynjacku_synth_port * port_ptr;
   char * symbol;
+  ZynjackuHints * hints_obj_ptr;
 
   LOG_DEBUG("zynjacku_synth_generic_lv2_ui_on() called.");
 
@@ -496,15 +497,25 @@ zynjacku_synth_generic_lv2_ui_on(
     return;                     /* already shown */
   }
 
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    0,
+    NULL,
+    NULL);
+
   g_signal_emit(
     synth_obj_ptr,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED],
     0,
     NULL,
     synth_ptr->id,
-    LV2DYNPARAM_GROUP_TYPE_GENERIC_URI,
+    hints_obj_ptr,
     zynjacku_synth_context_to_string(NULL),
     &synth_ptr->root_group_ui_context);
+
+  g_object_unref(hints_obj_ptr);
 
   list_for_each(node_ptr, &synth_ptr->parameter_ports)
   {

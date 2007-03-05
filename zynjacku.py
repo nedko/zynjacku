@@ -26,9 +26,9 @@ import gobject
 import phat
 import re
 
-if not "LV2DYNPARAM_URI" in dir(zynjacku):
-    print "zynjacku library is missing lv2dynparam constants."
-    sys.exit(1)
+hint_uris = { "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
+              "notebook": "http://home.gna.org/zynjacku/hints#notebook",
+              }
 
 # Synth window abstraction
 class SynthWindow(gobject.GObject):
@@ -303,7 +303,7 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
         self.box_params.remove(obj.get_top_widget())
 
     def on_child_group_appeared(self, group_name, hints, context):
-        if hints.has_key(zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI):
+        if hints.has_key(hint_uris['togglefloat']):
             group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
             self.window.defered.append(group)
             return group

@@ -36,8 +36,6 @@ initzynjacku(void)
  
   m = Py_InitModule("zynjacku", zynjacku_functions);
 
-#include "init_py_constants.c"
-
   d = PyModule_GetDict(m);
  
   zynjacku_register_classes(d);
