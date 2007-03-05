@@ -26,7 +26,8 @@ import gobject
 import phat
 import re
 
-hint_uris = { "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
+hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
+              "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
               "notebook": "http://home.gna.org/zynjacku/hints#notebook",
               }
 
@@ -71,18 +72,40 @@ class SynthWindowCustom(SynthWindow):
         self.synth.ui_off()
 
 class SynthWindowUniversalGroup(gobject.GObject):
-    def __init__(self, window, parent_group, name, context):
+    def __init__(self, window, parent_group, name, hints, context):
         gobject.GObject.__init__(self)
         self.window = window
         self.parent_group = parent_group
         self.group_name = name
         self.context = context
+        self.hints = hints
 
-    def child_add(self, obj):
+    def child_param_add(self, obj):
         return
 
-    def child_remove(self, obj):
+    def child_param_remove(self, obj):
         return
+
+    def get_top_widget(self):
+        return None
+
+    def child_group_add(self, obj):
+        return
+
+    def child_group_remove(self, obj):
+        return
+
+    def on_child_group_appeared(self, group_name, hints, context):
+        if hints.has_key(hint_uris['togglefloat']):
+            group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, hints, context)
+            self.window.defered.append(group)
+            return group
+        elif hints.has_key(hint_uris['notebook']):
+            group = SynthWindowUniversalGroupNotebook(self.window, self, group_name, hints, context)
+            self.window.defered.append(group)
+            return group
+        else:
+            return SynthWindowUniversalGroupGeneric(self.window, self, group_name, hints, context)
 
 class SynthWindowUniversalParameter(gobject.GObject):
     def __init__(self, window, parent_group, name, context):
@@ -96,7 +119,7 @@ class SynthWindowUniversalParameter(gobject.GObject):
         return None
 
     def remove(self):
-        self.parent_group.child_remove(self)
+        self.parent_group.child_param_remove(self)
 
 # Generic/Universal window UI, as opposed to custom UI privided by synth itself
 class SynthWindowUniversal(SynthWindow):
@@ -156,7 +179,7 @@ class SynthWindowUniversal(SynthWindow):
             self.ui_enabled = True
 
             for child in self.defered:
-                child.parent_group.child_add(child)
+                child.parent_group.child_param_add(child)
 
         self.window.show_all()
 
@@ -190,7 +213,7 @@ class SynthWindowUniversal(SynthWindow):
         #print "context: %s" % repr(context)
 
         if not parent:
-            return SynthWindowUniversalGroupGeneric(self, parent, group_name, context)
+            return SynthWindowUniversalGroupGeneric(self, parent, group_name, hints_hash, context)
 
         return parent.on_child_group_appeared(group_name, hints_hash, context)
 
@@ -254,8 +277,8 @@ class SynthWindowUniversal(SynthWindow):
         obj.remove()
 
 class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
-    def __init__(self, window, parent, group_name, context):
-        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, context)
+    def __init__(self, window, parent, group_name, hints, context):
+        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
         if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
             self.box_params = gtk.VBox()
@@ -267,18 +290,22 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
         self.box_top.pack_start(self.box_params, False, False)
 
         if parent:
-            frame = gtk.Frame(group_name)
-            frame.set_shadow_type(self.window.group_shadow_type)
+            if hints.has_key(hint_uris['hidden']):
+                frame = self.box_top
+            else:
+                frame = gtk.Frame(group_name)
+                frame.set_shadow_type(self.window.group_shadow_type)
 
-            frame.add(self.box_top)
+                frame.add(self.box_top)
 
-            if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
-                frame.set_label_align(0.5, 0.5)
+                if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+                    frame.set_label_align(0.5, 0.5)
 
             align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
             align.set_padding(0, 10, 10, 10)
             align.add(frame)
-            parent.box_top.pack_start(align, False, True)
+            self.top = align
+            parent.child_group_add(self)
         else:
             self.scrolled_window = gtk.ScrolledWindow()
             self.scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -291,43 +318,46 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
 
         #print "Generic group \"%s\" created: %s" % (group_name, repr(self))
 
-    def child_add(self, obj):
-        #print "child_add %s for group \"%s\"" % (repr(obj), self.group_name)
+    def child_param_add(self, obj):
+        #print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box_params.pack_start(obj.get_top_widget(), False, False)
 
         if self.window.ui_enabled:
             self.window.window.show_all()
 
-    def child_remove(self, obj):
-        #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+    def child_param_remove(self, obj):
+        #print "child_param_remove %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box_params.remove(obj.get_top_widget())
 
-    def on_child_group_appeared(self, group_name, hints, context):
-        if hints.has_key(hint_uris['togglefloat']):
-            group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
-            self.window.defered.append(group)
-            return group
-        else:
-            return SynthWindowUniversalGroupGeneric(self.window, self, group_name, context)
+    def child_group_add(self, obj):
+        #print "child_group_add %s for group \"%s\"" % (repr(obj), self.group_name)
+        self.box_top.pack_start(obj.get_top_widget(), False, True)
+
+    def child_group_remove(self, obj):
+        #print "child_group_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        pass
 
     def on_bool_appeared(self, window, name, hints, value, context):
         parameter = SynthWindowUniversalParameterBool(self.window, self, name, value, context)
-        self.child_add(parameter)
+        self.child_param_add(parameter)
         return parameter
 
     def on_float_appeared(self, window, name, hints, value, min, max, context):
         parameter = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
-        self.child_add(parameter)
+        self.child_param_add(parameter)
         return parameter
 
     def on_enum_appeared(self, window, name, hints, selected_value_index, valid_values, context):
         parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
-        self.child_add(parameter)
+        self.child_param_add(parameter)
         return parameter
 
+    def get_top_widget(self):
+        return self.top
+
 class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
-    def __init__(self, window, parent, group_name, context):
-        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, context)
+    def __init__(self, window, parent, group_name, hints, context):
+        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
         if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
             self.box = gtk.VBox()
@@ -346,23 +376,23 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
         m = re.match(r"([^:]+):(.*)", group_name)
 
         self.bool = SynthWindowUniversalParameterBool(self.window, self, m.group(1), False, None)
-        self.child_add(self.bool)
+        self.child_param_add(self.bool)
 
         self.float = SynthWindowUniversalParameterFloat(self.window, self, m.group(2), 0, 0, 1, None)
         self.float.set_sensitive(False)
-        self.child_add(self.float)
+        self.child_param_add(self.float)
 
         #print "Toggle float group \"%s\" created: %s" % (group_name, repr(self))
 
-    def child_add(self, obj):
-        #print "child_add %s for group \"%s\"" % (repr(obj), self.group_name)
+    def child_param_add(self, obj):
+        #print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box.pack_start(obj.get_top_widget(), False, False)
 
         if self.window.ui_enabled:
             self.window.window.show_all()
 
-    def child_remove(self, obj):
-        #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+    def child_param_remove(self, obj):
+        #print "child_param_remove %s for group \"%s\"" % (repr(obj), self.group_name)
         if obj == self.float:
             self.float.set_sensitive(False)
 
@@ -378,6 +408,39 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
         self.float.set_sensitive(True)
         self.float.set(name, value, min, max)
         return self.float
+
+class SynthWindowUniversalGroupNotebook(SynthWindowUniversalGroup):
+    def __init__(self, window, parent, group_name, hints, context):
+        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
+
+        self.notebook = gtk.Notebook()
+
+        self.float = None
+        self.bool = None
+
+        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        self.align.set_padding(10, 10, 10, 10)
+        self.align.add(self.notebook)
+
+        self.top = self.align
+
+        #print "Notebook group \"%s\" created: %s" % (group_name, repr(self))
+
+    def child_group_add(self, obj):
+        #print "child_group_add %s for group \"%s\"" % (repr(obj), self.group_name)
+        self.notebook.append_page(obj.get_top_widget(), gtk.Label(obj.group_name))
+
+    def child_group_remove(self, obj):
+        print "child_group_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+
+    def child_param_add(self, obj):
+        print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
+
+    def child_param_remove(self, obj):
+        print "child_param_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+
+    def get_top_widget(self):
+        return self.top
 
 class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
     def __init__(self, window, parent_group, name, value, min, max, context):
