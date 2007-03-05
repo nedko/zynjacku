@@ -160,7 +160,7 @@ zynjacku_enum_set(
   guint values_count)
 {
   struct zynjacku_enum * enum_ptr;
-  unsigned int i;
+  guint i;
   gchar * value;
 
   enum_ptr = ZYNJACKU_ENUM_GET_PRIVATE(enum_obj_ptr);

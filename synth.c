@@ -40,6 +40,7 @@
 #include "engine.h"
 #include "enum.h"
 #include "gtk2gui.h"
+#include "hints.h"
 
 #include "zynjacku.h"
 
@@ -258,7 +259,7 @@ zynjacku_synth_class_init(
       4,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* group name */
-      G_TYPE_STRING,            /* group type URI */
+      G_TYPE_OBJECT,            /* hints */
       G_TYPE_STRING);           /* context */
 
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
@@ -286,9 +287,10 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      4,                        /* n_params */
+      5,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
+      G_TYPE_OBJECT,            /* hints */
       G_TYPE_BOOLEAN,           /* value */
       G_TYPE_STRING);           /* context */
 
@@ -317,9 +319,10 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      6,                        /* n_params */
+      7,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
+      G_TYPE_OBJECT,            /* hints */
       G_TYPE_FLOAT,             /* value */
       G_TYPE_FLOAT,             /* min */
       G_TYPE_FLOAT,             /* max */
@@ -350,9 +353,10 @@ zynjacku_synth_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_OBJECT,            /* return type */
-      5,                        /* n_params */
+      6,                        /* n_params */
       G_TYPE_OBJECT,            /* parent */
       G_TYPE_STRING,            /* parameter name */
+      G_TYPE_OBJECT,            /* hints */
       G_TYPE_UINT,              /* selected value index */
       G_TYPE_OBJECT,            /* valid values (ZynjackuEnum) */
       G_TYPE_STRING);           /* context */
@@ -1012,15 +1016,24 @@ dynparam_group_appeared(
   void * instance_ui_context,
   void * parent_group_ui_context,
   const char * group_name,
-  const char * group_type_uri,
+  const struct lv2dynparam_hints * hints_ptr,
   void ** group_ui_context)
 {
   struct zynjacku_synth * synth_ptr;
   GObject * ret_obj_ptr;
+  ZynjackuHints * hints_obj_ptr;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
 
-  LOG_DEBUG("Group \"%s\" if type \"%s\" appeared, handle %p", group_name, group_type_uri, group_handle);
+  LOG_DEBUG("Group \"%s\" appeared, handle %p", group_name, group_handle);
+
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    hints_ptr->count,
+    (const gchar * const *)hints_ptr->names,
+    (const gchar * const *)hints_ptr->values);
 
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
@@ -1028,11 +1041,13 @@ dynparam_group_appeared(
     0,
     parent_group_ui_context,
     group_name,
-    group_type_uri,
+    hints_obj_ptr,
     zynjacku_synth_context_to_string(group_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("group-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(hints_obj_ptr);
 
   *group_ui_context = ret_obj_ptr;
 }
@@ -1111,10 +1126,12 @@ dynparam_parameter_boolean_appeared(
   void * instance_ui_context,
   void * group_ui_context,
   const char * parameter_name,
+  const struct lv2dynparam_hints * hints_ptr,
   BOOL value,
   void ** parameter_ui_context)
 {
   GObject * ret_obj_ptr;
+  ZynjackuHints * hints_obj_ptr;
 
   LOG_DEBUG(
     "Boolean parameter \"%s\" appeared, value %s, handle %p",
@@ -1122,17 +1139,28 @@ dynparam_parameter_boolean_appeared(
     value ? "TRUE" : "FALSE",
     parameter_handle);
 
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    hints_ptr->count,
+    (const gchar * const *)hints_ptr->names,
+    (const gchar * const *)hints_ptr->values);
+
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED],
     0,
     group_ui_context,
     parameter_name,
+    hints_obj_ptr,
     (gboolean)value,
     zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(hints_obj_ptr);
 
   *parameter_ui_context = ret_obj_ptr;
 }
@@ -1164,12 +1192,14 @@ dynparam_parameter_float_appeared(
   void * instance_ui_context,
   void * group_ui_context,
   const char * parameter_name,
+  const struct lv2dynparam_hints * hints_ptr,
   float value,
   float min,
   float max,
   void ** parameter_ui_context)
 {
   GObject * ret_obj_ptr;
+  ZynjackuHints * hints_obj_ptr;
 
   LOG_DEBUG(
     "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
@@ -1179,12 +1209,21 @@ dynparam_parameter_float_appeared(
     max,
     parameter_handle);
 
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    hints_ptr->count,
+    (const gchar * const *)hints_ptr->names,
+    (const gchar * const *)hints_ptr->values);
+
   g_signal_emit(
     (ZynjackuSynth *)instance_ui_context,
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
     0,
     group_ui_context,
     parameter_name,
+    hints_obj_ptr,
     (gfloat)value,
     (gfloat)min,
     (gfloat)max,
@@ -1192,6 +1231,8 @@ dynparam_parameter_float_appeared(
     &ret_obj_ptr);
 
   LOG_DEBUG("float-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(hints_obj_ptr);
 
   *parameter_ui_context = ret_obj_ptr;
 }
@@ -1226,6 +1267,7 @@ dynparam_parameter_enum_appeared(
   void * instance_ui_context,
   void * group_ui_context,
   const char * parameter_name,
+  const struct lv2dynparam_hints * hints_ptr,
   unsigned int selected_value,
   const char * const * values,
   unsigned int values_count,
@@ -1234,6 +1276,7 @@ dynparam_parameter_enum_appeared(
   unsigned int i;
   GObject * ret_obj_ptr;
   ZynjackuEnum * enum_ptr;
+  ZynjackuHints * hints_obj_ptr;
 
   LOG_DEBUG(
     "Enum parameter \"%s\" appeared, %u possible values, handle %p",
@@ -1246,6 +1289,14 @@ dynparam_parameter_enum_appeared(
     LOG_DEBUG("\"%s\"%s", values[i], selected_value == i ? " [SELECTED]" : "");
   }
 
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    hints_ptr->count,
+    (const gchar * const *)hints_ptr->names,
+    (const gchar * const *)hints_ptr->values);
+
   enum_ptr = g_object_new(ZYNJACKU_ENUM_TYPE, NULL);
 
   zynjacku_enum_set(enum_ptr, values, values_count);
@@ -1256,12 +1307,15 @@ dynparam_parameter_enum_appeared(
     0,
     group_ui_context,
     parameter_name,
+    hints_obj_ptr,
     (guint)selected_value,
     enum_ptr,
     zynjacku_synth_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("enum-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(hints_obj_ptr);
 
   g_object_unref(enum_ptr);
 

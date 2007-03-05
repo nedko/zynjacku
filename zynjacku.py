@@ -169,48 +169,64 @@ class SynthWindowUniversal(SynthWindow):
 
         self.ui_enabled = False
 
-    def on_group_appeared(self, synth, parent, group_name, group_type, context):
+    def convert_hints(self, hints):
+        hints_hash = {}
+        for i in range(hints.get_count()):
+            hints_hash[hints.get_name_at_index(i)] = hints.get_value_at_index(i)
+        return hints_hash
+
+    def on_group_appeared(self, synth, parent, group_name, hints, context):
         #print "-------------- Group \"%s\" appeared" % group_name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "group_name: %s" % group_name
-        #print "group_type: %s" % group_type
+        #print "hints: %s" % repr(hints)
+        #print "hints count: %s" % hints.get_count()
+        #for i in range(hints.get_count()):
+        #    print hints.get_name_at_index(i)
+        #    print hints.get_value_at_index(i)
+        hints_hash = self.convert_hints(hints)
+        #print repr(hints_hash)
         #print "context: %s" % repr(context)
 
         if not parent:
             return SynthWindowUniversalGroupGeneric(self, parent, group_name, context)
 
-        return parent.on_child_group_appeared(group_name, group_type, context)
+        return parent.on_child_group_appeared(group_name, hints_hash, context)
 
     def on_group_disappeared(self, synth, obj):
         #print "-------------- Group \"%s\" disappeared" % obj.group_name
         return
 
-    def on_bool_appeared(self, synth, parent, name, value, context):
+    def on_bool_appeared(self, synth, parent, name, hints, value, context):
         #print "-------------- Bool \"%s\" appeared" % name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "name: %s" % name
+        hints_hash = self.convert_hints(hints)
+        #print repr(hints_hash)
         #print "value: %s" % repr(value)
         #print "context: %s" % repr(context)
 
-        return parent.on_bool_appeared(self.window, name, value, context)
+        return parent.on_bool_appeared(self.window, name, hints_hash, value, context)
 
     def on_bool_disappeared(self, synth, obj):
         #print "-------------- Bool disappeared"
         obj.remove()
 
-    def on_float_appeared(self, synth, parent, name, value, min, max, context):
+    def on_float_appeared(self, synth, parent, name, hints, value, min, max, context):
         #print "-------------- Float \"%s\" appeared" % name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "name: %s" % name
+        hints_hash = self.convert_hints(hints)
+        #print repr(hints_hash)
         #print "value: %s" % repr(value)
         #print "min: %s" % repr(min)
         #print "max: %s" % repr(max)
         #print "context: %s" % repr(context)
 
-        return parent.on_float_appeared(self.window, name, value, min, max, context)
+        return parent.on_float_appeared(self.window, name, hints_hash, value, min, max, context)
 
     def on_float_disappeared(self, synth, obj):
         #print "-------------- Float \"%s\" disappeared" % obj.parameter_name
@@ -218,18 +234,20 @@ class SynthWindowUniversal(SynthWindow):
         #print repr(obj)
         obj.remove()
 
-    def on_enum_appeared(self, synth, parent, name, selected_value_index, valid_values, context):
+    def on_enum_appeared(self, synth, parent, name, hints, selected_value_index, valid_values, context):
         #print "-------------- Enum \"%s\" appeared" % name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "name: %s" % name
+        hints_hash = self.convert_hints(hints)
+        #print repr(hints_hash)
         #print "selected value index: %s" % repr(selected_value_index)
         #print "valid values: %s" % repr(valid_values)
         #print "valid values count: %s" % valid_values.get_count()
         #for i in range(valid_values.get_count()):
         #    print valid_values.get_at_index(i)
         #print "context: %s" % repr(context)
-        return parent.on_enum_appeared(self.window, name, selected_value_index, valid_values, context)
+        return parent.on_enum_appeared(self.window, name, hints_hash, selected_value_index, valid_values, context)
 
     def on_enum_disappeared(self, synth, obj):
         #print "-------------- Enum \"%s\" disappeared" % obj.parameter_name
@@ -284,25 +302,25 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
         #print "child_remove %s for group \"%s\"" % (repr(obj), self.group_name)
         self.box_params.remove(obj.get_top_widget())
 
-    def on_child_group_appeared(self, group_name, group_type, context):
-        if group_type == zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI:
+    def on_child_group_appeared(self, group_name, hints, context):
+        if hints.has_key(zynjacku.LV2DYNPARAM_GROUP_TYPE_TOGGLE_FLOAT_URI):
             group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, context)
             self.window.defered.append(group)
             return group
         else:
             return SynthWindowUniversalGroupGeneric(self.window, self, group_name, context)
 
-    def on_bool_appeared(self, window, name, value, context):
+    def on_bool_appeared(self, window, name, hints, value, context):
         parameter = SynthWindowUniversalParameterBool(self.window, self, name, value, context)
         self.child_add(parameter)
         return parameter
 
-    def on_float_appeared(self, window, name, value, min, max, context):
+    def on_float_appeared(self, window, name, hints, value, min, max, context):
         parameter = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
         self.child_add(parameter)
         return parameter
 
-    def on_enum_appeared(self, window, name, selected_value_index, valid_values, context):
+    def on_enum_appeared(self, window, name, hints, selected_value_index, valid_values, context):
         parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
         self.child_add(parameter)
         return parameter
@@ -351,11 +369,11 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
     def get_top_widget(self):
         return self.top
 
-    def on_bool_appeared(self, window, name, value, context):
+    def on_bool_appeared(self, window, name, hints, value, context):
         self.bool.context = context
         return self.bool
 
-    def on_float_appeared(self, window, name, value, min, max, context):
+    def on_float_appeared(self, window, name, hints, value, min, max, context):
         self.float.context = context
         self.float.set_sensitive(True)
         self.float.set(name, value, min, max)
