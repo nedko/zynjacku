@@ -530,6 +530,7 @@ zynjacku_synth_generic_lv2_ui_on(
       0,
       synth_ptr->root_group_ui_context,
       symbol,
+      hints_obj_ptr,
       port_ptr->data.parameter.value,
       port_ptr->data.parameter.min,
       port_ptr->data.parameter.max,
