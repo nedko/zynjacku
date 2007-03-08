@@ -126,6 +126,8 @@ zynjacku_engine_init(
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(instance);
 
+  engine_ptr->dispose_has_run = FALSE;
+
   engine_ptr->jack_client = NULL;
 
   slv2_init();

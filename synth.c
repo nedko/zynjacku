@@ -415,6 +415,7 @@ zynjacku_synth_init(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(instance);
 
+  synth_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&synth_ptr->parameter_ports);
   synth_ptr->midi_in_port.type = PORT_TYPE_INVALID;
   synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
