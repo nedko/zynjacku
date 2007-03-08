@@ -69,15 +69,15 @@ zynjacku_synth_supports_custom_ui(
   ZynjackuSynth * synth_obj_ptr);
 
 const char *
+zynjacku_synth_get_instance_name(
+  ZynjackuSynth * obj_ptr);
+
+const char *
 zynjacku_synth_get_name(
   ZynjackuSynth * obj_ptr);
 
 const char *
-zynjacku_synth_get_class_name(
-  ZynjackuSynth * obj_ptr);
-
-const char *
-zynjacku_synth_get_class_uri(
+zynjacku_synth_get_uri(
   ZynjackuSynth * obj_ptr);
 
 void

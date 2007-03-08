@@ -446,7 +446,7 @@ GType zynjacku_synth_get_type()
 }
 
 const char *
-zynjacku_synth_get_name(
+zynjacku_synth_get_instance_name(
   ZynjackuSynth * obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;
@@ -457,7 +457,7 @@ zynjacku_synth_get_name(
 }
 
 const char *
-zynjacku_synth_get_class_name(
+zynjacku_synth_get_name(
   ZynjackuSynth * obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;
@@ -468,7 +468,7 @@ zynjacku_synth_get_class_name(
 }
 
 const char *
-zynjacku_synth_get_class_uri(
+zynjacku_synth_get_uri(
   ZynjackuSynth * obj_ptr)
 {
   struct zynjacku_synth * synth_ptr;

@@ -137,7 +137,7 @@ class SynthWindowUniversal(SynthWindow):
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_size_request(600,300)
-        self.window.set_title(synth.get_name())
+        self.window.set_title(synth.get_instance_name())
         self.window.set_role("zynjacku_synth_ui")
 
         self.window.connect("destroy", self.on_window_destroy)
@@ -631,21 +631,21 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.synths_widget = glade_xml.get_widget("treeview_synths")
 
-        self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         text_renderer = gtk.CellRendererText()
         self.toggle_renderer = gtk.CellRendererToggle()
         self.toggle_renderer.set_property('activatable', True)
 
         column_ui_visible = gtk.TreeViewColumn("UI", self.toggle_renderer)
         column_ui_visible.add_attribute(self.toggle_renderer, "active", 0)
-        column_name = gtk.TreeViewColumn("Name", text_renderer, text=1)
-        column_class = gtk.TreeViewColumn("Class", text_renderer, text=2)
-        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=3)
+        column_instance = gtk.TreeViewColumn("Instance", text_renderer, text=1)
+        column_name = gtk.TreeViewColumn("Name", text_renderer, text=2)
+        #column_uri = gtk.TreeViewColumn("URI", text_renderer, text=3)
 
         self.synths_widget.append_column(column_ui_visible)
+        self.synths_widget.append_column(column_instance)
         self.synths_widget.append_column(column_name)
-        self.synths_widget.append_column(column_class)
-        self.synths_widget.append_column(column_uri)
+        #self.synths_widget.append_column(column_uri)
 
         for uri in uris:
             self.add_synth(uri)
@@ -677,7 +677,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         else:
             self.synths.append(synth)
             synth.ui_win = None
-            row = False, synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
+            row = False, synth.get_instance_name(), synth.get_name(), synth
             self.store.append(row)
             self.statusbar.remove(statusbar_context_id, statusbar_id)
 
@@ -765,16 +765,16 @@ class ZynjackuHostMulti(ZynjackuHost):
         text_renderer = gtk.CellRendererText()
 
         column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
-        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
-        column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+        #column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
+        #column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
 
         column_name.set_sort_column_id(0)
-        column_uri.set_sort_column_id(1)
-        column_license.set_sort_column_id(2)
+        #column_uri.set_sort_column_id(1)
+        #column_license.set_sort_column_id(2)
 
         plugin_repo_widget.append_column(column_name)
-        plugin_repo_widget.append_column(column_uri)
-        plugin_repo_widget.append_column(column_license)
+        #plugin_repo_widget.append_column(column_uri)
+        #plugin_repo_widget.append_column(column_license)
 
         plugin_repo_widget.set_model(store)
 
