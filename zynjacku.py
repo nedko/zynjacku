@@ -794,7 +794,10 @@ class ZynjackuHostMulti(ZynjackuHost):
                 return
 
     def on_synth_clear(self, widget):
-        print "Synth clear!"
+        self.store.clear();
+        for synth in self.synths:
+            synth.destruct()
+        self.synths = []
 
 class ZynjackuHostOne(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uri):
