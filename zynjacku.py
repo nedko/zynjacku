@@ -615,6 +615,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window = glade_xml.get_widget("zynjacku_main")
         self.main_window.set_title(client_name)
 
+        self.statusbar = self.glade_xml.get_widget("statusbar")
+
 	#Create our dictionay and connect it
         dic = {"on_quit_activate" : gtk.main_quit,
                "on_about_activate" : self.on_about,
@@ -626,15 +628,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         glade_xml.signal_autoconnect(dic)
 
         self.the_license = the_license
-
-        for uri in uris:
-            #print "Loading %s" % uri
-            synth = zynjacku.Synth(uri=uri)
-            if not synth.construct(self.engine):
-                print"Failed to construct %s" % uri
-            else:
-                self.synths.append(synth)
-                synth.ui_win = None
 
         self.synths_widget = glade_xml.get_widget("treeview_synths")
 
@@ -654,9 +647,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.synths_widget.append_column(column_class)
         self.synths_widget.append_column(column_uri)
 
-        for synth in self.synths:
-            row = False, synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
-            self.store.append(row)
+        for uri in uris:
+            self.add_synth(uri)
 
         self.synths_widget.set_model(self.store)
 
@@ -672,6 +664,22 @@ class ZynjackuHostMulti(ZynjackuHost):
             synth.destruct()
 
         ZynjackuHost.__del__(self)
+
+    def add_synth(self, uri):
+        statusbar_context_id = self.statusbar.get_context_id("loading plugin")
+        statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
+        while gtk.events_pending():
+            gtk.main_iteration()
+        synth = zynjacku.Synth(uri=uri)
+        self.statusbar.pop(statusbar_id)
+        if not synth.construct(self.engine):
+            self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
+        else:
+            self.synths.append(synth)
+            synth.ui_win = None
+            row = False, synth.get_name(), synth.get_class_name(), synth.get_class_uri(), synth
+            self.store.append(row)
+            self.statusbar.remove(statusbar_context_id, statusbar_id)
 
     def run(self):
         toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
@@ -734,28 +742,24 @@ class ZynjackuHostMulti(ZynjackuHost):
             gtk.main_iteration()
 
     def on_plugin_repo_tack(self, repo, name, uri, plugin_license, store):
+        #print "tack: %s" % name
         store.append([name, uri, plugin_license])
 
-    def rescan_plugins(self, store, progressbar):
+    def rescan_plugins(self, store, progressbar, force):
+        store.clear()
         repo = zynjacku.zynjacku_plugin_repo_get()
-        repo.connect("tick", self.on_plugin_repo_tick, progressbar)
-        repo.connect("tack", self.on_plugin_repo_tack, store)
-        repo.iterate(False)
-        #print repr(repo)
-        #print repr(progressbar)
-        return
-        for i in range(10):
-            while gtk.events_pending():
-                gtk.main_iteration()
-            time.sleep(1)
-            store.append(["name%u" % i, "uri", "license"])
-            progressbar.set_fraction((i + 1) * 0.1)
-        progressbar.hide()
+        tick = repo.connect("tick", self.on_plugin_repo_tick, progressbar)
+        tack = repo.connect("tack", self.on_plugin_repo_tack, store)
+        repo.iterate(force)
+        repo.disconnect(tack)
+        repo.disconnect(tick)
 
     def on_synth_load(self, widget):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
         plugin_repo_widget = self.glade_xml.get_widget("treeview_available_synths")
         progressbar = self.glade_xml.get_widget("progressbar")
+
+        plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
         store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         text_renderer = gtk.CellRendererText()
@@ -764,6 +768,10 @@ class ZynjackuHostMulti(ZynjackuHost):
         column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
         column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
 
+        column_name.set_sort_column_id(0)
+        column_uri.set_sort_column_id(1)
+        column_license.set_sort_column_id(2)
+
         plugin_repo_widget.append_column(column_name)
         plugin_repo_widget.append_column(column_uri)
         plugin_repo_widget.append_column(column_license)
@@ -771,13 +779,19 @@ class ZynjackuHostMulti(ZynjackuHost):
         plugin_repo_widget.set_model(store)
 
         dialog.show()
-        self.rescan_plugins(store, progressbar)
-        ret = dialog.run()
-        dialog.hide()
-        if ret == 0:
-            print ret
-        elif ret == 1:
-            print ret
+        self.rescan_plugins(store, progressbar, False)
+        while True:
+            ret = dialog.run()
+            if ret == 0:
+                dialog.hide()
+                for path in plugin_repo_widget.get_selection().get_selected_rows()[1]:
+                    self.add_synth(store.get(store.get_iter(path), 1)[0])
+                return
+            elif ret == 1:
+                self.rescan_plugins(store, progressbar, True)
+            else:
+                dialog.hide()
+                return
 
     def on_synth_clear(self, widget):
         print "Synth clear!"

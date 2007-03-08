@@ -28,7 +28,7 @@
 
 #include "list.h"
 #include "plugin_repo.h"
-//#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #define LV2_RDF_LICENSE_URI "<http://usefulinc.com/ns/doap#license>"
@@ -62,6 +62,29 @@ static ZynjackuPluginRepo * g_the_repo;
 char *
 zynjacku_rdf_uri_quote(const char * uri);
 
+void
+zynjacku_plugin_repo_clear(
+  struct zynjacku_plugin_repo * repo_ptr)
+{
+  struct list_head * node_ptr;
+  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+
+  while(!list_empty(&repo_ptr->available_plugins))
+  {
+    node_ptr = repo_ptr->available_plugins.next;
+
+    list_del(node_ptr);
+
+    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
+
+    //LOG_DEBUG("Removing %s", plugin_info_ptr->name);
+    slv2_plugin_free(plugin_info_ptr->plugin);
+    free(plugin_info_ptr->license);
+    free(plugin_info_ptr->name);
+    free(plugin_info_ptr);
+  }
+}
+
 static void
 zynjacku_plugin_repo_dispose(GObject * obj)
 {
@@ -87,6 +110,7 @@ zynjacku_plugin_repo_dispose(GObject * obj)
    * the most simple solution is to unref all members on which you own a 
    * reference.
    */
+  zynjacku_plugin_repo_clear(plugin_repo_ptr);
 
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
@@ -322,6 +346,8 @@ zynjacku_plugin_repo_iterate(
 
   if (force_scan || !plugin_repo_ptr->scanned)
   {
+    zynjacku_plugin_repo_clear(plugin_repo_ptr);
+
     plugins = slv2_plugins_new();
     slv2_plugins_load_all(plugins);
     plugins_count = slv2_plugins_size(plugins);
@@ -351,6 +377,7 @@ zynjacku_plugin_repo_iterate(
         plugin_info_ptr->name = slv2_plugin_get_name(plugin);
         plugin_info_ptr->license = zynjacku_plugin_repo_get_plugin_license(plugin);
 
+        LOG_DEBUG("tack emit");
         g_signal_emit(
           repo_obj_ptr,
           g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK],
