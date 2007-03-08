@@ -28,7 +28,7 @@
 
 #include "list.h"
 #include "plugin_repo.h"
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define LV2_RDF_LICENSE_URI "<http://usefulinc.com/ns/doap#license>"
