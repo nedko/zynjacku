@@ -53,6 +53,11 @@ GType zynjacku_plugin_repo_get_type();
 ZynjackuPluginRepo *
 zynjacku_plugin_repo_get();
 
+void
+zynjacku_plugin_repo_iterate(
+  ZynjackuPluginRepo * repo_obj_ptr,
+  gboolean force_scan);
+
 G_END_DECLS
 
 #endif /* #ifndef SLV2_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED */

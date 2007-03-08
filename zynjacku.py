@@ -25,6 +25,7 @@ import gtk.glade
 import gobject
 import phat
 import re
+import time
 
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
@@ -603,14 +604,28 @@ class ZynjackuHost(SynthWindowFactory):
         print repr(obj2)
 
 class ZynjackuHostMulti(ZynjackuHost):
-    def __init__(self, glade_xml, client_name, uris):
+    def __init__(self, glade_xml, client_name, the_license, uris):
         #print "ZynjackuHostMulti constructor called."
         ZynjackuHost.__init__(self, client_name)
         
         self.synths = []
 
+        self.glade_xml = glade_xml
+
         self.main_window = glade_xml.get_widget("zynjacku_main")
         self.main_window.set_title(client_name)
+
+	#Create our dictionay and connect it
+        dic = {"on_quit_activate" : gtk.main_quit,
+               "on_about_activate" : self.on_about,
+               "on_preset_load_activate" : self.on_preset_load,
+               "on_preset_save_as_activate" : self.on_preset_save_as,
+               "on_synth_load_activate" : self.on_synth_load,
+               "on_synth_clear_activate" : self.on_synth_clear,
+               }
+        glade_xml.signal_autoconnect(dic)
+
+        self.the_license = the_license
 
         for uri in uris:
             #print "Loading %s" % uri
@@ -690,6 +705,83 @@ class ZynjackuHostMulti(ZynjackuHost):
             model[path][4].ui_win.show()
             model[path][0] = True
 
+    def on_about(self, widget):
+        about = gtk.AboutDialog()
+        about.set_transient_for(self.main_window)
+        about.set_name("zynjacku")
+        about.set_license(self.the_license)
+        about.set_website("http://home.gna.org/zynjacku/")
+        about.set_authors(["Nedko Arnaudov"])
+        about.show()
+        about.run()
+        about.hide()
+
+    def on_preset_load(self, widget):
+        print "Preset load not implemented yet!"
+
+    def on_preset_save_as(self, widget):
+        print "Preset saving not implemented yet!"
+
+    def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
+        if progress == 1.0:
+            progressbar.hide()
+            return
+
+        progressbar.show()
+        progressbar.set_fraction(progress)
+        progressbar.set_text("Checking %s" % uri);
+        while gtk.events_pending():
+            gtk.main_iteration()
+
+    def on_plugin_repo_tack(self, repo, name, uri, plugin_license, store):
+        store.append([name, uri, plugin_license])
+
+    def rescan_plugins(self, store, progressbar):
+        repo = zynjacku.zynjacku_plugin_repo_get()
+        repo.connect("tick", self.on_plugin_repo_tick, progressbar)
+        repo.connect("tack", self.on_plugin_repo_tack, store)
+        repo.iterate(False)
+        #print repr(repo)
+        #print repr(progressbar)
+        return
+        for i in range(10):
+            while gtk.events_pending():
+                gtk.main_iteration()
+            time.sleep(1)
+            store.append(["name%u" % i, "uri", "license"])
+            progressbar.set_fraction((i + 1) * 0.1)
+        progressbar.hide()
+
+    def on_synth_load(self, widget):
+        dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
+        plugin_repo_widget = self.glade_xml.get_widget("treeview_available_synths")
+        progressbar = self.glade_xml.get_widget("progressbar")
+
+        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        text_renderer = gtk.CellRendererText()
+
+        column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
+        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
+        column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+
+        plugin_repo_widget.append_column(column_name)
+        plugin_repo_widget.append_column(column_uri)
+        plugin_repo_widget.append_column(column_license)
+
+        plugin_repo_widget.set_model(store)
+
+        dialog.show()
+        self.rescan_plugins(store, progressbar)
+        ret = dialog.run()
+        dialog.hide()
+        if ret == 0:
+            print ret
+        elif ret == 1:
+            print ret
+
+    def on_synth_clear(self, widget):
+        print "Synth clear!"
+
 class ZynjackuHostOne(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uri):
         #print "ZynjackuHostOne constructor called."
@@ -749,19 +841,23 @@ class ZynjackuHostOne(ZynjackuHost):
         ZynjackuHost.__del__(self)
 
 def main():
-    glade_dir = os.path.dirname(sys.argv[0])
+    data_dir = os.path.dirname(sys.argv[0])
 
     # since ppl tend to run "python zynjacku.py", lets assume that it is in current directory
     # "python ./zynjacku.py" and "./zynjacku.py" will work anyway.
-    if not glade_dir:
-        glade_dir = "."
+    if not data_dir:
+        data_dir = "."
 
-    glade_file = glade_dir + os.sep + "zynjacku.glade"
+    glade_file = data_dir + os.sep + "zynjacku.glade"
 
     if not os.path.isfile(glade_file):
-        glade_file = glade_dir + os.sep + ".." + os.sep + "share"+ os.sep + "zynjacku" + os.sep + "zynjacku.glade"
+        data_dir = data_dir + os.sep + ".." + os.sep + "share"+ os.sep + "zynjacku"
+        glade_file = data_dir + os.sep + "zynjacku.glade"
 
+    #print 'data dir is "%s"' % data_dir
     #print 'Loading glade from "%s"' % glade_file
+
+    the_license = file(data_dir + os.sep + "gpl.txt").read()
 
     glade_xml = gtk.glade.XML(glade_file)
 
@@ -775,7 +871,7 @@ def main():
     if len(sys.argv) == 2:
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
     else:
-        host = ZynjackuHostMulti(glade_xml, "zynjacku", sys.argv[1:])
+        host = ZynjackuHostMulti(glade_xml, "zynjacku", the_license, sys.argv[1:])
 
     host.run()
 
