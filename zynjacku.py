@@ -26,6 +26,7 @@ import gobject
 import phat
 import re
 import time
+import midi_led
 
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
@@ -617,6 +618,13 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.statusbar = self.glade_xml.get_widget("statusbar")
 
+        self.hbox_menubar = glade_xml.get_widget("hbox_menubar")
+        self.midi_led = midi_led.widget()
+        self.midi_led_frame = gtk.Frame()
+        self.midi_led_frame.set_shadow_type(gtk.SHADOW_OUT)
+        self.midi_led_frame.add(self.midi_led);
+        self.hbox_menubar.pack_start(self.midi_led_frame, False, False)
+
 	#Create our dictionay and connect it
         dic = {"on_quit_activate" : gtk.main_quit,
                "on_about_activate" : self.on_about,
@@ -631,7 +639,7 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.synths_widget = glade_xml.get_widget("treeview_synths")
 
-        self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         text_renderer = gtk.CellRendererText()
         self.toggle_renderer = gtk.CellRendererToggle()
         self.toggle_renderer.set_property('activatable', True)
@@ -655,6 +663,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
 
+        gobject.timeout_add(100, self.update_midi_led)
+
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
 
@@ -664,6 +674,10 @@ class ZynjackuHostMulti(ZynjackuHost):
             synth.destruct()
 
         ZynjackuHost.__del__(self)
+
+    def update_midi_led(self):
+        self.midi_led.set(self.engine.get_midi_activity())
+        return True
 
     def add_synth(self, uri):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
@@ -677,7 +691,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         else:
             self.synths.append(synth)
             synth.ui_win = None
-            row = False, synth.get_instance_name(), synth.get_name(), synth
+            row = False, synth.get_instance_name(), synth.get_name(), synth.get_uri(), synth
             self.store.append(row)
             self.statusbar.remove(statusbar_context_id, statusbar_id)
 

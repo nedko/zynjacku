@@ -21,13 +21,13 @@
   <property name="focus_on_map">True</property>
 
   <child>
-    <widget class="GtkVBox" id="vbox_menubar">
+    <widget class="GtkVBox" id="vbox_top">
       <property name="visible">True</property>
       <property name="homogeneous">False</property>
       <property name="spacing">0</property>
 
       <child>
-	<widget class="GtkHBox" id="hbox5">
+	<widget class="GtkHBox" id="hbox_menubar">
 	  <property name="visible">True</property>
 	  <property name="homogeneous">False</property>
 	  <property name="spacing">0</property>

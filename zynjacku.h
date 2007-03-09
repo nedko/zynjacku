@@ -81,6 +81,7 @@ struct zynjacku_engine
   struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_synth_port"s linked by port_type_siblings */
   jack_port_t * jack_midi_in;
   LV2_MIDI lv2_midi_buffer;
+  gboolean midi_activity;
 };
 
 SLV2Plugin

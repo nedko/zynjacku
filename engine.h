@@ -78,6 +78,10 @@ void
 zynjacku_engine_ui_run(
   ZynjackuEngine * engine_obj_ptr);
 
+gboolean
+zynjacku_engine_get_midi_activity(
+  ZynjackuEngine * engine_obj_ptr);
+
 G_END_DECLS
 
 #endif /* #ifndef ENGINE_H__512BF192_2626_4759_839B_47B7780A971B__INCLUDED */

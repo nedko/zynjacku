@@ -267,7 +267,7 @@ zynjacku_engine_stop_jack(
 }
 
 /* Translate from a JACK MIDI buffer to an LV2 MIDI buffer. */
-void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nframes_t nframes)
+gboolean jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nframes_t nframes)
 {
   void * input_buf;
   jack_midi_event_t input_event;
@@ -311,6 +311,8 @@ void jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nfram
   }
 
   output_buf->size = data - output_buf->data;
+
+  return input_event_count != 0;
 }
 
 #define engine_ptr ((struct zynjacku_engine *)context_ptr)
@@ -325,7 +327,10 @@ jack_process_cb(
   struct zynjacku_synth * synth_ptr;
 
   /* Copy MIDI input data to all LV2 midi in ports */
-  jackmidi2lv2midi(engine_ptr->jack_midi_in, &engine_ptr->lv2_midi_buffer, nframes);
+  if (jackmidi2lv2midi(engine_ptr->jack_midi_in, &engine_ptr->lv2_midi_buffer, nframes))
+  {
+    engine_ptr->midi_activity = TRUE;
+  }
 
   /* Iterate over plugins */
   list_for_each(synth_node_ptr, &engine_ptr->plugins)
@@ -435,4 +440,20 @@ zynjacku_engine_get_sample_rate(
   }
 
   return jack_get_sample_rate(engine_ptr->jack_client);
+}
+
+gboolean
+zynjacku_engine_get_midi_activity(
+  ZynjackuEngine * engine_obj_ptr)
+{
+  gboolean ret;
+  struct zynjacku_engine * engine_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  ret = engine_ptr->midi_activity;
+
+  engine_ptr->midi_activity = FALSE;
+
+  return ret;
 }
