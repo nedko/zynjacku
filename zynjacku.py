@@ -463,7 +463,7 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
         #align = gtk.Alignment(0.5, 0.5)
         #align.add(self.knob)
         hbox.pack_start(self.knob, True, True)
-        self.spin = gtk.SpinButton(adjustment)
+        self.spin = gtk.SpinButton(adjustment, 0.0, 2)
         #align = gtk.Alignment(0.5, 0.5)
         #align.add(self.spin)
         hbox.pack_start(self.spin, False, False)
