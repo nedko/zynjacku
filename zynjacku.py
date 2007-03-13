@@ -158,6 +158,8 @@ class SynthWindowUniversal(SynthWindow):
             self.synth.disconnect(self.bool_appeared_connect_id)
             self.synth.disconnect(self.group_disappeared_connect_id)
             self.synth.disconnect(self.group_appeared_connect_id)
+            self.synth.disconnect(self.int_disappeared_connect_id)
+            self.synth.disconnect(self.int_appeared_connect_id)
         else:
             self.synth.ui_off()
 
@@ -175,6 +177,8 @@ class SynthWindowUniversal(SynthWindow):
             self.float_disappeared_connect_id = self.synth.connect("float-disappeared", self.on_float_disappeared)
             self.enum_appeared_connect_id = self.synth.connect("enum-appeared", self.on_enum_appeared)
             self.enum_disappeared_connect_id = self.synth.connect("enum-disappeared", self.on_enum_disappeared)
+            self.int_appeared_connect_id = self.synth.connect("int-appeared", self.on_int_appeared)
+            self.int_disappeared_connect_id = self.synth.connect("int-disappeared", self.on_int_disappeared)
 
             self.synth.ui_on()
 
@@ -278,6 +282,26 @@ class SynthWindowUniversal(SynthWindow):
         #print "-------------- Enum \"%s\" disappeared" % obj.parameter_name
         obj.remove()
 
+    def on_int_appeared(self, synth, parent, name, hints, value, min, max, context):
+        print "-------------- Integer \"%s\" appeared" % name
+        #print "synth: %s" % repr(synth)
+        #print "parent: %s" % repr(parent)
+        #print "name: %s" % name
+        hints_hash = self.convert_hints(hints)
+        #print repr(hints_hash)
+        #print "value: %s" % repr(value)
+        #print "min: %s" % repr(min)
+        #print "max: %s" % repr(max)
+        #print "context: %s" % repr(context)
+
+        return parent.on_int_appeared(self.window, name, hints_hash, value, min, max, context)
+
+    def on_int_disappeared(self, synth, obj):
+        print "-------------- Integer \"%s\" disappeared" % obj.parameter_name
+        #print repr(self.parent_group)
+        #print repr(obj)
+        obj.remove()
+
 class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
         SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
@@ -347,6 +371,11 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
 
     def on_float_appeared(self, window, name, hints, value, min, max, context):
         parameter = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
+        self.child_param_add(parameter)
+        return parameter
+
+    def on_int_appeared(self, window, name, hints, value, min, max, context):
+        parameter = SynthWindowUniversalParameterInt(self.window, self, name, value, min, max, context)
         self.child_param_add(parameter)
         return parameter
 
@@ -492,6 +521,7 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
         hbox = gtk.HBox()
         self.knob = phat.HFanSlider()
         self.knob.set_adjustment(adjustment)
+        #self.knob.set_size_request(200,-1)
         #align = gtk.Alignment(0.5, 0.5)
         #align.add(self.knob)
         hbox.pack_start(self.knob, True, True)
@@ -522,6 +552,55 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
     def on_value_changed(self, adjustment):
         #print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
         self.window.synth.float_set(self.context, adjustment.get_value())
+
+    def set_sensitive(self, sensitive):
+        self.knob.set_sensitive(sensitive)
+        self.spin.set_sensitive(sensitive)
+
+    def set(self, name, value, min, max):
+        self.adjustment.disconnect(self.cid)
+        self.label.set_text(name)
+        self.adjustment = gtk.Adjustment(value, min, max, 1, 19)
+        self.spin.set_adjustment(self.adjustment)
+        self.knob.set_adjustment(self.adjustment)
+        self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
+
+class SynthWindowUniversalParameterInt(SynthWindowUniversalParameter):
+    def __init__(self, window, parent_group, name, value, min, max, context):
+        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+
+        self.box = gtk.HBox()
+
+        self.label = gtk.Label(name)
+        align = gtk.Alignment(0.5, 0.5)
+        align.add(self.label)
+        self.box.pack_start(align, True, True)
+
+        adjustment = gtk.Adjustment(value, min, max, 1, 19)
+
+        self.spin = gtk.SpinButton(adjustment, 0.0, 0)
+        #align = gtk.Alignment(0.5, 0.5)
+        #align.add(self.spin)
+        self.box.pack_start(self.spin, True, False)
+
+        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        self.align.set_padding(10, 10, 10, 10)
+        self.align.add(self.box)
+
+        self.top = self.align
+
+        self.adjustment = adjustment
+
+        self.cid = adjustment.connect("value-changed", self.on_value_changed)
+
+        print "Int \"%s\" created: %s" % (name, repr(self))
+
+    def get_top_widget(self):
+        return self.top
+
+    def on_value_changed(self, adjustment):
+        #print "Int changed. \"%s\" set to %d" % (self.parameter_name, int(adjustment.get_value()))
+        self.window.synth.int_set(self.context, int(adjustment.get_value()))
 
     def set_sensitive(self, sensitive):
         self.knob.set_sensitive(sensitive)

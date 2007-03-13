@@ -101,6 +101,12 @@ zynjacku_synth_float_set(
   gfloat value);
 
 void
+zynjacku_synth_int_set(
+  ZynjackuSynth * obj_ptr,
+  gchar * context,
+  gint value);
+
+void
 zynjacku_synth_enum_set(
   ZynjackuSynth * obj_ptr,
   gchar * context,

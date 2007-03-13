@@ -54,8 +54,10 @@
 #define ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED   6
 #define ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED       7
 #define ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED    8
-#define ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF       9
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT             10
+#define ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED        9
+#define ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED    10
+#define ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF      11
+#define ZYNJACKU_SYNTH_SIGNALS_COUNT             12
 
 /* properties */
 #define ZYNJACKU_SYNTH_PROP_URI                1
@@ -364,6 +366,40 @@ zynjacku_synth_class_init(
   g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED] =
     g_signal_new(
       "enum-disappeared",       /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_OBJECT);           /* object */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED] =
+    g_signal_new(
+      "int-appeared",           /* signal_name */
+      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_OBJECT,            /* return type */
+      7,                        /* n_params */
+      G_TYPE_OBJECT,            /* parent */
+      G_TYPE_STRING,            /* parameter name */
+      G_TYPE_OBJECT,            /* hints */
+      G_TYPE_INT,               /* value */
+      G_TYPE_INT,               /* min */
+      G_TYPE_INT,               /* max */
+      G_TYPE_STRING);           /* context */
+
+  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED] =
+    g_signal_new(
+      "int-disappeared",        /* signal_name */
       ZYNJACKU_SYNTH_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
@@ -1134,6 +1170,23 @@ dynparam_parameter_enum_disappeared(
 }
 
 void
+dynparam_parameter_int_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  void * parameter_ui_context)
+{
+  LOG_DEBUG("dynparam_parameter_int_disappeared() called.");
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED],
+    0,
+    parameter_ui_context);
+
+  g_object_unref(parameter_ui_context);
+}
+
+void
 dynparam_parameter_boolean_appeared(
   lv2dynparam_host_parameter parameter_handle,
   void * instance_ui_context,
@@ -1353,6 +1406,81 @@ zynjacku_synth_enum_set(
   if (synth_ptr->dynparams != NULL)
   {
     dynparam_parameter_enum_change(
+      synth_ptr->dynparams,
+      (lv2dynparam_host_parameter)context,
+      value);
+  }
+}
+
+void
+dynparam_parameter_int_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  const char * parameter_name,
+  const struct lv2dynparam_hints * hints_ptr,
+  signed int value,
+  signed int min,
+  signed int max,
+  void ** parameter_ui_context)
+{
+  GObject * ret_obj_ptr;
+  ZynjackuHints * hints_obj_ptr;
+
+  LOG_DEBUG(
+    "Integer parameter \"%s\" appeared, value %d, min %d, max %d, handle %p",
+    parameter_name,
+    value,
+    min,
+    max,
+    parameter_handle);
+
+  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
+
+  zynjacku_hints_set(
+    hints_obj_ptr,
+    hints_ptr->count,
+    (const gchar * const *)hints_ptr->names,
+    (const gchar * const *)hints_ptr->values);
+
+  g_signal_emit(
+    (ZynjackuSynth *)instance_ui_context,
+    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED],
+    0,
+    group_ui_context,
+    parameter_name,
+    hints_obj_ptr,
+    (gint)value,
+    (gint)min,
+    (gint)max,
+    zynjacku_synth_context_to_string(parameter_handle),
+    &ret_obj_ptr);
+
+  LOG_DEBUG("int-appeared signal returned object ptr is %p", ret_obj_ptr);
+
+  g_object_unref(hints_obj_ptr);
+
+  *parameter_ui_context = ret_obj_ptr;
+}
+
+void
+zynjacku_synth_int_set(
+  ZynjackuSynth * synth_obj_ptr,
+  gchar * string_context,
+  gint value)
+{
+  void * context;
+  struct zynjacku_synth * synth_ptr;
+
+  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+
+  context = zynjacku_synth_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_synth_int_set() called, context %p", context);
+
+  if (synth_ptr->dynparams != NULL)
+  {
+    dynparam_parameter_int_change(
       synth_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
