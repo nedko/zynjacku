@@ -69,8 +69,8 @@ void
 zynjacku_hints_set(
   ZynjackuHints * hints_obj_ptr,
   guint count,
-  const gchar * const * names,
-  const gchar * const * values);
+  char ** names,
+  char ** values);
 
 G_END_DECLS
 

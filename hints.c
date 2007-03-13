@@ -175,8 +175,8 @@ void
 zynjacku_hints_set(
   ZynjackuHints * hints_obj_ptr,
   guint count,
-  const gchar * const * names,
-  const gchar * const * values)
+  char ** names,
+  char ** values)
 {
   guint i;
   struct zynjacku_hints * hints_ptr;
