@@ -433,7 +433,7 @@ class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
         #print "Notebook group \"%s\" created: %s" % (group_name, repr(self))
 
     def on_realize(self, obj):
-        print "realize"
+        #print "realize"
         self.box.pack_start(self.enum.get_top_widget())
         self.enum.connect("zynjacku-parameter-changed", self.on_changed)
         selected = self.enum.get_selection()
