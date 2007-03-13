@@ -30,7 +30,7 @@ import midi_led
 
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
-              "notebook": "http://home.gna.org/zynjacku/hints#notebook",
+              "onesubgroup": "http://home.gna.org/zynjacku/hints#onesubgroup",
               }
 
 # Synth window abstraction
@@ -102,8 +102,8 @@ class SynthWindowUniversalGroup(gobject.GObject):
             group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, hints, context)
             self.window.defered.append(group)
             return group
-        elif hints.has_key(hint_uris['notebook']):
-            group = SynthWindowUniversalGroupNotebook(self.window, self, group_name, hints, context)
+        elif hints.has_key(hint_uris['onesubgroup']):
+            group = SynthWindowUniversalGroupOneSubGroup(self.window, self, group_name, hints, context)
             self.window.defered.append(group)
             return group
         else:
@@ -297,6 +297,7 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
             else:
                 frame = gtk.Frame(group_name)
                 frame.set_shadow_type(self.window.group_shadow_type)
+                self.frame = frame
 
                 frame.add(self.box_top)
 
@@ -357,6 +358,9 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
     def get_top_widget(self):
         return self.top
 
+    def change_display_name(self, name):
+        self.frame.set_label(name)
+
 class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
         SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
@@ -411,38 +415,66 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
         self.float.set(name, value, min, max)
         return self.float
 
-class SynthWindowUniversalGroupNotebook(SynthWindowUniversalGroup):
+class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
         SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
-        self.notebook = gtk.Notebook()
-
-        self.float = None
-        self.bool = None
+        self.box = gtk.VBox()
 
         self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         self.align.set_padding(10, 10, 10, 10)
-        self.align.add(self.notebook)
+        self.align.add(self.box)
+        self.groups = []
 
         self.top = self.align
 
+        self.top.connect("realize", self.on_realize)
+
         #print "Notebook group \"%s\" created: %s" % (group_name, repr(self))
+
+    def on_realize(self, obj):
+        print "realize"
+        self.box.pack_start(self.enum.get_top_widget())
+        self.enum.connect("zynjacku-parameter-changed", self.on_changed)
+        selected = self.enum.get_selection()
+        for group in self.groups:
+            if group.group_name == selected:
+                self.box.pack_start(group.get_top_widget())
+                self.selected_group = group
+
+    def on_enum_appeared(self, window, name, hints, selected_value_index, valid_values, context):
+        #print "enum appeared"
+        parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
+        self.enum = parameter
+        return parameter
 
     def child_group_add(self, obj):
         #print "child_group_add %s for group \"%s\"" % (repr(obj), self.group_name)
-        self.notebook.append_page(obj.get_top_widget(), gtk.Label(obj.group_name))
+        #self.box.pack_start(obj.get_top_widget())
+        self.groups.append(obj)
+        obj.change_display_name(self.group_name)
 
     def child_group_remove(self, obj):
         print "child_group_remove %s for group \"%s\"" % (repr(obj), self.group_name)
 
-    def child_param_add(self, obj):
-        print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
+#    def child_param_add(self, obj):
+#        print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
 
-    def child_param_remove(self, obj):
-        print "child_param_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+#    def child_param_remove(self, obj):
+#        print "child_param_remove %s for group \"%s\"" % (repr(obj), self.group_name)
 
     def get_top_widget(self):
         return self.top
+
+    def on_changed(self, adjustment):
+        #print "Enum changed."
+        self.box.remove(self.selected_group.get_top_widget())
+        selected = self.enum.get_selection()
+        for group in self.groups:
+            if group.group_name == selected:
+                self.box.pack_start(group.get_top_widget())
+                group.get_top_widget().show_all()
+                self.selected_group = group
 
 class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
     def __init__(self, window, parent_group, name, value, min, max, context):
@@ -540,6 +572,7 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
             self.liststore.append(row)
 
         self.combobox.set_active(selected_value_index)
+        self.selected_value_index = selected_value_index;
 
         self.combobox.connect("changed", self.on_changed)
 
@@ -552,7 +585,12 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
 
     def on_changed(self, adjustment):
         #print "Enum changed. \"%s\" set to %u" % (self.parameter_name, adjustment.get_active())
-        self.window.synth.enum_set(self.context, adjustment.get_active())
+        self.selected_value_index = adjustment.get_active()
+        self.window.synth.enum_set(self.context, self.selected_value_index)
+        self.emit("zynjacku-parameter-changed")
+
+    def get_selection(self):
+        return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
 class SynthWindowFactory:
     def __init__(self):
@@ -905,5 +943,7 @@ def main():
         host = ZynjackuHostMulti(glade_xml, "zynjacku", the_license, sys.argv[1:])
 
     host.run()
+
+gobject.signal_new("zynjacku-parameter-changed", SynthWindowUniversalParameter, gobject.SIGNAL_RUN_FIRST | gobject.SIGNAL_ACTION, gobject.TYPE_NONE, [])
 
 main()
