@@ -28,9 +28,6 @@ LV2DYNPARAM_INCLUDEDIR := $(strip $(shell pkg-config --variable=includedir lv2dy
 
 CC = gcc -c 
 
-GENDEP_SED_EXPR = "s/^\\(.*\\)\\.o *: /$(subst /,\/,$(@:.d=.o)) $(subst /,\/,$@) : /g"
-GENDEP_C = set -e; gcc -MM $(CFLAGS) $< | sed $(GENDEP_SED_EXPR) > $@; [ -s $@ ] || rm -f $@
-
 .PHONY: run test install uninstall
 
 SOURCES = engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c enum.c gtk2gui.c hints.c
@@ -58,16 +55,8 @@ zynjacku.so: $(OBJECTS)
 %.o:%.c
 	$(CC) $(CFLAGS) $< -o $@
 
-%.d:%.c
-	$(GENDEP_C)
-
 clean:
 	-@rm $(OBJECTS) zynjacku_wrap.c zynjacku.so zynjacku.defs *.pyc
 
 run: zynjacku.so
 	./zynjacku.py
-
-# All object and dependency files depend on this file
-$(OBJECTS) $(DEP_FILES): GNUmakefile
-
--include $(DEP_FILES)
