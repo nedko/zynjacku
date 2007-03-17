@@ -20,4 +20,5 @@ ignore-glob
   zynjacku_engine_activate_synth
   zynjacku_engine_deactivate_synth
   zynjacku_enum_set
+  zynjacku_hints_set
 %%
