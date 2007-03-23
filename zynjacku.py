@@ -722,12 +722,13 @@ class ZynjackuHost(SynthWindowFactory):
         print repr(obj2)
 
 class ZynjackuHostMulti(ZynjackuHost):
-    def __init__(self, glade_xml, client_name, the_license, uris):
+    def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
         #print "ZynjackuHostMulti constructor called."
         ZynjackuHost.__init__(self, client_name)
         
         self.synths = []
 
+        self.data_dir = data_dir
         self.glade_xml = glade_xml
 
         self.main_window = glade_xml.get_widget("zynjacku_main")
@@ -854,7 +855,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         about.set_website("http://home.gna.org/zynjacku/")
         about.set_authors(["Nedko Arnaudov"])
         about.set_artists(["Thorsten Wilms"])
-        about.set_logo(gtk.gdk.pixbuf_new_from_file("zynjacku_logo_06_on_dark.png"))
+        about.set_logo(gtk.gdk.pixbuf_new_from_file("%s/logo.png" % self.data_dir))
         about.show()
         about.run()
         about.hide()
@@ -1023,7 +1024,7 @@ def main():
     if len(sys.argv) == 2:
         host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
     else:
-        host = ZynjackuHostMulti(glade_xml, "zynjacku", the_license, sys.argv[1:])
+        host = ZynjackuHostMulti(data_dir, glade_xml, "zynjacku", the_license, sys.argv[1:])
 
     host.run()
 
