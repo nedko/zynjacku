@@ -28,6 +28,13 @@ LV2DYNPARAM_INCLUDEDIR := $(strip $(shell pkg-config --variable=includedir lv2dy
 
 CC = gcc -c 
 
+# uncomment next line if you have JACK version 0.102.20.
+#CFLAGS += -DHAVE_OLD_JACK_MIDI
+
+# uncomment next line if you don't have latest jack-midi changes (in jack-midi branch)
+# for 0.103.0 you need this uncommented
+#CFLAGS += -DJACK_MIDI_NEEDS_NFRAMES
+
 .PHONY: run test install uninstall
 
 SOURCES = engine.c synth.c plugin_repo.c log.c zynjacku_wrap.c zynjackumodule.c enum.c gtk2gui.c hints.c

@@ -41,8 +41,7 @@
 
 #include "zynjacku.h"
 
-/* uncomment next line if your version of JACK does not include the latest changes. */
-//#define jack_midi_get_event_count(port_buf, nframes) jack_midi_port_get_info(port_buf, nframes)->event_count
+#include "jack_compat.c"
 
 int
 jack_process_cb(
@@ -279,14 +278,14 @@ gboolean jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_n
   input_event_index = 0;
   output_buf->event_count = 0;
   input_buf = jack_port_get_buffer(jack_port, nframes);
-  input_event_count = jack_midi_get_event_count(input_buf, nframes);
+  input_event_count = jack_midi_get_event_count(input_buf);
 
   /* iterate over all incoming JACK MIDI events */
   data = output_buf->data;
   for (i = 0; i < input_event_count; i++)
   {
     /* retrieve JACK MIDI event */
-    jack_midi_event_get(&input_event, input_buf, i, nframes);
+    jack_midi_event_get(&input_event, input_buf, i);
     if ((data - output_buf->data) + sizeof(double) + sizeof(size_t) + input_event.size >= output_buf->capacity)
     {
       break;
