@@ -19,13 +19,18 @@
 
 import os
 import sys
-import zynjacku
 import gtk
 import gtk.glade
 import gobject
 import phat
 import re
 import time
+
+old_path = sys.path
+sys.path.append("%s/.libs" % os.path.dirname(sys.argv[0]))
+import zynjacku_c as zynjacku
+sys.path = old_path
+
 import midi_led
 
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",

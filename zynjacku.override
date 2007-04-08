@@ -11,7 +11,7 @@ headers
 #include "enum.h"
 #include "hints.h"
 %%
-modulename zynjacku
+modulename zynjacku_c
 %%
 import gobject.GObject as PyGObject_Type 
 %%

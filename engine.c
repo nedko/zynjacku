@@ -30,6 +30,8 @@
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/host.h>
 
+#include "config.h"
+
 #include "lv2-miditype.h"
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR

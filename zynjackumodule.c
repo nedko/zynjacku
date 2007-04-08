@@ -22,26 +22,26 @@
 
 #include <pygobject.h>
  
-void zynjacku_register_classes(PyObject * obj);
-extern PyMethodDef zynjacku_functions[];
+void zynjacku_c_register_classes(PyObject * obj);
+extern PyMethodDef zynjacku_c_functions[];
  
 DL_EXPORT(void)
 
-initzynjacku(void)
+initzynjacku_c(void)
 {
   PyObject * m;
   PyObject * d;
 
   init_pygobject();
  
-  m = Py_InitModule("zynjacku", zynjacku_functions);
+  m = Py_InitModule("zynjacku_c", zynjacku_c_functions);
 
   d = PyModule_GetDict(m);
  
-  zynjacku_register_classes(d);
+  zynjacku_c_register_classes(d);
  
   if (PyErr_Occurred())
   {
-    Py_FatalError("can't initialise module zynjacku");
+    Py_FatalError("can't initialise module zynjacku_c");
   }
 }
