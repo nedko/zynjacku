@@ -27,7 +27,7 @@ import re
 import time
 
 old_path = sys.path
-sys.path.append("%s/.libs" % os.path.dirname(sys.argv[0]))
+sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
 import zynjacku_c as zynjacku
 sys.path = old_path
 
@@ -854,8 +854,10 @@ class ZynjackuHostMulti(ZynjackuHost):
         about = gtk.AboutDialog()
         about.set_transient_for(self.main_window)
         about.set_name("zynjacku")
-        #about.set_version(" ver 1.0")
-        #about.set_comments("(built from svn version ???)")
+        if zynjacku.zynjacku_get_version() == "dev":
+            about.set_comments("(development snapshot)")
+        else:
+            about.set_version(zynjacku.zynjacku_get_version())
         about.set_license(self.the_license)
         about.set_website("http://home.gna.org/zynjacku/")
         about.set_authors(["Nedko Arnaudov"])

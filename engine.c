@@ -458,3 +458,9 @@ zynjacku_engine_get_midi_activity(
 
   return ret;
 }
+
+const gchar *
+zynjacku_get_version()
+{
+  return VERSION;
+}
