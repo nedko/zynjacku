@@ -86,8 +86,8 @@ bin_SCRIPTS = zynjacku.py midi_led.py
 zynjackudir = $(pkgdatadir)
 dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
 
-install-exec-local:
-	ln -vfs zynjacku.py $(bindir)/zynjacku
+install-exec-hook:
+	ln -vfs zynjacku.py $(DESTDIR)$(bindir)/zynjacku
 
-uninstall-local:
-	rm -vf $(bindir)/zynjacku
+uninstall-hook:
+	rm -vf $(DESTDIR)$(bindir)/zynjacku
