@@ -28,7 +28,7 @@
 
 #include "list.h"
 #include "plugin_repo.h"
-//#define LOG_LEVEL LOG_LEVEL_ERROR
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define LV2_RDF_LICENSE_URI "<http://usefulinc.com/ns/doap#license>"
@@ -36,8 +36,6 @@
 #define ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK    0 /* plugin iterated */
 #define ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK    1 /* "good" plugin found */
 #define ZYNJACKU_SYNTH_SIGNALS_COUNT        2
-
-static SLV2Model slv2_model;
 
 static guint g_zynjacku_plugin_repo_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
 
@@ -55,6 +53,8 @@ struct zynjacku_plugin_repo
 
   gboolean scanned;
   struct list_head available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
+  SLV2Model slv2_model;
+  SLV2Plugins slv2_plugins;
 };
 
 #define ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_REPO_TYPE, struct zynjacku_plugin_repo))
@@ -84,6 +84,13 @@ zynjacku_plugin_repo_clear(
     free(plugin_info_ptr->license);
     free(plugin_info_ptr->name);
     free(plugin_info_ptr);
+  }
+
+  if (repo_ptr->scanned)
+  {
+    slv2_plugins_free(repo_ptr->slv2_plugins);
+    slv2_model_free(repo_ptr->slv2_model);
+    repo_ptr->scanned = FALSE;
   }
 }
 
@@ -193,9 +200,6 @@ zynjacku_plugin_repo_init(
   plugin_repo_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&plugin_repo_ptr->available_plugins);
   plugin_repo_ptr->scanned = FALSE;
-
-  slv2_model = slv2_model_new();
-  slv2_model_load_all(slv2_model);
 }
 
 GType zynjacku_plugin_repo_get_type()
@@ -336,7 +340,6 @@ zynjacku_plugin_repo_iterate(
   gboolean force_scan)
 {
   struct zynjacku_plugin_repo * plugin_repo_ptr;
-  SLV2Plugins plugins;
   unsigned int plugins_count;
   unsigned int index;
   SLV2Plugin plugin;
@@ -349,12 +352,18 @@ zynjacku_plugin_repo_iterate(
 
   plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(repo_obj_ptr);
 
+  /* disable force scan because if we free model/plugins using non-duplicated plugin will crash */
+  force_scan = FALSE;
   if (force_scan || !plugin_repo_ptr->scanned)
   {
-    zynjacku_plugin_repo_clear(plugin_repo_ptr);
+    /* disable force scan because if we free model/plugins using non-duplicated plugin will crash */
+    //zynjacku_plugin_repo_clear(plugin_repo_ptr);
 
-    plugins = slv2_model_get_all_plugins(slv2_model);
-    plugins_count = slv2_plugins_size(plugins);
+    plugin_repo_ptr->slv2_model = slv2_model_new();
+    slv2_model_load_all(plugin_repo_ptr->slv2_model);
+    plugin_repo_ptr->slv2_plugins = slv2_model_get_all_plugins(plugin_repo_ptr->slv2_model);
+
+    plugins_count = slv2_plugins_size(plugin_repo_ptr->slv2_plugins);
     progress_step = 1.0 / plugins_count;
     progress = 0;
 
@@ -362,7 +371,7 @@ zynjacku_plugin_repo_iterate(
 
     for (index = 0 ; index < plugins_count; index++)
     {
-      plugin = slv2_plugins_get_at(plugins, index);
+      plugin = slv2_plugins_get_at(plugin_repo_ptr->slv2_plugins, index);
 
       g_signal_emit(
         repo_obj_ptr,
@@ -374,7 +383,7 @@ zynjacku_plugin_repo_iterate(
       if (zynjacku_plugin_repo_check_plugin(plugin))
       {
         plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
-        plugin_info_ptr->plugin = slv2_plugin_duplicate(plugin);
+        plugin_info_ptr->plugin = plugin;
 
         list_add_tail(&plugin_info_ptr->siblings, &plugin_repo_ptr->available_plugins);
 
@@ -393,8 +402,6 @@ zynjacku_plugin_repo_iterate(
 
       progress += progress_step;
     }
-
-    slv2_plugins_free(plugins);
 
     g_signal_emit(
       repo_obj_ptr,
@@ -449,21 +456,17 @@ SLV2Plugin
 zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
   SLV2Plugin plugin;
-  SLV2Plugins plugins;
+  struct zynjacku_plugin_repo * plugin_repo_ptr;
 
-  plugins = slv2_model_get_all_plugins(slv2_model);
+  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(g_the_repo);
 
-  plugin = slv2_plugins_get_by_uri(plugins, uri);
+  plugin = slv2_plugins_get_by_uri(plugin_repo_ptr->slv2_plugins, uri);
   if (plugin == NULL)
   {
-    slv2_plugins_free(plugins);
     return NULL;
   }
 
-  /* yup, overwrite old plugin_ptr value - we don't need it anyway after the dup */
-  plugin = slv2_plugin_duplicate(plugin);
-
-  slv2_plugins_free(plugins);
+  LOG_DEBUG("Lookup plugin with %u ports", (unsigned int)slv2_plugin_get_num_ports(plugin));
 
   return plugin;
 }

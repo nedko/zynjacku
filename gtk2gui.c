@@ -382,7 +382,7 @@ zynjacku_gtk2gui_init(
   slv2_strings_free(uris);
 
   gtk2gui_ptr->count = count;
-  gtk2gui_ptr->plugin = slv2_plugin_duplicate(plugin);
+  gtk2gui_ptr->plugin = plugin;
 
   ports_count = 0;
 
