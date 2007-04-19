@@ -288,7 +288,7 @@ class SynthWindowUniversal(SynthWindow):
         obj.remove()
 
     def on_int_appeared(self, synth, parent, name, hints, value, min, max, context):
-        print "-------------- Integer \"%s\" appeared" % name
+        #print "-------------- Integer \"%s\" appeared" % name
         #print "synth: %s" % repr(synth)
         #print "parent: %s" % repr(parent)
         #print "name: %s" % name
@@ -302,7 +302,7 @@ class SynthWindowUniversal(SynthWindow):
         return parent.on_int_appeared(self.window, name, hints_hash, value, min, max, context)
 
     def on_int_disappeared(self, synth, obj):
-        print "-------------- Integer \"%s\" disappeared" % obj.parameter_name
+        #print "-------------- Integer \"%s\" disappeared" % obj.parameter_name
         #print repr(self.parent_group)
         #print repr(obj)
         obj.remove()
@@ -489,7 +489,8 @@ class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
         obj.change_display_name(self.group_name)
 
     def child_group_remove(self, obj):
-        print "child_group_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        #print "child_group_remove %s for group \"%s\"" % (repr(obj), self.group_name)
+        return
 
 #    def child_param_add(self, obj):
 #        print "child_param_add %s for group \"%s\"" % (repr(obj), self.group_name)
@@ -598,7 +599,7 @@ class SynthWindowUniversalParameterInt(SynthWindowUniversalParameter):
 
         self.cid = adjustment.connect("value-changed", self.on_value_changed)
 
-        print "Int \"%s\" created: %s" % (name, repr(self))
+        #print "Int \"%s\" created: %s" % (name, repr(self))
 
     def get_top_widget(self):
         return self.top
@@ -1028,10 +1029,12 @@ def main():
     gobject.type_register(SynthWindowUniversalParameterFloat)
     gobject.type_register(SynthWindowUniversalParameterBool)
 
+    client_name = "zynjacku"
+
     if len(sys.argv) == 2:
-        host = ZynjackuHostOne(glade_xml, "zynjacku", sys.argv[1])
+        host = ZynjackuHostOne(glade_xml, client_name, sys.argv[1])
     else:
-        host = ZynjackuHostMulti(data_dir, glade_xml, "zynjacku", the_license, sys.argv[1:])
+        host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:])
 
     host.run()
 
