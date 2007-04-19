@@ -787,8 +787,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
 
-        gobject.timeout_add(100, self.update_midi_led)
-
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
 
@@ -821,7 +819,13 @@ class ZynjackuHostMulti(ZynjackuHost):
 
     def run(self):
         toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
+
+        update_midi_led_callback_id = gobject.timeout_add(100, self.update_midi_led)
+
         ZynjackuHost.run(self)
+
+        gobject.source_remove(update_midi_led_callback_id)
+
         for synth in self.synths:
             if synth.ui_win:
                 synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
