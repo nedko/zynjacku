@@ -28,7 +28,7 @@
 
 #include "list.h"
 #include "plugin_repo.h"
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define LV2_RDF_LICENSE_URI "<http://usefulinc.com/ns/doap#license>"
@@ -356,6 +356,7 @@ zynjacku_plugin_repo_iterate(
   force_scan = FALSE;
   if (force_scan || !plugin_repo_ptr->scanned)
   {
+    LOG_DEBUG("Scanning plugins...");
     /* disable force scan because if we free model/plugins using non-duplicated plugin will crash */
     //zynjacku_plugin_repo_clear(plugin_repo_ptr);
 
@@ -429,15 +430,19 @@ zynjacku_plugin_repo_iterate(
   }
 }
 
-#if 0
 SLV2Plugin
-zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
+zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
   struct list_head * node_ptr;
   const char * current_uri;
   struct zynjacku_simple_plugin_info * plugin_info_ptr;
+  struct zynjacku_plugin_repo * plugin_repo_ptr;
 
-  list_for_each(node_ptr, &g_available_plugins)
+  zynjacku_plugin_repo_iterate(zynjacku_plugin_repo_get(), FALSE);
+
+  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(zynjacku_plugin_repo_get());
+
+  list_for_each(node_ptr, &plugin_repo_ptr->available_plugins)
   {
     plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
     current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin);
@@ -448,27 +453,6 @@ zynjacku_plugin_repo_lookup_by_uri_list(const char * uri)
   }
 
   return NULL;
-}
-#endif
-
-/* Nasty hack until we start using real plugin list */
-SLV2Plugin
-zynjacku_plugin_repo_lookup_by_uri(const char * uri)
-{
-  SLV2Plugin plugin;
-  struct zynjacku_plugin_repo * plugin_repo_ptr;
-
-  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(g_the_repo);
-
-  plugin = slv2_plugins_get_by_uri(plugin_repo_ptr->slv2_plugins, uri);
-  if (plugin == NULL)
-  {
-    return NULL;
-  }
-
-  LOG_DEBUG("Lookup plugin with %u ports", (unsigned int)slv2_plugin_get_num_ports(plugin));
-
-  return plugin;
 }
 
 ZynjackuPluginRepo *
