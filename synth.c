@@ -558,7 +558,8 @@ zynjacku_synth_generic_lv2_ui_on(
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
 
-    symbol = slv2_port_get_symbol(synth_ptr->plugin, slv2_port_by_index(port_ptr->index));
+    symbol = slv2_port_get_symbol(synth_ptr->plugin,
+			slv2_plugin_get_port_by_index(synth_ptr->plugin, port_ptr->index));
 
     g_signal_emit(
       synth_obj_ptr,
@@ -721,10 +722,10 @@ create_port(
   gboolean ret;
 
   /* Get the 'class' of the port (control input, audio output, etc) */
-  class = slv2_port_get_class(plugin_ptr->plugin, slv2_port_by_index(port_index));
+  class = slv2_port_get_class(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
 
   /* Get the port symbol (label) for console printing */
-  symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_port_by_index(port_index));
+  symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
   if (symbol == NULL)
   {
     LOG_ERROR("slv2_port_get_symbol() failed.");
@@ -742,9 +743,9 @@ create_port(
 
     port_ptr->type = PORT_TYPE_PARAMETER;
     port_ptr->index = port_index;
-    port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
-    port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
-    port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_port_by_index(port_index));
+    port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+    port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+    port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
     slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
     list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);

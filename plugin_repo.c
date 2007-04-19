@@ -37,6 +37,8 @@
 #define ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK    1 /* "good" plugin found */
 #define ZYNJACKU_SYNTH_SIGNALS_COUNT        2
 
+static SLV2Model slv2_model;
+
 static guint g_zynjacku_plugin_repo_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
 
 struct zynjacku_simple_plugin_info
@@ -191,6 +193,9 @@ zynjacku_plugin_repo_init(
   plugin_repo_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&plugin_repo_ptr->available_plugins);
   plugin_repo_ptr->scanned = FALSE;
+
+  slv2_model = slv2_model_new();
+  slv2_model_load_all(slv2_model);
 }
 
 GType zynjacku_plugin_repo_get_type()
@@ -234,7 +239,7 @@ zynjacku_plugin_repo_check_plugin(
 
   for (port_index = 0 ; port_index < ports_count ; port_index++)
   {
-    class = slv2_port_get_class(plugin, slv2_port_by_index(port_index));
+    class = slv2_port_get_class(plugin, slv2_plugin_get_port_by_index(plugin, port_index));
 
     if (class == SLV2_CONTROL_INPUT)
     {
@@ -348,8 +353,7 @@ zynjacku_plugin_repo_iterate(
   {
     zynjacku_plugin_repo_clear(plugin_repo_ptr);
 
-    plugins = slv2_plugins_new();
-    slv2_plugins_load_all(plugins);
+    plugins = slv2_model_get_all_plugins(slv2_model);
     plugins_count = slv2_plugins_size(plugins);
     progress_step = 1.0 / plugins_count;
     progress = 0;
@@ -447,8 +451,7 @@ zynjacku_plugin_repo_lookup_by_uri(const char * uri)
   SLV2Plugin plugin;
   SLV2Plugins plugins;
 
-  plugins = slv2_plugins_new();
-  slv2_plugins_load_all(plugins);
+  plugins = slv2_model_get_all_plugins(slv2_model);
 
   plugin = slv2_plugins_get_by_uri(plugins, uri);
   if (plugin == NULL)
