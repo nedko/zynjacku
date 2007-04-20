@@ -468,8 +468,6 @@ zynjacku_gtk2gui_uninit(
 
   free(gtk2gui_ptr->ports);
 
-  slv2_plugin_free(gtk2gui_ptr->plugin);
-
   for (index = 0 ; index < gtk2gui_ptr->count ; index++)
   {
     if (gtk2gui_ptr->ui_array[index].ui != NULL)

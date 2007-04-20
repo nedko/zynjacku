@@ -53,7 +53,7 @@ struct zynjacku_plugin_repo
 
   gboolean scanned;
   struct list_head available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
-  SLV2Model slv2_model;
+  SLV2World slv2_world;
   SLV2Plugins slv2_plugins;
 };
 
@@ -80,7 +80,6 @@ zynjacku_plugin_repo_clear(
     plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
 
     //LOG_DEBUG("Removing %s", plugin_info_ptr->name);
-    slv2_plugin_free(plugin_info_ptr->plugin);
     free(plugin_info_ptr->license);
     free(plugin_info_ptr->name);
     free(plugin_info_ptr);
@@ -88,8 +87,8 @@ zynjacku_plugin_repo_clear(
 
   if (repo_ptr->scanned)
   {
-    slv2_plugins_free(repo_ptr->slv2_plugins);
-    slv2_model_free(repo_ptr->slv2_model);
+    slv2_plugins_free(repo_ptr->slv2_world, repo_ptr->slv2_plugins);
+    slv2_world_free(repo_ptr->slv2_world);
     repo_ptr->scanned = FALSE;
   }
 }
@@ -352,17 +351,17 @@ zynjacku_plugin_repo_iterate(
 
   plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(repo_obj_ptr);
 
-  /* disable force scan because if we free model/plugins using non-duplicated plugin will crash */
+  /* disable force scan because if we free world/plugins using non-duplicated plugin will crash */
   force_scan = FALSE;
   if (force_scan || !plugin_repo_ptr->scanned)
   {
     LOG_DEBUG("Scanning plugins...");
-    /* disable force scan because if we free model/plugins using non-duplicated plugin will crash */
+    /* disable force scan because if we free world/plugins using non-duplicated plugin will crash */
     //zynjacku_plugin_repo_clear(plugin_repo_ptr);
 
-    plugin_repo_ptr->slv2_model = slv2_model_new();
-    slv2_model_load_all(plugin_repo_ptr->slv2_model);
-    plugin_repo_ptr->slv2_plugins = slv2_model_get_all_plugins(plugin_repo_ptr->slv2_model);
+    plugin_repo_ptr->slv2_world = slv2_world_new();
+    slv2_world_load_all(plugin_repo_ptr->slv2_world);
+    plugin_repo_ptr->slv2_plugins = slv2_world_get_all_plugins(plugin_repo_ptr->slv2_world);
 
     plugins_count = slv2_plugins_size(plugin_repo_ptr->slv2_plugins);
     progress_step = 1.0 / plugins_count;
