@@ -148,56 +148,91 @@ zynjacku_gtk2gui_load(
   struct zynjacku_gtk2gui_ui * ui_ptr,
   SLV2Plugin plugin)
 {
-  SLV2Strings slv2_strings;
+  SLV2Values values;
+  SLV2Value value;
   void * module;
   const char * gtk2gui_binary;
-  unsigned int string_index;
+  unsigned int index;
+  unsigned int count;
+  const char * uri;
 
-  slv2_strings = slv2_plugin_get_value_for_subject(
+  values = slv2_plugin_get_value_for_subject(
     plugin,
     ui_ptr->quoted_uri,
     LV2GTK2GUI_OPTIONAL_FEATURE_URI);
 
-  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  count = slv2_values_size(values);
+  for (index = 0 ; index < count ; index++)
   {
-    if (!zynjacku_gtk2gui_process_feature(ui_ptr, slv2_strings_get_at(slv2_strings, string_index)))
+    value = slv2_values_get_at(values, index);
+
+    if (!slv2_value_is_uri(value))
     {
-      LOG_WARNING("Ignoring unknown optional feature %s", slv2_strings_get_at(slv2_strings, string_index));
+      LOG_WARNING("Ignoring optional feature that is not URI");
+      continue;
+    }
+
+    uri = slv2_value_as_uri(value);
+
+    if (!zynjacku_gtk2gui_process_feature(ui_ptr, uri))
+    {
+      LOG_WARNING("Ignoring unknown optional feature %s", uri);
     }
   }
 
-  slv2_strings_free(slv2_strings);
+  slv2_values_free(values);
 
-  slv2_strings = slv2_plugin_get_value_for_subject(
+  values = slv2_plugin_get_value_for_subject(
     plugin,
     ui_ptr->quoted_uri,
     LV2GTK2GUI_REQUIRED_FEATURE_URI);
 
-  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  count = slv2_values_size(values);
+  for (index = 0 ; index < count ; index++)
   {
-    if (!zynjacku_gtk2gui_process_feature(ui_ptr, slv2_strings_get_at(slv2_strings, string_index)))
+    value = slv2_values_get_at(values, index);
+
+    if (!slv2_value_is_uri(value))
     {
-      LOG_WARNING("Ignoring custom GUI because of unknown required feature %s", slv2_strings_get_at(slv2_strings, string_index));
+      LOG_WARNING("Ignoring custom GUI because of required feature that is not URI");
+      module = NULL;
+      goto exit;
+    }
+
+    uri = slv2_value_as_uri(value);
+
+    if (!zynjacku_gtk2gui_process_feature(ui_ptr, uri))
+    {
+      LOG_WARNING("Ignoring custom GUI because of unknown required feature %s", uri);
       module = NULL;
       goto exit;
     }
   }
 
-  slv2_strings_free(slv2_strings);
+  slv2_values_free(values);
 
-  slv2_strings = slv2_plugin_get_value_for_subject(
+  values = slv2_plugin_get_value_for_subject(
     plugin,
     ui_ptr->quoted_uri,
     LV2GTK2GUI_BINARY_URI);
 
-  if (slv2_strings_size(slv2_strings) != 1)
+  if (slv2_values_size(values) != 1)
   {
     LOG_WARNING("Ignoring custom GUI %s", ui_ptr->uri);
     module = NULL;
     goto exit;
   }
 
-  gtk2gui_binary = slv2_strings_get_at(slv2_strings, 0);
+  value = slv2_values_get_at(values, 0);
+
+  if (!slv2_value_is_uri(value))
+  {
+    LOG_WARNING("Ignoring custom GUI %s with binary specifier is not URI");
+    module = NULL;
+    goto exit;
+  }
+
+  gtk2gui_binary = slv2_value_as_uri(value);
 
   if (strlen(gtk2gui_binary) <= 8 || memcmp(gtk2gui_binary, "file:///", 8) != 0)
   {
@@ -228,7 +263,7 @@ zynjacku_gtk2gui_load(
   }
 
 exit:
-  slv2_strings_free(slv2_strings);
+  slv2_values_free(values);
   return module;
 }
 
@@ -331,7 +366,8 @@ zynjacku_gtk2gui_init(
   SLV2Plugin plugin,
   const struct list_head * parameter_ports_ptr)
 {
-  SLV2Strings uris;
+  SLV2Values uris;
+  SLV2Value value;
   unsigned int index;
   unsigned int count;
   const char * uri;
@@ -342,7 +378,7 @@ zynjacku_gtk2gui_init(
 
   uris = slv2_plugin_get_value(plugin, LV2GTK2GUI_URI);
 
-  count = slv2_strings_size(uris);
+  count = slv2_values_size(uris);
 
   if (count == 0)
   {
@@ -367,7 +403,14 @@ zynjacku_gtk2gui_init(
   LOG_NOTICE("Plugin has %u custom GUI(s)", count);
   for (index = 0 ; index < count ; index++)
   {
-    uri = slv2_strings_get_at(uris, index);
+    value = slv2_values_get_at(uris, index);
+
+    if (!slv2_value_is_uri(value))
+    {
+      continue;
+    }
+
+    uri = slv2_value_as_uri(value);
 
     LOG_DEBUG("%s", uri);
 
@@ -379,9 +422,9 @@ zynjacku_gtk2gui_init(
     }
   }
 
-  slv2_strings_free(uris);
+  slv2_values_free(uris);
 
-  gtk2gui_ptr->count = count;
+  gtk2gui_ptr->count = index;
   gtk2gui_ptr->plugin = plugin;
 
   ports_count = 0;
@@ -428,7 +471,7 @@ fail_free:
   free(gtk2gui_ptr);
 
 fail:
-  slv2_strings_free(uris);
+  slv2_values_free(uris);
   return ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE;
 }
 

@@ -309,26 +309,29 @@ char *
 zynjacku_plugin_repo_get_plugin_license(
   SLV2Plugin plugin)
 {
-  SLV2Strings slv2_strings;
-  char * quoted_uri;
+  SLV2Values slv2_values;
+  SLV2Value slv2_value;
   char * license;
 
-  quoted_uri = zynjacku_rdf_uri_quote(slv2_plugin_get_uri(plugin));
-
-  slv2_strings = slv2_plugin_get_value_for_subject(
+  slv2_values = slv2_plugin_get_value_for_subject(
     plugin,
-    quoted_uri,
+    slv2_plugin_get_uri(plugin),
     LV2_RDF_LICENSE_URI);
 
-  if (slv2_strings_size(slv2_strings) == 0)
+  if (slv2_values_size(slv2_values) == 0)
   {
     return strdup("none");      /* slv2 acutallu should reject those early */
   }
 
-  license = strdup(slv2_strings_get_at(slv2_strings, 0));
+  slv2_value = slv2_values_get_at(slv2_values, 0);
+  if (!slv2_value_is_string(slv2_value))
+  {
+    return strdup("none");      /* slv2 acutallu should reject those early */
+  }
 
-  slv2_strings_free(slv2_strings);
-  free(quoted_uri);
+  license = strdup(slv2_value_as_string(slv2_value));
+
+  slv2_values_free(slv2_values);
 
   return license;
 }

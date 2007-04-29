@@ -870,9 +870,12 @@ zynjacku_synth_construct(
   struct zynjacku_synth * synth_ptr;
   guint sample_rate;
   struct zynjacku_engine * engine_ptr;
-  SLV2Strings slv2_strings;
-  unsigned int string_index;
+  SLV2Values slv2_values;
+  SLV2Value slv2_value;
+  unsigned int slv2_values_count;
+  unsigned int value_index;
   gboolean dynparams_supported;
+  const char * uri;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
@@ -892,39 +895,59 @@ zynjacku_synth_construct(
 
   dynparams_supported = FALSE;
 
-  slv2_strings = slv2_plugin_get_required_features(synth_ptr->plugin);
+  slv2_values = slv2_plugin_get_required_features(synth_ptr->plugin);
 
-  LOG_NOTICE("Plugin has %u required features", (unsigned int)slv2_strings_size(slv2_strings));
-  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  slv2_values_count = slv2_values_size(slv2_values);
+  LOG_NOTICE("Plugin has %u required features", slv2_values_count);
+  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
-    if (strcmp(LV2DYNPARAM_URI, slv2_strings_get_at(slv2_strings, string_index)) == 0)
+    slv2_value = slv2_values_get_at(slv2_values, value_index);
+    if (!slv2_value_is_uri(slv2_value))
+    {
+      LOG_ERROR("Plugin requires feature that is not URI");
+      slv2_values_free(slv2_values);
+      goto fail;
+    }
+
+    uri = slv2_value_as_uri(slv2_value);
+    LOG_NOTICE("%s", uri);
+    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
     {
       dynparams_supported = TRUE;
     }
     else
     {
-      LOG_ERROR("Plugin requires unsupported feature \"%s\"", slv2_strings_get_at(slv2_strings, string_index));
-      slv2_strings_free(slv2_strings);
+      LOG_ERROR("Plugin requires unsupported feature \"%s\"", uri);
+      slv2_values_free(slv2_values);
       goto fail;
     }
   }
 
-  slv2_strings_free(slv2_strings);
+  slv2_values_free(slv2_values);
 
-  slv2_strings = slv2_plugin_get_optional_features(synth_ptr->plugin);
+  slv2_values = slv2_plugin_get_optional_features(synth_ptr->plugin);
 
-  LOG_NOTICE("Plugin has %u optional features", (unsigned int)slv2_strings_size(slv2_strings));
-  for (string_index = 0 ; string_index < slv2_strings_size(slv2_strings) ; string_index++)
+  slv2_values_count = slv2_values_size(slv2_values);
+  LOG_NOTICE("Plugin has %u optional features", slv2_values_count);
+  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
   {
-    LOG_NOTICE("\"%s\"", slv2_strings_get_at(slv2_strings, string_index));
-    if (strcmp(LV2DYNPARAM_URI, slv2_strings_get_at(slv2_strings, string_index)) == 0)
+    slv2_value = slv2_values_get_at(slv2_values, value_index);
+    if (!slv2_value_is_uri(slv2_value))
+    {
+      LOG_ERROR("Plugin requires feature that is not URI");
+      slv2_values_free(slv2_values);
+      goto fail;
+    }
+
+    uri = slv2_value_as_uri(slv2_value);
+    LOG_NOTICE("%s", uri);
+    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
     {
       dynparams_supported = TRUE;
     }
   }
 
-  slv2_strings_free(slv2_strings);
+  slv2_values_free(slv2_values);
 
   sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
 
