@@ -313,10 +313,14 @@ zynjacku_plugin_repo_get_plugin_license(
   SLV2Value slv2_value;
   char * license;
 
+  LOG_DEBUG("Before slv2_plugin_get_value_for_subject()");
+
   slv2_values = slv2_plugin_get_value_for_subject(
     plugin,
     slv2_plugin_get_uri(plugin),
     LV2_RDF_LICENSE_URI);
+
+  LOG_DEBUG("After slv2_plugin_get_value_for_subject()");
 
   if (slv2_values_size(slv2_values) == 0)
   {

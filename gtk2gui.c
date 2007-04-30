@@ -139,7 +139,7 @@ zynjacku_gtk2gui_process_feature(
     return TRUE;
   }
 
-  LOG_DEBUG("Unknown feature %s", slv2_strings_get_at(slv2_strings, string_index));
+  LOG_DEBUG("Unknown feature %s", feature);
   return FALSE;
 }
 
@@ -376,7 +376,11 @@ zynjacku_gtk2gui_init(
   struct list_head * node_ptr;
   struct zynjacku_synth_port * port_ptr;
 
+  LOG_DEBUG("Before slv2_plugin_get_value(plugin,%s)", LV2GTK2GUI_URI);
+
   uris = slv2_plugin_get_value(plugin, LV2GTK2GUI_URI);
+
+  LOG_DEBUG("After slv2_plugin_get_value(plugin,%s)", LV2GTK2GUI_URI);
 
   count = slv2_values_size(uris);
 
