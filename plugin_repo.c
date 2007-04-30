@@ -313,7 +313,11 @@ zynjacku_plugin_repo_get_plugin_license(
   SLV2Value slv2_value;
   char * license;
 
+  return strdup("none");      /* slv2 workaround */
+
   LOG_DEBUG("Before slv2_plugin_get_value_for_subject()");
+
+  LOG_DEBUG("...%s...", slv2_plugin_get_uri(plugin));
 
   slv2_values = slv2_plugin_get_value_for_subject(
     plugin,
