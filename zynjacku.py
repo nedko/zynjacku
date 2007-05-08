@@ -890,7 +890,7 @@ class ZynjackuHostMulti(ZynjackuHost):
             gtk.main_iteration()
 
     def on_plugin_repo_tack(self, repo, name, uri, plugin_license, store):
-        #print "tack: %s" % name
+        #print "tack: %s %s %s" % (name, uri, plugin_license)
         store.append([name, uri, plugin_license])
 
     def rescan_plugins(self, store, progressbar, force):
