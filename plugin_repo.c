@@ -31,7 +31,7 @@
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
-#define LV2_RDF_LICENSE_URI "<http://usefulinc.com/ns/doap#license>"
+#define LV2_RDF_LICENSE_URI "http://usefulinc.com/ns/doap#license"
 
 #define ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK    0 /* plugin iterated */
 #define ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK    1 /* "good" plugin found */
@@ -313,28 +313,22 @@ zynjacku_plugin_repo_get_plugin_license(
   SLV2Value slv2_value;
   char * license;
 
-  return strdup("none");      /* slv2 workaround */
-
-  LOG_DEBUG("Before slv2_plugin_get_value_for_subject()");
-
-  LOG_DEBUG("...%s...", slv2_plugin_get_uri(plugin));
-
-  slv2_values = slv2_plugin_get_value_for_subject(
+  slv2_values = slv2_plugin_get_value(
     plugin,
-    slv2_plugin_get_uri(plugin),
+    SLV2_URI,
     LV2_RDF_LICENSE_URI);
-
-  LOG_DEBUG("After slv2_plugin_get_value_for_subject()");
 
   if (slv2_values_size(slv2_values) == 0)
   {
-    return strdup("none");      /* slv2 acutallu should reject those early */
+    LOG_WARNING("Plugin license query returned empty set");
+    return strdup("none");      /* acutally, slv2 should reject those early */
   }
 
   slv2_value = slv2_values_get_at(slv2_values, 0);
-  if (!slv2_value_is_string(slv2_value))
+  if (!slv2_value_is_uri(slv2_value))
   {
-    return strdup("none");      /* slv2 acutallu should reject those early */
+    LOG_WARNING("Plugin license is not uri");
+    return strdup("none");      /* acutally, slv2 should reject those early */
   }
 
   license = strdup(slv2_value_as_string(slv2_value));

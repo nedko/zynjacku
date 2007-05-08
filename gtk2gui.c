@@ -41,10 +41,10 @@
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
-#define LV2GTK2GUI_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui>"
-#define LV2GTK2GUI_BINARY_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary>"
-#define LV2GTK2GUI_OPTIONAL_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature>"
-#define LV2GTK2GUI_REQUIRED_FEATURE_URI "<http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature>"
+#define LV2GTK2GUI_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#gui"
+#define LV2GTK2GUI_BINARY_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary"
+#define LV2GTK2GUI_OPTIONAL_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature"
+#define LV2GTK2GUI_REQUIRED_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature"
 #define LV2GTK2GUI_NOUSERRESIZE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#noUserResize"
 #define LV2GTK2GUI_FIXEDSIZE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#fixedSize"
 
@@ -53,8 +53,7 @@ struct zynjacku_gtk2gui;
 struct zynjacku_gtk2gui_ui
 {
   struct zynjacku_gtk2gui * gtk2gui_ptr;
-  char * uri;
-  char * quoted_uri;
+  SLV2Value uri;
   char * bundle_path;
   void * module;
   const LV2UI_Descriptor * descr_ptr;
@@ -158,7 +157,8 @@ zynjacku_gtk2gui_load(
 
   values = slv2_plugin_get_value_for_subject(
     plugin,
-    ui_ptr->quoted_uri,
+    ui_ptr->uri,
+    SLV2_URI,
     LV2GTK2GUI_OPTIONAL_FEATURE_URI);
 
   count = slv2_values_size(values);
@@ -184,7 +184,8 @@ zynjacku_gtk2gui_load(
 
   values = slv2_plugin_get_value_for_subject(
     plugin,
-    ui_ptr->quoted_uri,
+    ui_ptr->uri,
+    SLV2_URI,
     LV2GTK2GUI_REQUIRED_FEATURE_URI);
 
   count = slv2_values_size(values);
@@ -213,7 +214,8 @@ zynjacku_gtk2gui_load(
 
   values = slv2_plugin_get_value_for_subject(
     plugin,
-    ui_ptr->quoted_uri,
+    ui_ptr->uri,
+    SLV2_URI,
     LV2GTK2GUI_BINARY_URI);
 
   if (slv2_values_size(values) != 1)
@@ -298,23 +300,14 @@ gboolean
 zynjacku_gtk2gui_ui_init(
   struct zynjacku_gtk2gui_ui * ui_ptr,
   SLV2Plugin plugin,
-  const char * uri)
+  SLV2Value uri)
 {
   LV2UI_DescriptorFunction descr_func;
+  const char * uri_string;
 
   ui_ptr->resizable = TRUE;
 
-  ui_ptr->uri = strdup(uri);
-  if (ui_ptr->uri == NULL)
-  {
-    goto fail;
-  }
-
-  ui_ptr->quoted_uri = zynjacku_rdf_uri_quote(uri);
-  if (ui_ptr->quoted_uri == NULL)
-  {
-    goto fail_free_uri;
-  }
+  ui_ptr->uri = uri;
 
   ui_ptr->module = zynjacku_gtk2gui_load(ui_ptr, plugin);
 
@@ -325,7 +318,11 @@ zynjacku_gtk2gui_ui_init(
     goto fail_dlclose;
   }
 
-  ui_ptr->descr_ptr = zynjacku_gtk2gui_get_descriptor(descr_func, ui_ptr->uri);
+  uri_string = slv2_value_as_uri(ui_ptr->uri);
+
+  LOG_DEBUG("%s", uri_string);
+
+  ui_ptr->descr_ptr = zynjacku_gtk2gui_get_descriptor(descr_func, uri_string);
   if (ui_ptr->descr_ptr == NULL)
   {
     LOG_WARNING("LV2 gtk2gui descriptor not found.");
@@ -343,10 +340,6 @@ zynjacku_gtk2gui_ui_init(
 fail_dlclose:
   dlclose(ui_ptr->module);
 
-fail_free_uri:
-  free(ui_ptr->uri);
-
-fail:
   return FALSE;
 }
 
@@ -356,8 +349,6 @@ zynjacku_gtk2gui_ui_uninit(
 {
   dlclose(ui_ptr->module);
   free(ui_ptr->bundle_path);
-  free(ui_ptr->quoted_uri);
-  free(ui_ptr->uri);
 }
 
 zynjacku_gtk2gui_handle
@@ -370,7 +361,6 @@ zynjacku_gtk2gui_init(
   SLV2Value value;
   unsigned int index;
   unsigned int count;
-  const char * uri;
   struct zynjacku_gtk2gui * gtk2gui_ptr;
   unsigned int ports_count;
   struct list_head * node_ptr;
@@ -378,7 +368,7 @@ zynjacku_gtk2gui_init(
 
   LOG_DEBUG("Before slv2_plugin_get_value(plugin,%s)", LV2GTK2GUI_URI);
 
-  uris = slv2_plugin_get_value(plugin, LV2GTK2GUI_URI);
+  uris = slv2_plugin_get_value(plugin, SLV2_URI, LV2GTK2GUI_URI);
 
   LOG_DEBUG("After slv2_plugin_get_value(plugin,%s)", LV2GTK2GUI_URI);
 
@@ -414,13 +404,9 @@ zynjacku_gtk2gui_init(
       continue;
     }
 
-    uri = slv2_value_as_uri(value);
-
-    LOG_DEBUG("%s", uri);
-
     gtk2gui_ptr->ui_array[index].gtk2gui_ptr = gtk2gui_ptr;
 
-    if (!zynjacku_gtk2gui_ui_init(gtk2gui_ptr->ui_array + index, plugin, uri))
+    if (!zynjacku_gtk2gui_ui_init(gtk2gui_ptr->ui_array + index, plugin, value))
     {
       goto fail_free_array;
     }
@@ -521,9 +507,6 @@ zynjacku_gtk2gui_uninit(
     {
       zynjacku_gtk2gui_ui_destroy(gtk2gui_ptr->ui_array + index);
     }
-
-    free(gtk2gui_ptr->ui_array[index].quoted_uri);
-    free(gtk2gui_ptr->ui_array[index].uri);
   }
 
   free(gtk2gui_ptr->ui_array);
@@ -581,7 +564,7 @@ zynjacku_gtk2gui_ui_on(
 
     gtk2gui_ptr->ui_array[index].ui = gtk2gui_ptr->ui_array[index].descr_ptr->instantiate(
       gtk2gui_ptr->ui_array[index].descr_ptr,
-      gtk2gui_ptr->ui_array[index].uri,
+      slv2_value_as_uri(gtk2gui_ptr->ui_array[index].uri),
       gtk2gui_ptr->ui_array[index].bundle_path,
       zynjacku_gtk2gui_control, 
       gtk2gui_ptr,
