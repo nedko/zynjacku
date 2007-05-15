@@ -72,6 +72,17 @@ AM_CHECK_PYTHON_HEADERS(,[AC_MSG_ERROR(Could not find Python headers)])
 #AS_AC_EXPAND(PYTHONDIR, $pythondir)
 #AC_SUBST(PYTHONDIR)
 
+AC_ARG_ENABLE(pymod-checks, [AS_HELP_STRING(--disable-pymod-checks, [Force disable checks for Python modules required at run time])], [ disable_pymod_checks="yes" ], [ disable_pymod_checks="no" ])
+
+if test "$disable_pymod_checks" != "yes"
+then
+  AM_CHECK_PYMOD(phat,,,[AC_MSG_ERROR(Could not find PyPHAT)])
+  # We cannot check for pyphat version, check phat version instead
+  PKG_CHECK_MODULES(PHAT, phat >= 0.4.1)
+else
+  AC_MSG_WARN([Checks for python modules required runtime have been force disabled])
+fi
+
 # LASH
 have_lash="unknown"
 AC_ARG_ENABLE(lash, [AS_HELP_STRING(--disable-lash, [Force disable LASH support [default=no]])], [ have_lash="no" ])
