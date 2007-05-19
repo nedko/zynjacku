@@ -60,7 +60,7 @@ struct zynjacku_gtk2gui_ui
   LV2UI_Handle ui;
   GtkWidget * widget_ptr;
   GtkWidget * window_ptr;
-  BOOL resizable;
+  bool resizable;
 };
 
 struct zynjacku_gtk2gui
@@ -127,7 +127,7 @@ zynjacku_get_bundle_path(
   return bundle_path;
 }
 
-BOOL
+bool
 zynjacku_gtk2gui_process_feature(
   struct zynjacku_gtk2gui_ui * ui_ptr,
   const char * feature)
@@ -135,12 +135,12 @@ zynjacku_gtk2gui_process_feature(
   if (strcmp(feature, LV2GTK2GUI_FIXEDSIZE_URI) == 0 ||
       strcmp(feature, LV2GTK2GUI_NOUSERRESIZE_URI) == 0)
   {
-    ui_ptr->resizable = FALSE;
-    return TRUE;
+    ui_ptr->resizable = false;
+    return true;
   }
 
   LOG_DEBUG("Unknown feature %s", feature);
-  return FALSE;
+  return false;
 }
 
 void *
@@ -297,7 +297,7 @@ loop:
   goto loop;
 }
 
-gboolean
+bool
 zynjacku_gtk2gui_ui_init(
   struct zynjacku_gtk2gui_ui * ui_ptr,
   SLV2Plugin plugin,
@@ -306,7 +306,7 @@ zynjacku_gtk2gui_ui_init(
   LV2UI_DescriptorFunction descr_func;
   const char * uri_string;
 
-  ui_ptr->resizable = TRUE;
+  ui_ptr->resizable = true;
 
   ui_ptr->uri = uri;
 
@@ -336,12 +336,12 @@ zynjacku_gtk2gui_ui_init(
 
   LOG_DEBUG("LV2 gtk2gui descriptor found.");
 
-  return TRUE;
+  return true;
 
 fail_dlclose:
   dlclose(ui_ptr->module);
 
-  return FALSE;
+  return false;
 }
 
 void

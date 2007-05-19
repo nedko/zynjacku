@@ -153,7 +153,8 @@ zynjacku_engine_start_jack(
   ZynjackuEngine * obj_ptr,
   const char * client_name)
 {
-  BOOL ret;
+  gboolean ret;
+  int iret;
   struct zynjacku_engine * engine_ptr;
 
   LOG_DEBUG("zynjacku_engine_start_jack() called.");
@@ -178,8 +179,8 @@ zynjacku_engine_start_jack(
     goto fail;
   }
 
-  ret = jack_set_process_callback(engine_ptr->jack_client, &jack_process_cb, engine_ptr);
-  if (ret != 0)
+  iret = jack_set_process_callback(engine_ptr->jack_client, &jack_process_cb, engine_ptr);
+  if (iret != 0)
   {
     LOG_ERROR("jack_set_process_callback() failed.");
     ret = FALSE;

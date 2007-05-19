@@ -1220,7 +1220,7 @@ dynparam_parameter_boolean_appeared(
   void * group_ui_context,
   const char * parameter_name,
   const struct lv2dynparam_hints * hints_ptr,
-  BOOL value,
+  bool value,
   void ** parameter_ui_context)
 {
   GObject * ret_obj_ptr;
