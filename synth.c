@@ -1010,11 +1010,11 @@ zynjacku_synth_construct(
   if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
       synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
   {
-    sprintf(port_name + size_id + size_name, " L");
+    strcpy(port_name + size_id + size_name, " L");
     synth_ptr->audio_out_left_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     list_add_tail(&synth_ptr->audio_out_left_port.port_type_siblings, &engine_ptr->audio_ports);
 
-    sprintf(port_name + size_id + size_name, " R");
+    strcpy(port_name + size_id + size_name, " R");
     synth_ptr->audio_out_right_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     list_add_tail(&synth_ptr->audio_out_right_port.port_type_siblings, &engine_ptr->audio_ports);
   }
@@ -1081,6 +1081,9 @@ zynjacku_synth_destruct(
   g_object_unref(synth_ptr->engine_object_ptr);
 
   synth_ptr->instance = NULL;
+
+  free(synth_ptr->id);
+  synth_ptr->id = NULL;
 }
 
 void
