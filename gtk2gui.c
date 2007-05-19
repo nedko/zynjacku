@@ -71,6 +71,7 @@ struct zynjacku_gtk2gui
   unsigned int ports_count;
   struct zynjacku_synth_port ** ports;
   void * context_ptr;
+  const char * synth_id;
 };
 
 char *
@@ -355,6 +356,7 @@ zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
   void * context_ptr,
   SLV2Plugin plugin,
+  const char * synth_id,
   const struct list_head * parameter_ports_ptr)
 {
   SLV2Values uris;
@@ -445,6 +447,7 @@ zynjacku_gtk2gui_init(
 
   gtk2gui_ptr->ports_count = ports_count;
   gtk2gui_ptr->context_ptr = context_ptr;
+  gtk2gui_ptr->synth_id = synth_id;
 
   return (zynjacku_gtk2gui_handle)gtk2gui_ptr;
 
@@ -575,6 +578,8 @@ zynjacku_gtk2gui_ui_on(
     LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
 
     gtk2gui_ptr->ui_array[index].window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    gtk_window_set_title(GTK_WINDOW(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->synth_id);
 
     gtk_window_set_resizable(GTK_WINDOW(gtk2gui_ptr->ui_array[index].window_ptr), gtk2gui_ptr->ui_array[index].resizable);
 

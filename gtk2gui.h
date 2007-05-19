@@ -30,6 +30,7 @@ zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_init(
   void * context_ptr,
   SLV2Plugin plugin,
+  const char * synth_id,
   const struct list_head * parameter_ports_ptr);
 
 void

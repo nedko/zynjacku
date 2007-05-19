@@ -1038,7 +1038,7 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_obj_ptr, synth_ptr->plugin, &synth_ptr->parameter_ports);
+  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_obj_ptr, synth_ptr->plugin, synth_ptr->id, &synth_ptr->parameter_ports);
 
   LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
 
