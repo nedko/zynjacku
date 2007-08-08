@@ -716,13 +716,17 @@ create_port(
   struct zynjacku_synth * plugin_ptr,
   uint32_t port_index)
 {
-  SLV2PortClass class;
+  SLV2PortDirection direction;
+  SLV2PortDataType type;
   char * symbol;
   struct zynjacku_synth_port * port_ptr;
   gboolean ret;
 
-  /* Get the 'class' of the port (control input, audio output, etc) */
-  class = slv2_port_get_class(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+  /* Get the direction of the port (input, output, etc) */
+  direction = slv2_port_get_direction(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+
+  /* Get the type of the port (control, audio, midi, osc, etc) */
+  type = slv2_port_get_data_type(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
 
   /* Get the port symbol (label) for console printing */
   symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
@@ -732,78 +736,102 @@ create_port(
     return FALSE;
   }
 
-  if (class == SLV2_CONTROL_INPUT)
+  if (type == SLV2_PORT_TYPE_CONTROL)
   {
-    port_ptr = malloc(sizeof(struct zynjacku_synth_port));
-    if (port_ptr == NULL)
+    if (direction == SLV2_PORT_DIRECTION_INPUT)
     {
-      LOG_ERROR("malloc() failed.");
-      goto fail;
-    }
+      port_ptr = malloc(sizeof(struct zynjacku_synth_port));
+      if (port_ptr == NULL)
+      {
+        LOG_ERROR("malloc() failed.");
+        goto fail;
+      }
 
-    port_ptr->type = PORT_TYPE_PARAMETER;
-    port_ptr->index = port_index;
-    port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-    port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-    port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-    slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
-    LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
-    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
-  }
-  else if (class == SLV2_AUDIO_OUTPUT)
-  {
-    if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &plugin_ptr->audio_out_left_port;
+      port_ptr->type = PORT_TYPE_PARAMETER;
+      port_ptr->index = port_index;
+      port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+      port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+      port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
+      slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
+      LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
+      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
     }
-    else if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+    else if (direction == SLV2_PORT_DIRECTION_OUTPUT)
     {
-      port_ptr = &plugin_ptr->audio_out_right_port;
+      LOG_ERROR("control rate float output ports are not supported.");
+      goto fail;
     }
     else
     {
-      LOG_ERROR("Maximum two audio output ports are supported.");
+      LOG_ERROR("control rate float ports with unknown direction are not supported.");
       goto fail;
     }
-
-    port_ptr->type = PORT_TYPE_AUDIO;
-    port_ptr->index = port_index;
   }
-  else if (class == SLV2_AUDIO_INPUT)
+  else if (type == SLV2_PORT_TYPE_AUDIO)
   {
-    LOG_ERROR("audio input ports are not supported.");
-    goto fail;
-  }
-  else if (class == SLV2_CONTROL_OUTPUT)
-  {
-    LOG_ERROR("control rate float output ports are not supported.");
-    goto fail;
-  }
-  else if (class == SLV2_MIDI_INPUT)
-  {
-    if (plugin_ptr->midi_in_port.type == PORT_TYPE_INVALID)
+    if (direction == SLV2_PORT_DIRECTION_OUTPUT)
     {
-      port_ptr = &plugin_ptr->midi_in_port;
+      if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
+      {
+        port_ptr = &plugin_ptr->audio_out_left_port;
+      }
+      else if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+      {
+        port_ptr = &plugin_ptr->audio_out_right_port;
+      }
+      else
+      {
+        LOG_ERROR("Maximum two audio output ports are supported.");
+        goto fail;
+      }
+
+      port_ptr->type = PORT_TYPE_AUDIO;
+      port_ptr->index = port_index;
+    }
+    else if (direction == SLV2_PORT_DIRECTION_INPUT)
+    {
+      LOG_ERROR("audio input ports are not supported.");
+      goto fail;
     }
     else
     {
-      LOG_ERROR("maximum one midi input port is supported.");
+      LOG_ERROR("audio ports of unknown direction are not supported.");
       goto fail;
     }
-
-    port_ptr->type = PORT_TYPE_MIDI;
-    port_ptr->index = port_index;
-    slv2_instance_connect_port(plugin_ptr->instance, port_index, &engine_ptr->lv2_midi_buffer);
-    list_add_tail(&port_ptr->port_type_siblings, &engine_ptr->midi_ports);
   }
-  else if (class == SLV2_MIDI_OUTPUT)
+  else if (type == SLV2_PORT_TYPE_MIDI)
   {
-    LOG_ERROR("midi output ports are not supported.");
-    goto fail;
+    if (direction == SLV2_PORT_DIRECTION_INPUT)
+    {
+      if (plugin_ptr->midi_in_port.type == PORT_TYPE_INVALID)
+      {
+        port_ptr = &plugin_ptr->midi_in_port;
+      }
+      else
+      {
+        LOG_ERROR("maximum one midi input port is supported.");
+        goto fail;
+      }
+
+      port_ptr->type = PORT_TYPE_MIDI;
+      port_ptr->index = port_index;
+      slv2_instance_connect_port(plugin_ptr->instance, port_index, &engine_ptr->lv2_midi_buffer);
+      list_add_tail(&port_ptr->port_type_siblings, &engine_ptr->midi_ports);
+    }
+    else if (direction == SLV2_PORT_DIRECTION_OUTPUT)
+    {
+      LOG_ERROR("midi output ports are not supported.");
+      goto fail;
+    }
+    else
+    {
+      LOG_ERROR("midi ports of unknown direction are not supported.");
+      goto fail;
+    }
   }
   else
   {
-    LOG_ERROR("unrecognized port.");
+    LOG_ERROR("unrecognized port data type.");
     goto fail;
   }
 
