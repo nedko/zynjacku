@@ -736,7 +736,7 @@ create_port(
     return FALSE;
   }
 
-  if (type == SLV2_PORT_TYPE_CONTROL)
+  if (type == SLV2_PORT_DATA_TYPE_CONTROL)
   {
     if (direction == SLV2_PORT_DIRECTION_INPUT)
     {
@@ -767,7 +767,7 @@ create_port(
       goto fail;
     }
   }
-  else if (type == SLV2_PORT_TYPE_AUDIO)
+  else if (type == SLV2_PORT_DATA_TYPE_AUDIO)
   {
     if (direction == SLV2_PORT_DIRECTION_OUTPUT)
     {
@@ -799,7 +799,7 @@ create_port(
       goto fail;
     }
   }
-  else if (type == SLV2_PORT_TYPE_MIDI)
+  else if (type == SLV2_PORT_DATA_TYPE_MIDI)
   {
     if (direction == SLV2_PORT_DIRECTION_INPUT)
     {

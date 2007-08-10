@@ -249,7 +249,7 @@ zynjacku_plugin_repo_check_plugin(
     /* Get the type of the port (control, audio, midi, osc, etc) */
     type = slv2_port_get_data_type(plugin, slv2_plugin_get_port_by_index(plugin, port_index));
 
-    if (type == SLV2_PORT_TYPE_CONTROL)
+    if (type == SLV2_PORT_DATA_TYPE_CONTROL)
     {
       if (direction != SLV2_PORT_DIRECTION_INPUT)
       {
@@ -257,7 +257,7 @@ zynjacku_plugin_repo_check_plugin(
         goto free;
       }
     }
-    else if (type == SLV2_PORT_TYPE_AUDIO)
+    else if (type == SLV2_PORT_DATA_TYPE_AUDIO)
     {
       if (direction != SLV2_PORT_DIRECTION_OUTPUT)
       {
@@ -273,7 +273,7 @@ zynjacku_plugin_repo_check_plugin(
 
       audio_out_ports_count++;
     }
-    else if (type == SLV2_PORT_TYPE_MIDI)
+    else if (type == SLV2_PORT_DATA_TYPE_MIDI)
     {
       if (direction != SLV2_PORT_DIRECTION_INPUT)
       {
