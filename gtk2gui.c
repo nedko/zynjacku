@@ -560,7 +560,7 @@ zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
   unsigned int index)
 {
-  LV2_Host_Feature * features[1];
+  LV2_Feature * features[1];
   struct zynjacku_synth_port * port_ptr;
   unsigned int port_index;
 
@@ -582,7 +582,7 @@ zynjacku_gtk2gui_ui_on(
       zynjacku_gtk2gui_callback_program_change,
       zynjacku_gtk2gui_callback_program_save,
       gtk2gui_ptr,
-      (const LV2_Host_Feature * const *)features);
+      (const LV2_Feature * const *)features);
 
     LOG_DEBUG("Instantiation done.");
 
