@@ -25,6 +25,7 @@
 #include <string.h>
 #include <slv2/slv2.h>
 #include <glib-object.h>
+#include <lv2dynparam/lv2dynparam.h>
 
 #include "list.h"
 #include "plugin_repo.h"
@@ -232,10 +233,45 @@ zynjacku_plugin_repo_check_plugin(
   char * name;
   uint32_t ports_count;
   uint32_t port_index;
+  SLV2Values slv2_values;
+  SLV2Value slv2_value;
+  unsigned int slv2_values_count;
+  unsigned int value_index;
+  const char * uri;
 
   ret = FALSE;
 
   name = slv2_plugin_get_name(plugin);
+
+  /* check required features */
+
+  slv2_values = slv2_plugin_get_required_features(plugin);
+
+  slv2_values_count = slv2_values_size(slv2_values);
+  LOG_DEBUG("Plugin \"%s\" has %u required features", name, slv2_values_count);
+  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
+  {
+    slv2_value = slv2_values_get_at(slv2_values, value_index);
+    if (!slv2_value_is_uri(slv2_value))
+    {
+      LOG_DEBUG("Plugin \"%s\" requires feature that is not URI", name);
+      slv2_values_free(slv2_values);
+      goto free;
+    }
+
+    uri = slv2_value_as_uri(slv2_value);
+    LOG_DEBUG("%s", uri);
+    if (strcmp(LV2DYNPARAM_URI, uri) != 0)
+    {
+      LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, uri);
+      slv2_values_free(slv2_values);
+      goto free;
+    }
+  }
+
+  slv2_values_free(slv2_values);
+
+  /* check port configuration */
 
   ports_count = slv2_plugin_get_num_ports(plugin);
   audio_out_ports_count = 0;
