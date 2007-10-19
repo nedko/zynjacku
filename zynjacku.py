@@ -644,7 +644,15 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
     def __init__(self, window, parent_group, name, selected_value_index, valid_values, context):
         SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
 
-        widget = gtk.CheckButton(name)
+        label = gtk.Label(name)
+
+        self.box = gtk.VBox()
+
+        self.label = gtk.Label(name)
+        align = gtk.Alignment(0, 0)
+        align.set_padding(0, 0, 10, 10)
+        align.add(self.label)
+        self.box.pack_start(align, True, True)
 
         self.liststore = gtk.ListStore(gobject.TYPE_STRING)
         self.combobox = gtk.ComboBox(self.liststore)
@@ -661,12 +669,14 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
 
         self.combobox.connect("changed", self.on_changed)
 
-        self.align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        self.align.set_padding(10, 10, 10, 10)
-        self.align.add(self.combobox)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(0, 10, 10, 10)
+        align.add(self.combobox)
+
+        self.box.pack_start(align, False, False)
 
     def get_top_widget(self):
-        return self.align
+        return self.box
 
     def on_changed(self, adjustment):
         #print "Enum changed. \"%s\" set to %u" % (self.parameter_name, adjustment.get_active())
