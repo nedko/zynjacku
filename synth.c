@@ -944,6 +944,9 @@ zynjacku_synth_construct(
     {
       dynparams_supported = TRUE;
     }
+    else if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, uri) == 0)
+    {
+    }
     else
     {
       LOG_ERROR("Plugin requires unsupported feature \"%s\"", uri);

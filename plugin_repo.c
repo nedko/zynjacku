@@ -26,6 +26,7 @@
 #include <slv2/slv2.h>
 #include <glib-object.h>
 #include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/lv2_rtmempool.h>
 
 #include "list.h"
 #include "plugin_repo.h"
@@ -260,13 +261,22 @@ zynjacku_plugin_repo_check_plugin(
     }
 
     uri = slv2_value_as_uri(slv2_value);
+
     LOG_DEBUG("%s", uri);
-    if (strcmp(LV2DYNPARAM_URI, uri) != 0)
+
+    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
     {
-      LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, uri);
-      slv2_values_free(slv2_values);
-      goto free;
+      continue;
     }
+
+    if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, uri) == 0)
+    {
+      continue;
+    }
+
+    LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, uri);
+    slv2_values_free(slv2_values);
+    goto free;
   }
 
   slv2_values_free(slv2_values);
