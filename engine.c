@@ -46,6 +46,8 @@
 
 #include "jack_compat.c"
 
+#include "rtmempool.h"
+
 int
 jack_process_cb(
   jack_nframes_t nframes,
@@ -129,6 +131,8 @@ zynjacku_engine_init(
   engine_ptr->dispose_has_run = FALSE;
 
   engine_ptr->jack_client = NULL;
+
+  rtmempool_allocator_init(&engine_ptr->mempool_allocator);
 }
 
 GType zynjacku_engine_get_type()

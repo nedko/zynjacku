@@ -82,6 +82,7 @@ struct zynjacku_engine
   jack_port_t * jack_midi_in;
   LV2_MIDI lv2_midi_buffer;
   gboolean midi_activity;
+  struct lv2_rtsafe_memory_pool_provider mempool_allocator;
 };
 
 SLV2Plugin

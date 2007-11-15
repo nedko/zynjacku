@@ -60,6 +60,8 @@ zynjacku_c_la_SOURCES += hints.h
 zynjacku_c_la_SOURCES += list.h
 zynjacku_c_la_SOURCES += lv2-gtk2gui.h
 zynjacku_c_la_SOURCES += lv2-miditype.h
+zynjacku_c_la_SOURCES += rtmempool.c
+zynjacku_c_la_SOURCES += rtmempool.h
 
 #nodist_zynjacku_la_SOURCES = 
 

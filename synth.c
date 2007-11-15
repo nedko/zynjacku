@@ -993,7 +993,7 @@ zynjacku_synth_construct(
     if (!lv2dynparam_host_attach(
           slv2_instance_get_descriptor(synth_ptr->instance),
           slv2_instance_get_handle(synth_ptr->instance),
-          NULL,
+          &engine_ptr->mempool_allocator,
           synth_obj_ptr,
           &synth_ptr->dynparams))
     {
