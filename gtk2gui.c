@@ -27,6 +27,7 @@
 #include <dlfcn.h>
 #include <lv2dynparam/lv2.h>
 #include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 #include <gtk/gtk.h>
 #include <jack/jack.h>

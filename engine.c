@@ -28,6 +28,7 @@
 #include <jack/midiport.h>
 #include <glib-object.h>
 #include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 
 #include "config.h"

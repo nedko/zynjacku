@@ -34,6 +34,7 @@
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 #include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 
 #include "synth.h"
@@ -992,6 +993,7 @@ zynjacku_synth_construct(
     if (!lv2dynparam_host_attach(
           slv2_instance_get_descriptor(synth_ptr->instance),
           slv2_instance_get_handle(synth_ptr->instance),
+          NULL,
           synth_obj_ptr,
           &synth_ptr->dynparams))
     {
