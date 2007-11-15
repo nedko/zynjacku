@@ -83,6 +83,8 @@ struct zynjacku_engine
   LV2_MIDI lv2_midi_buffer;
   gboolean midi_activity;
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
+  LV2_Feature host_feature_rtmempool;
+  const LV2_Feature * host_features[2];
 };
 
 SLV2Plugin

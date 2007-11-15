@@ -133,6 +133,12 @@ zynjacku_engine_init(
   engine_ptr->jack_client = NULL;
 
   rtmempool_allocator_init(&engine_ptr->mempool_allocator);
+
+  engine_ptr->host_feature_rtmempool.URI = LV2_RTSAFE_MEMORY_POOL_URI;
+  engine_ptr->host_feature_rtmempool.data = &engine_ptr->mempool_allocator;
+
+  engine_ptr->host_features[0] = &engine_ptr->host_feature_rtmempool;
+  engine_ptr->host_features[1] = NULL;
 }
 
 GType zynjacku_engine_get_type()

@@ -981,7 +981,7 @@ zynjacku_synth_construct(
   sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
 
   /* Instantiate the plugin */
-  synth_ptr->instance = slv2_plugin_instantiate(synth_ptr->plugin, sample_rate, NULL);
+  synth_ptr->instance = slv2_plugin_instantiate(synth_ptr->plugin, sample_rate, engine_ptr->host_features);
   if (synth_ptr->instance == NULL)
   {
     LOG_ERROR("Failed to instantiate plugin.");
