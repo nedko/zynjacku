@@ -530,32 +530,6 @@ zynjacku_gtk2gui_callback_write(
   gtk2gui_ptr->ports[port_index]->data.parameter.value = *(float *)buffer;
 }
 
-/* LV2UI_Command_Function */
-void
-zynjacku_gtk2gui_callback_command(
-  LV2UI_Controller gtk2gui_handle,
-  uint32_t argc,
-  const char* const* argv)
-{
-}
-
-/* LV2UI_Program_Change_Function */
-void
-zynjacku_gtk2gui_callback_program_change(
-  LV2UI_Controller controller,
-  unsigned char program)
-{
-}
-
-/* LV2UI_Program_Save_Function */
-void
-zynjacku_gtk2gui_callback_program_save(
-  LV2UI_Controller controller,
-  unsigned char program,
-  const char *name)
-{
-}
-
 void
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
@@ -579,9 +553,6 @@ zynjacku_gtk2gui_ui_on(
       gtk2gui_ptr->plugin,
       gtk2gui_ptr->ui_array[index].factory,
       zynjacku_gtk2gui_callback_write,
-      zynjacku_gtk2gui_callback_command,
-      zynjacku_gtk2gui_callback_program_change,
-      zynjacku_gtk2gui_callback_program_save,
       gtk2gui_ptr,
       (const LV2_Feature * const *)features);
 
