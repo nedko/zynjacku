@@ -553,8 +553,6 @@ zynjacku_synth_generic_lv2_ui_on(
     zynjacku_synth_context_to_string(NULL),
     &synth_ptr->root_group_ui_context);
 
-  g_object_unref(hints_obj_ptr);
-
   list_for_each(node_ptr, &synth_ptr->parameter_ports)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
@@ -577,6 +575,8 @@ zynjacku_synth_generic_lv2_ui_on(
 
     free(symbol);
   }
+
+  g_object_unref(hints_obj_ptr);
 }
 
 void
