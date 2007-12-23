@@ -41,7 +41,7 @@
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
-#define LV2GTK2GUI_URI "http://ll-plugins.nongnu.org/lv2/ext/gui/dev/1#GtkGUI"
+#define LV2GTK2GUI_URI "http://ll-plugins.nongnu.org/lv2/ext/gui#GtkGUI"
 //#define LV2GTK2GUI_BINARY_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary"
 //#define LV2GTK2GUI_OPTIONAL_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature"
 //#define LV2GTK2GUI_REQUIRED_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature"
@@ -407,6 +407,11 @@ zynjacku_gtk2gui_init(
     gtk2gui_ptr->count++;
   }
 
+  if (gtk2gui_ptr->count == 0)
+  {
+    goto fail_free_array;
+  }
+
   gtk2gui_ptr->plugin = plugin;
 
   ports_count = 0;
@@ -495,6 +500,7 @@ unsigned int
 zynjacku_gtk2gui_get_count(
   zynjacku_gtk2gui_handle gtk2gui_handle)
 {
+  LOG_ERROR("count is %u", gtk2gui_ptr->count);
   return gtk2gui_ptr->count;
 }
 
@@ -539,9 +545,15 @@ zynjacku_gtk2gui_ui_on(
   struct zynjacku_synth_port * port_ptr;
   unsigned int port_index;
 
-  LOG_DEBUG("zynjacku_gtk2gui_ui_on() called.");
+  LOG_DEBUG("zynjacku_gtk2gui_ui_on(%u) called.", index);
 
   assert(index < gtk2gui_ptr->count);
+
+  if (gtk2gui_ptr->ui_array[index].instance != NULL)
+  {
+    slv2_ui_instance_free(gtk2gui_ptr->ui_array[index].instance);
+    gtk2gui_ptr->ui_array[index].instance = NULL;
+  }
 
   if (gtk2gui_ptr->ui_array[index].instance == NULL)
   {
