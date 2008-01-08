@@ -31,12 +31,28 @@ sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
 import zynjacku_c as zynjacku
 sys.path = old_path
 
-import midi_led
-
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
               "onesubgroup": "http://home.gna.org/zynjacku/hints#onesubgroup",
               }
+
+class midi_led(gtk.EventBox):
+    def __init__(self):
+        gtk.EventBox.__init__(self)
+        self.label = gtk.Label()
+        #attrs = pango.AttrList()
+        #font_attr =  pango.AttrFamily("monospace")
+        #attrs.insert(font_attr)
+        #self.label.set_attributes(attrs)
+        self.add(self.label)
+
+    def set(self, active):
+        if active:
+            self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.Color(0, int(65535 * 0.5), 0))
+        else:
+            self.modify_bg(gtk.STATE_NORMAL, self.label.style.bg[gtk.STATE_NORMAL])
+
+        self.label.set_text(" MIDI ")
 
 # Synth window abstraction
 class SynthWindow(gobject.GObject):
@@ -753,7 +769,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.statusbar = self.glade_xml.get_widget("statusbar")
 
         self.hbox_menubar = glade_xml.get_widget("hbox_menubar")
-        self.midi_led = midi_led.widget()
+        self.midi_led = midi_led()
         self.midi_led_frame = gtk.Frame()
         self.midi_led_frame.set_shadow_type(gtk.SHADOW_OUT)
         self.midi_led_frame.add(self.midi_led);

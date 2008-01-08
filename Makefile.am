@@ -84,8 +84,8 @@ zynjacku_wrap.c: zynjacku.defs zynjacku.override
 	--override zynjacku.override \
 	zynjacku.defs > $@
 
-CLEANFILES = zynjacku_wrap.c zynjacku.pyc midi_led.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py midi_led.py
+CLEANFILES = zynjacku_wrap.c zynjacku.pyc zynjacku.defs
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py
 
 bin_SCRIPTS = zynjacku.py midi_led.py
 
