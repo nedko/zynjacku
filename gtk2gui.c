@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <slv2/slv2.h>
 #include <dlfcn.h>
-#include <lv2dynparam/lv2.h>
+#include <lv2.h>
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>

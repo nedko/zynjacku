@@ -22,7 +22,7 @@
  *****************************************************************************/
 
 #include <glib-object.h>
-#include <lv2dynparam/lv2.h>
+#include <lv2.h>
 #include <lv2dynparam/lv2dynparam.h>
 
 #include "hints.h"
