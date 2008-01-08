@@ -17,7 +17,12 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -Werror -g
+zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
+
+if DEV_VERSION
+zynjacku_c_CFLAGS += -Werror
+endif
+
 zynjacku_c_CFLAGS += @GTK_CFLAGS@
 zynjacku_c_CFLAGS += @PYGTK_CFLAGS@
 zynjacku_c_CFLAGS += @SLV2_CFLAGS@
@@ -58,7 +63,6 @@ zynjacku_c_la_SOURCES += gtk2gui.h
 zynjacku_c_la_SOURCES += hints.c
 zynjacku_c_la_SOURCES += hints.h
 zynjacku_c_la_SOURCES += list.h
-zynjacku_c_la_SOURCES += lv2-gtk2gui.h
 zynjacku_c_la_SOURCES += lv2-miditype.h
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
