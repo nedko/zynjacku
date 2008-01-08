@@ -87,7 +87,7 @@ zynjacku_wrap.c: zynjacku.defs zynjacku.override
 CLEANFILES = zynjacku_wrap.c zynjacku.pyc zynjacku.defs
 EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py
 
-bin_SCRIPTS = zynjacku.py midi_led.py
+bin_SCRIPTS = zynjacku.py
 
 zynjackudir = $(pkgdatadir)
 dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
