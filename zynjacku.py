@@ -87,7 +87,7 @@ class SynthWindowCustom(SynthWindow):
 
     def show(self):
         '''Show synth window'''
-        self.synth.ui_on()
+        return self.synth.ui_on()
 
     def hide(self):
         '''Hide synth window'''
@@ -878,8 +878,13 @@ class ZynjackuHostMulti(ZynjackuHost):
             if not model[path][4].ui_win:
                 if not self.create_synth_window(model[path][4], model[path]):
                     return
-            model[path][4].ui_win.show()
-            model[path][0] = True
+
+            statusbar_context_id = self.statusbar.get_context_id("loading plugin UI")
+            if model[path][4].ui_win.show():
+                self.statusbar.remove(statusbar_context_id, statusbar_id)
+                model[path][0] = True
+            else:
+                self.statusbar.push(statusbar_context_id, "Failed to construct show synth UI")
 
     def on_about(self, widget):
         about = gtk.AboutDialog()
@@ -1016,7 +1021,8 @@ class ZynjackuHostOne(ZynjackuHost):
             return
         
         test_connect_id = self.synth.connect("test", self.on_test)
-        self.synth.ui_win.show()
+        if not self.synth.ui_win.show():
+            return
         self.synth.ui_win.connect("destroy", gtk.main_quit)
 
         ZynjackuHost.run(self)

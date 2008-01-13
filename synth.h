@@ -80,7 +80,7 @@ const char *
 zynjacku_synth_get_uri(
   ZynjackuSynth * obj_ptr);
 
-void
+gboolean
 zynjacku_synth_ui_on(
   ZynjackuSynth * synth_obj_ptr);
 

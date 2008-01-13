@@ -646,7 +646,7 @@ zynjacku_synth_supports_custom_ui(
   return (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
 }
 
-void
+gboolean
 zynjacku_synth_ui_on(
   ZynjackuSynth * synth_obj_ptr)
 {
@@ -658,9 +658,10 @@ zynjacku_synth_ui_on(
 
   if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0);
+    return zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0);
   }
-  else if (synth_ptr->dynparams)
+
+  if (synth_ptr->dynparams)
   {
     lv2dynparam_host_ui_on(synth_ptr->dynparams);
   }
@@ -668,6 +669,8 @@ zynjacku_synth_ui_on(
   {
     zynjacku_synth_generic_lv2_ui_on(synth_obj_ptr);
   }
+
+  return true;
 }
 
 void

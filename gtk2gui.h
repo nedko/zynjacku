@@ -46,7 +46,7 @@ zynjacku_gtk2gui_get_name(
   zynjacku_gtk2gui_handle gtk2gui_handle,
   unsigned int index);
 
-void
+bool
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
   unsigned int index);

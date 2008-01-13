@@ -536,7 +536,7 @@ zynjacku_gtk2gui_callback_write(
   gtk2gui_ptr->ports[port_index]->data.parameter.value = *(float *)buffer;
 }
 
-void
+bool
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle gtk2gui_handle,
   unsigned int index)
@@ -570,11 +570,18 @@ zynjacku_gtk2gui_ui_on(
 
     LOG_DEBUG("Instantiation done.");
 
+    if (gtk2gui_ptr->ui_array[index].instance == NULL)
+    {
+      LOG_ERROR("plugin custom UI instantiation failed");
+      return false;
+    }
+
+    LOG_DEBUG("instance: %p", gtk2gui_ptr->ui_array[index].instance);
+
     gtk2gui_ptr->ui_array[index].widget_ptr = slv2_ui_instance_get_widget(gtk2gui_ptr->ui_array[index].instance);
     gtk2gui_ptr->ui_array[index].descr_ptr = slv2_ui_instance_get_descriptor(gtk2gui_ptr->ui_array[index].instance);
     gtk2gui_ptr->ui_array[index].instance_handle = slv2_ui_instance_get_handle(gtk2gui_ptr->ui_array[index].instance);
 
-    LOG_DEBUG("instance: %p", gtk2gui_ptr->ui_array[index].instance);
     LOG_DEBUG("widget: %p", gtk2gui_ptr->ui_array[index].widget_ptr);
     assert(GTK_IS_WIDGET(gtk2gui_ptr->ui_array[index].widget_ptr));
 
@@ -625,6 +632,8 @@ zynjacku_gtk2gui_ui_on(
 
   /* Show the widgets */
   gtk_widget_show_all(gtk2gui_ptr->ui_array[index].window_ptr);
+
+  return true;
 }
 
 void
