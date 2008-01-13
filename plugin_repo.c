@@ -348,6 +348,12 @@ zynjacku_plugin_repo_check_plugin(
     goto free;
   }
 
+  if (midi_in_ports_count == 0)
+  {
+    LOG_DEBUG("Skipping \"%s\" %s, plugin without midi input ports", name, slv2_plugin_get_uri(plugin));
+    goto free;
+  }
+
   LOG_DEBUG("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin));
 
   ret = TRUE;
