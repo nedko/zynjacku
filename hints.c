@@ -3,7 +3,7 @@
  *
  *   This file is part of zynjacku
  *
- *   Copyright (C) 2006,2007 Nedko Arnaudov <nedko@arnaudov.name>
+ *   Copyright (C) 2006,2007,2008 Nedko Arnaudov <nedko@arnaudov.name>
  *   Copyright (C) 2006 Dave Robillard <drobilla@connect.carleton.ca>
  *
  *   This program is free software; you can redistribute it and/or modify
