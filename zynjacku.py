@@ -881,7 +881,6 @@ class ZynjackuHostMulti(ZynjackuHost):
 
             statusbar_context_id = self.statusbar.get_context_id("loading plugin UI")
             if model[path][4].ui_win.show():
-                self.statusbar.remove(statusbar_context_id, statusbar_id)
                 model[path][0] = True
             else:
                 self.statusbar.push(statusbar_context_id, "Failed to construct show synth UI")
