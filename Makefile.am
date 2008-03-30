@@ -17,6 +17,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+DEFAULT_INCLUDES =
+
 zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
 
 if DEV_VERSION
@@ -50,6 +52,8 @@ zynjacku_c_la_SOURCES += engine.h
 zynjacku_c_la_SOURCES += jack_compat.c
 zynjacku_c_la_SOURCES += synth.c
 zynjacku_c_la_SOURCES += synth.h
+zynjacku_c_la_SOURCES += lv2.c
+zynjacku_c_la_SOURCES += lv2.h
 zynjacku_c_la_SOURCES += plugin_repo.c
 zynjacku_c_la_SOURCES += plugin_repo.h
 zynjacku_c_la_SOURCES += log.c
@@ -73,7 +77,7 @@ zynjacku_c_la_SOURCES += rtmempool.h
 PYGTK_DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 PYGTK_CODEGEN=`pkg-config --variable=codegendir pygtk-2.0`
 
-zynjacku.defs: engine.h synth.h plugin_repo.h enum.h hints.h
+zynjacku.defs: engine.h synth.h enum.h hints.h
 	python $(PYGTK_CODEGEN)/h2def.py $^ > $@
 
 # Generate the C wrapper from the defs and our override file

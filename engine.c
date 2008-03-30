@@ -21,9 +21,11 @@
  *
  *****************************************************************************/
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <slv2/slv2.h>
+#include <assert.h>
+#include <lv2.h>
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>
@@ -41,12 +43,20 @@
 #include "synth.h"
 #include "engine.h"
 #include "gtk2gui.h"
+#include "lv2.h"
 
 #include "zynjacku.h"
 
 #include "jack_compat.c"
 
 #include "rtmempool.h"
+#include "plugin_repo.h"
+
+#define ZYNJACKU_ENGINE_SIGNAL_TICK    0 /* plugin iterated */
+#define ZYNJACKU_ENGINE_SIGNAL_TACK    1 /* "good" plugin found */
+#define ZYNJACKU_ENGINE_SIGNALS_COUNT  2
+
+static guint g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNALS_COUNT];
 
 int
 jack_process_cb(
@@ -81,6 +91,7 @@ zynjacku_engine_dispose(GObject * obj)
   if (engine_ptr->jack_client)
   {
     zynjacku_engine_stop_jack(ZYNJACKU_ENGINE(obj));
+    zynjacku_plugin_repo_uninit();
   }
 
   /* Chain up to the parent class */
@@ -115,6 +126,38 @@ zynjacku_engine_class_init(
   G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_engine_finalize;
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_engine));
+
+  g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TICK] =
+    g_signal_new(
+      "tick",                   /* signal_name */
+      ZYNJACKU_ENGINE_TYPE,     /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      2,                        /* n_params */
+      G_TYPE_FLOAT,             /* progress 0 .. 1 */
+      G_TYPE_STRING);           /* uri of plugin being scanned */
+
+  g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TACK] =
+    g_signal_new(
+      "tack",                   /* signal_name */
+      ZYNJACKU_ENGINE_TYPE,     /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      3,                        /* n_params */
+      G_TYPE_STRING,            /* plugin name */
+      G_TYPE_STRING,            /* plugin uri */
+      G_TYPE_STRING);           /* plugin license */
+
 }
 
 static void
@@ -139,6 +182,8 @@ zynjacku_engine_init(
 
   engine_ptr->host_features[0] = &engine_ptr->host_feature_rtmempool;
   engine_ptr->host_features[1] = NULL;
+
+  zynjacku_plugin_repo_init();
 }
 
 GType zynjacku_engine_get_type()
@@ -354,8 +399,8 @@ jack_process_cb(
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
     if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
     {
-      slv2_instance_connect_port(
-        synth_ptr->instance,
+      zynjacku_lv2_connect_port(
+        synth_ptr->lv2plugin,
         synth_ptr->audio_out_left_port.index,
         jack_port_get_buffer(synth_ptr->audio_out_left_port.data.audio, nframes));
     }
@@ -363,14 +408,14 @@ jack_process_cb(
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
     if (synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
     {
-      slv2_instance_connect_port(
-        synth_ptr->instance,
+      zynjacku_lv2_connect_port(
+        synth_ptr->lv2plugin,
         synth_ptr->audio_out_right_port.index,
         jack_port_get_buffer(synth_ptr->audio_out_right_port.data.audio, nframes));
     }
 
     /* Run plugin for this cycle */
-    slv2_instance_run(synth_ptr->instance, nframes);
+    zynjacku_lv2_run(synth_ptr->lv2plugin, nframes);
   }
 
   return 0;
@@ -394,7 +439,7 @@ zynjacku_engine_activate_synth(
   list_add_tail(&synth_ptr->siblings, &engine_ptr->plugins);
 
   /* Activate plugin */
-  slv2_instance_activate(synth_ptr->instance);
+  zynjacku_lv2_activate(synth_ptr->lv2plugin);
 }
 
 void
@@ -406,7 +451,7 @@ zynjacku_engine_deactivate_synth(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  slv2_instance_deactivate(synth_ptr->instance);
+  zynjacku_lv2_deactivate(synth_ptr->lv2plugin);
 
   list_del(&synth_ptr->siblings);
 }
@@ -471,4 +516,50 @@ const gchar *
 zynjacku_get_version()
 {
   return VERSION;
+}
+
+#define engine_obj_ptr ((ZynjackuEngine *)context)
+
+void
+zynjacku_engine_tick(
+  void *context,
+  float progress,               /* 0..1 */
+  const char *message)
+{
+  g_signal_emit(
+    engine_obj_ptr,
+    g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TICK],
+    0,
+    progress,
+    message);
+}
+
+void
+zynjacku_engine_tack(
+  void *context,
+  const char *uri)
+{
+  const char * name;
+  const char * license;
+
+  name = zynjacku_plugin_repo_get_name(uri);
+  license = zynjacku_plugin_repo_get_license(uri);
+
+  g_signal_emit(
+    engine_obj_ptr,
+    g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TACK],
+    0,
+    name,
+    uri,
+    license);
+}
+
+#undef engine_obj_ptr
+
+void
+zynjacku_engine_iterate_plugins(
+  ZynjackuEngine * engine_obj_ptr,
+  gboolean force)
+{
+  zynjacku_plugin_repo_iterate(force, engine_obj_ptr, zynjacku_engine_tick, zynjacku_engine_tack);
 }

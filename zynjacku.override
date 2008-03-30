@@ -7,7 +7,6 @@ headers
 
 #include "synth.h"
 #include "engine.h"
-#include "plugin_repo.h"
 #include "enum.h"
 #include "hints.h"
 %%

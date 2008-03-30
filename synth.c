@@ -31,7 +31,7 @@
 
 #include "lv2-miditype.h"
 #include "list.h"
-#define LOG_LEVEL LOG_LEVEL_ERROR
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
@@ -42,8 +42,10 @@
 #include "enum.h"
 #include "gtk2gui.h"
 #include "hints.h"
+#include "lv2.h"
 
 #include "zynjacku.h"
+#include "plugin_repo.h"
 
 /* signals */
 #define ZYNJACKU_SYNTH_SIGNAL_TEST                0
@@ -128,7 +130,7 @@ zynjacku_synth_dispose(GObject * obj)
    * the most simple solution is to unref all members on which you own a 
    * reference.
    */
-  if (synth_ptr->instance)
+  if (synth_ptr->lv2plugin != NULL)
   {
     zynjacku_synth_destruct(ZYNJACKU_SYNTH(obj));
   }
@@ -458,8 +460,8 @@ zynjacku_synth_init(
   synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  synth_ptr->instance = NULL;
   synth_ptr->uri = NULL;
+  synth_ptr->lv2plugin = NULL;
 
   synth_ptr->root_group_ui_context = NULL;
 }
@@ -501,7 +503,7 @@ zynjacku_synth_get_name(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
-  return slv2_plugin_get_name(synth_ptr->plugin);
+  return synth_ptr->name;
 }
 
 const char *
@@ -512,7 +514,7 @@ zynjacku_synth_get_uri(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
 
-  return slv2_plugin_get_uri(synth_ptr->plugin);
+  return synth_ptr->uri;
 }
 
 void
@@ -522,7 +524,6 @@ zynjacku_synth_generic_lv2_ui_on(
   struct zynjacku_synth * synth_ptr;
   struct list_head * node_ptr;
   struct zynjacku_synth_port * port_ptr;
-  char * symbol;
   ZynjackuHints * hints_obj_ptr;
 
   LOG_DEBUG("zynjacku_synth_generic_lv2_ui_on() called.");
@@ -557,23 +558,18 @@ zynjacku_synth_generic_lv2_ui_on(
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
 
-    symbol = slv2_port_get_symbol(synth_ptr->plugin,
-			slv2_plugin_get_port_by_index(synth_ptr->plugin, port_ptr->index));
-
     g_signal_emit(
       synth_obj_ptr,
       g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
       0,
       synth_ptr->root_group_ui_context,
-      symbol,
+      port_ptr->symbol,
       hints_obj_ptr,
       port_ptr->data.parameter.value,
       port_ptr->data.parameter.min,
       port_ptr->data.parameter.max,
       zynjacku_synth_context_to_string(NULL),
       &port_ptr->ui_context);
-
-    free(symbol);
   }
 
   g_object_unref(hints_obj_ptr);
@@ -658,7 +654,7 @@ zynjacku_synth_ui_on(
 
   if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    return zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui, 0);
+    return zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui);
   }
 
   if (synth_ptr->dynparams)
@@ -685,7 +681,7 @@ zynjacku_synth_ui_off(
 
   if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_ui_off(synth_ptr->gtk2gui, 0);
+    zynjacku_gtk2gui_ui_off(synth_ptr->gtk2gui);
   }
   else if (synth_ptr->dynparams)
   {
@@ -712,141 +708,6 @@ zynjacku_gtk2gui_on_ui_destroyed(
     g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF],
     0,
     NULL);
-}
-
-gboolean
-create_port(
-  struct zynjacku_engine * engine_ptr,
-  struct zynjacku_synth * plugin_ptr,
-  uint32_t port_index)
-{
-  SLV2PortDirection direction;
-  SLV2PortDataType type;
-  char * symbol;
-  struct zynjacku_synth_port * port_ptr;
-  gboolean ret;
-
-  /* Get the direction of the port (input, output, etc) */
-  direction = slv2_port_get_direction(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-
-  /* Get the type of the port (control, audio, midi, osc, etc) */
-  type = slv2_port_get_data_type(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-
-  /* Get the port symbol (label) for console printing */
-  symbol = slv2_port_get_symbol(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-  if (symbol == NULL)
-  {
-    LOG_ERROR("slv2_port_get_symbol() failed.");
-    return FALSE;
-  }
-
-  if (type == SLV2_PORT_DATA_TYPE_CONTROL)
-  {
-    if (direction == SLV2_PORT_DIRECTION_INPUT)
-    {
-      port_ptr = malloc(sizeof(struct zynjacku_synth_port));
-      if (port_ptr == NULL)
-      {
-        LOG_ERROR("malloc() failed.");
-        goto fail;
-      }
-
-      port_ptr->type = PORT_TYPE_PARAMETER;
-      port_ptr->index = port_index;
-      port_ptr->data.parameter.value = slv2_port_get_default_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-      port_ptr->data.parameter.min = slv2_port_get_minimum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-      port_ptr->data.parameter.max = slv2_port_get_maximum_value(plugin_ptr->plugin, slv2_plugin_get_port_by_index(plugin_ptr->plugin, port_index));
-      slv2_instance_connect_port(plugin_ptr->instance, port_index, &port_ptr->data.parameter);
-      LOG_INFO("Set %s to %f", symbol, port_ptr->data.parameter);
-      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
-    }
-    else if (direction == SLV2_PORT_DIRECTION_OUTPUT)
-    {
-      LOG_ERROR("control rate float output ports are not supported.");
-      goto fail;
-    }
-    else
-    {
-      LOG_ERROR("control rate float ports with unknown direction are not supported.");
-      goto fail;
-    }
-  }
-  else if (type == SLV2_PORT_DATA_TYPE_AUDIO)
-  {
-    if (direction == SLV2_PORT_DIRECTION_OUTPUT)
-    {
-      if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->audio_out_left_port;
-      }
-      else if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->audio_out_right_port;
-      }
-      else
-      {
-        LOG_ERROR("Maximum two audio output ports are supported.");
-        goto fail;
-      }
-
-      port_ptr->type = PORT_TYPE_AUDIO;
-      port_ptr->index = port_index;
-    }
-    else if (direction == SLV2_PORT_DIRECTION_INPUT)
-    {
-      LOG_ERROR("audio input ports are not supported.");
-      goto fail;
-    }
-    else
-    {
-      LOG_ERROR("audio ports of unknown direction are not supported.");
-      goto fail;
-    }
-  }
-  else if (type == SLV2_PORT_DATA_TYPE_MIDI)
-  {
-    if (direction == SLV2_PORT_DIRECTION_INPUT)
-    {
-      if (plugin_ptr->midi_in_port.type == PORT_TYPE_INVALID)
-      {
-        port_ptr = &plugin_ptr->midi_in_port;
-      }
-      else
-      {
-        LOG_ERROR("maximum one midi input port is supported.");
-        goto fail;
-      }
-
-      port_ptr->type = PORT_TYPE_MIDI;
-      port_ptr->index = port_index;
-      slv2_instance_connect_port(plugin_ptr->instance, port_index, &engine_ptr->lv2_midi_buffer);
-      list_add_tail(&port_ptr->port_type_siblings, &engine_ptr->midi_ports);
-    }
-    else if (direction == SLV2_PORT_DIRECTION_OUTPUT)
-    {
-      LOG_ERROR("midi output ports are not supported.");
-      goto fail;
-    }
-    else
-    {
-      LOG_ERROR("midi ports of unknown direction are not supported.");
-      goto fail;
-    }
-  }
-  else
-  {
-    LOG_ERROR("unrecognized port data type.");
-    goto fail;
-  }
-
-  ret = TRUE;
-  goto exit;
-fail:
-  ret = FALSE;
-exit:
-  free(symbol);
-
-  return ret;
 }
 
 void
@@ -892,22 +753,14 @@ zynjacku_synth_construct(
   ZynjackuSynth * synth_obj_ptr,
   GObject * engine_object_ptr)
 {
-  uint32_t ports_count;
-  uint32_t i;
   static unsigned int id;
-  char * name;
   char * port_name;
   size_t size_name;
   size_t size_id;
   struct zynjacku_synth * synth_ptr;
-  guint sample_rate;
   struct zynjacku_engine * engine_ptr;
-  SLV2Values slv2_values;
-  SLV2Value slv2_value;
-  unsigned int slv2_values_count;
-  unsigned int value_index;
-  gboolean dynparams_supported;
-  const char * uri;
+  struct list_head * node_ptr;
+  struct zynjacku_synth_port * port_ptr;
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
@@ -918,93 +771,33 @@ zynjacku_synth_construct(
     goto fail;
   }
 
-  synth_ptr->plugin = zynjacku_plugin_repo_lookup_by_uri(synth_ptr->uri);
-  if (synth_ptr->plugin == NULL)
+  if (zynjacku_plugin_repo_load_synth(synth_ptr))
   {
-    LOG_ERROR("Failed to find plugin <%s>", synth_ptr->uri);
+    LOG_ERROR("Failed to load LV2 info for synth %s", synth_ptr->uri);
     goto fail;
   }
 
-  dynparams_supported = FALSE;
-
-  slv2_values = slv2_plugin_get_required_features(synth_ptr->plugin);
-
-  slv2_values_count = slv2_values_size(slv2_values);
-  LOG_NOTICE("Plugin has %u required features", slv2_values_count);
-  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
+  synth_ptr->lv2plugin = zynjacku_lv2_load(
+    synth_ptr->uri,
+    zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr)),
+    engine_ptr->host_features);
+  if (synth_ptr->lv2plugin == NULL)
   {
-    slv2_value = slv2_values_get_at(slv2_values, value_index);
-    if (!slv2_value_is_uri(slv2_value))
-    {
-      LOG_ERROR("Plugin requires feature that is not URI");
-      slv2_values_free(slv2_values);
-      goto fail;
-    }
-
-    uri = slv2_value_as_uri(slv2_value);
-    LOG_NOTICE("%s", uri);
-    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
-    {
-      dynparams_supported = TRUE;
-    }
-    else if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, uri) == 0)
-    {
-    }
-    else
-    {
-      LOG_ERROR("Plugin requires unsupported feature \"%s\"", uri);
-      slv2_values_free(slv2_values);
-      goto fail;
-    }
-  }
-
-  slv2_values_free(slv2_values);
-
-  slv2_values = slv2_plugin_get_optional_features(synth_ptr->plugin);
-
-  slv2_values_count = slv2_values_size(slv2_values);
-  LOG_NOTICE("Plugin has %u optional features", slv2_values_count);
-  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
-  {
-    slv2_value = slv2_values_get_at(slv2_values, value_index);
-    if (!slv2_value_is_uri(slv2_value))
-    {
-      LOG_ERROR("Plugin requires feature that is not URI");
-      slv2_values_free(slv2_values);
-      goto fail;
-    }
-
-    uri = slv2_value_as_uri(slv2_value);
-    LOG_NOTICE("%s", uri);
-    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
-    {
-      dynparams_supported = TRUE;
-    }
-  }
-
-  slv2_values_free(slv2_values);
-
-  sample_rate = zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr));
-
-  /* Instantiate the plugin */
-  synth_ptr->instance = slv2_plugin_instantiate(synth_ptr->plugin, sample_rate, engine_ptr->host_features);
-  if (synth_ptr->instance == NULL)
-  {
-    LOG_ERROR("Failed to instantiate plugin.");
+    LOG_ERROR("Failed to load LV2 plugin %s", synth_ptr->uri);
     goto fail;
   }
 
-  if (dynparams_supported)
+  if (synth_ptr->dynparams_supported)
   {
     if (!lv2dynparam_host_attach(
-          slv2_instance_get_descriptor(synth_ptr->instance),
-          slv2_instance_get_handle(synth_ptr->instance),
+          zynjacku_lv2_get_descriptor(synth_ptr->lv2plugin),
+          zynjacku_lv2_get_handle(synth_ptr->lv2plugin),
           &engine_ptr->mempool_allocator,
           synth_obj_ptr,
           &synth_ptr->dynparams))
     {
       LOG_ERROR("Failed to instantiate dynparams extension.");
-      goto fail_instance_free;
+      goto fail_unload;
     }
   }
   else
@@ -1012,36 +805,29 @@ zynjacku_synth_construct(
     synth_ptr->dynparams = NULL;
   }
 
-  /* Create ports */
-  ports_count  = slv2_plugin_get_num_ports(synth_ptr->plugin);
+  /* connect midi port */
+  zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+  list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
 
-  for (i = 0 ; i < ports_count ; i++)
+  /* connect parameter ports */
+  list_for_each(node_ptr, &synth_ptr->parameter_ports)
   {
-    if (!create_port(engine_ptr, synth_ptr, i))
-    {
-      LOG_ERROR("Failed to create plugin port");
-      goto fail_free_ports;
-    }
+    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
   }
 
-  name = slv2_plugin_get_name(synth_ptr->plugin);
-  if (name == NULL)
-  {
-    LOG_ERROR("Failed to get plugin name");
-    goto fail_free_ports;
-  }
-
-  size_name = strlen(name);
+  size_name = strlen(synth_ptr->name);
   port_name = malloc(size_name + 1024);
   if (port_name == NULL)
   {
-    free(name);
     LOG_ERROR("Failed to allocate memory for port name");
     goto fail_free_ports;
   }
 
+  /* setup audio ports (they are connected in jack process callback */
   size_id = sprintf(port_name, "%u:", id);
-  memcpy(port_name + size_id, name, size_name);
+  memcpy(port_name + size_id, synth_ptr->name, size_name);
 
   if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
       synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
@@ -1065,8 +851,6 @@ zynjacku_synth_construct(
   port_name[size_id + size_name] = 0;
   synth_ptr->id = port_name;
 
-  free(name);
-
   id++;
 
   zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(synth_obj_ptr));
@@ -1074,18 +858,18 @@ zynjacku_synth_construct(
   synth_ptr->engine_object_ptr = engine_object_ptr;
   g_object_ref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->gtk2gui = zynjacku_gtk2gui_init(synth_obj_ptr, synth_ptr->plugin, synth_ptr->id, &synth_ptr->parameter_ports);
+  /* no plugins to test gtk2gui */
+  //synth_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, synth_obj_ptr, synth_ptr->uri, synth_ptr->id, &synth_ptr->parameter_ports);
 
-  LOG_DEBUG("Constructed synth <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
+  LOG_DEBUG("Constructed synth <%s>", synth_ptr->uri);
 
   return TRUE;
 
 fail_free_ports:
   zynjacku_synth_free_ports(engine_ptr, synth_ptr);
 
-fail_instance_free:
-  slv2_instance_free(synth_ptr->instance);
-  synth_ptr->instance = NULL;
+fail_unload:
+  zynjacku_lv2_unload(synth_ptr->lv2plugin);
 
 fail:
   return FALSE;
@@ -1101,22 +885,21 @@ zynjacku_synth_destruct(
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(synth_ptr->engine_object_ptr);
 
-  LOG_DEBUG("Destructing plugin <%s>", slv2_plugin_get_uri(synth_ptr->plugin));
+  LOG_DEBUG("Destructing plugin <%s>", synth_ptr->uri);
 
   zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(synth_ptr->engine_object_ptr), G_OBJECT(synth_obj_ptr));
 
   if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_uninit(synth_ptr->gtk2gui);
+    zynjacku_gtk2gui_destroy(synth_ptr->gtk2gui);
   }
-
-  slv2_instance_free(synth_ptr->instance);
 
   zynjacku_synth_free_ports(engine_ptr, synth_ptr);
 
   g_object_unref(synth_ptr->engine_object_ptr);
 
-  synth_ptr->instance = NULL;
+  zynjacku_lv2_unload(synth_ptr->lv2plugin);
+  synth_ptr->lv2plugin = NULL;
 
   free(synth_ptr->id);
   synth_ptr->id = NULL;

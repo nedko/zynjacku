@@ -36,6 +36,7 @@ struct zynjacku_synth_port
   struct list_head port_type_siblings;
   unsigned int type;            /* one of PORT_TYPE_XXX */
   uint32_t index;               /* LV2 port index within owning plugin */
+  char *symbol;
   union
   {
     struct
@@ -59,8 +60,8 @@ struct zynjacku_synth
   gchar * uri;
 
   struct list_head siblings;
-  SLV2Plugin plugin;            /* plugin "class" (actually just a few strings) */
-  SLV2Instance instance;        /* plugin "instance" (loaded shared lib) */
+  zynjacku_lv2_handle lv2plugin;
+  bool dynparams_supported;
   struct zynjacku_synth_port midi_in_port;
   struct zynjacku_synth_port audio_out_left_port;
   struct zynjacku_synth_port audio_out_right_port;
@@ -68,6 +69,7 @@ struct zynjacku_synth
   lv2dynparam_host_instance dynparams;
   zynjacku_gtk2gui_handle gtk2gui;
   char * id;
+  char * name;
 };
 
 struct zynjacku_engine
@@ -85,9 +87,6 @@ struct zynjacku_engine
   LV2_Feature host_feature_rtmempool;
   const LV2_Feature * host_features[2];
 };
-
-SLV2Plugin
-zynjacku_plugin_repo_lookup_by_uri(const char * uri);
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
 

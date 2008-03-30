@@ -20,44 +20,53 @@
  *
  *****************************************************************************/
 
-#ifndef SLV2_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED
-#define SLV2_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED
+#ifndef PLUGIN_REPO_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED
+#define PLUGIN_REPO_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED
 
-G_BEGIN_DECLS
+typedef
+void
+(* zynjacku_plugin_repo_tick)(
+  void *context,
+  float progress,               /* 0..1 */
+  const char *message);
 
-#define ZYNJACKU_PLUGIN_REPO_TYPE (zynjacku_plugin_repo_get_type())
-#define ZYNJACKU_PLUGIN_REPO(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), ZYNJACKU_PLUGIN_REPO_TYPE, ZynjackuPluginRepo))
-#define ZYNJACKU_PLUGIN_REPO_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), ZYNJACKU_PLUGIN_REPO_TYPE, ZynjackuPluginRepoClass))
-#define ZYNJACKU_IS_PLUGIN_REPO(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), ZYNJACKU_PLUGIN_REPO_TYPE))
-#define ZYNJACKU_IS_PLUGIN_REPO_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), ZYNJACKU_PLUGIN_REPO_TYPE))
-#define ZYNJACKU_PLUGIN_REPO_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), ZYNJACKU_PLUGIN_REPO_TYPE, ZynjackuPluginRepoClass))
+typedef
+void
+( *zynjacku_plugin_repo_tack)(
+  void *context,
+  const char *uri);
 
-#define ZYNJACKU_TYPE_PLUGIN_REPO ZYNJACKU_PLUGIN_REPO_TYPE
-
-typedef struct _ZynjackuPluginRepo ZynjackuPluginRepo;
-typedef struct _ZynjackuPluginRepoClass ZynjackuPluginRepoClass;
-
-struct _ZynjackuPluginRepo {
-  GObject parent;
-  /* instance members */
-};
-
-struct _ZynjackuPluginRepoClass {
-  GObjectClass parent;
-  /* class members */
-};
-
-/* used by ZYNJACKU_PLUGIN_REPO_TYPE */
-GType zynjacku_plugin_repo_get_type();
-
-ZynjackuPluginRepo *
-zynjacku_plugin_repo_get();
+bool
+zynjacku_plugin_repo_init();
 
 void
 zynjacku_plugin_repo_iterate(
-  ZynjackuPluginRepo * repo_obj_ptr,
-  gboolean force_scan);
+  bool force_scan,
+  void *context,
+  zynjacku_plugin_repo_tick tick,
+  zynjacku_plugin_repo_tack tack);
 
-G_END_DECLS
+const char *
+zynjacku_plugin_repo_get_name(
+  const char *uri);
 
-#endif /* #ifndef SLV2_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED */
+const char *
+zynjacku_plugin_repo_get_license(
+  const char *uri);
+
+const char *
+zynjacku_plugin_repo_get_dlpath(
+  const char *uri);
+
+const char *
+zynjacku_plugin_repo_get_bundle_path(
+  const char *uri);
+
+bool
+zynjacku_plugin_repo_load_synth(
+  struct zynjacku_synth * synth_ptr);
+
+void
+zynjacku_plugin_repo_uninit();
+
+#endif /* #ifndef PLUGIN_REPO_H__27C1E0DC_DD5E_4A79_838B_DC6B90402229__INCLUDED */

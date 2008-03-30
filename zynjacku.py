@@ -925,12 +925,11 @@ class ZynjackuHostMulti(ZynjackuHost):
 
     def rescan_plugins(self, store, progressbar, force):
         store.clear()
-        repo = zynjacku.zynjacku_plugin_repo_get()
-        tick = repo.connect("tick", self.on_plugin_repo_tick, progressbar)
-        tack = repo.connect("tack", self.on_plugin_repo_tack, store)
-        repo.iterate(force)
-        repo.disconnect(tack)
-        repo.disconnect(tick)
+        tick = self.engine.connect("tick", self.on_plugin_repo_tick, progressbar)
+        tack = self.engine.connect("tack", self.on_plugin_repo_tack, store)
+        self.engine.iterate_plugins(force)
+        self.engine.disconnect(tack)
+        self.engine.disconnect(tick)
 
     def on_synth_load(self, widget):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")

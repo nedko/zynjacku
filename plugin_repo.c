@@ -27,59 +27,230 @@
 #include <glib-object.h>
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
+#include <lv2dynparam/host.h>
+#include <jack/jack.h>
 
+#include "lv2-miditype.h"
 #include "list.h"
+#include "gtk2gui.h"
+#include "lv2.h"
+#include "zynjacku.h"
 #include "plugin_repo.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 
 #define LV2_RDF_LICENSE_URI "http://usefulinc.com/ns/doap#license"
+#define LV2_MIDI_PORT_URI "http://ll-plugins.nongnu.org/lv2/ext/MidiPort"
 
-#define ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK    0 /* plugin iterated */
-#define ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK    1 /* "good" plugin found */
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT        2
-
-static guint g_zynjacku_plugin_repo_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
-
-struct zynjacku_simple_plugin_info
+struct zynjacku_plugin_info
 {
   struct list_head siblings;
-  SLV2Plugin plugin;
+  SLV2Plugin slv2info;
   char * name;
   char * license;
+  char * uri;
 };
 
-struct zynjacku_plugin_repo
+struct zynjacku_iterate_context
 {
-  gboolean dispose_has_run;
-
-  gboolean scanned;
-  struct list_head available_plugins; /* "struct zynjacku_simple_plugin_info"s linked by siblings */
-  SLV2World slv2_world;
-  SLV2Plugins slv2_plugins;
+  float progress;
+  float progress_step;
+  void *context;
+  zynjacku_plugin_repo_tick tick;
+  zynjacku_plugin_repo_tack tack;
 };
 
-#define ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_REPO_TYPE, struct zynjacku_plugin_repo))
+/* this should really be parameter of slv2 filter plugins callback */
+struct zynjacku_iterate_context g_iterate_context;
 
-static ZynjackuPluginRepo * g_the_repo;
+static struct list_head g_available_plugins; /* "struct zynjacku_plugin_info's linked by siblings */
+static SLV2World g_world;
+static SLV2Plugins g_plugins;
+static SLV2Value g_slv2uri_port_input;
+static SLV2Value g_slv2uri_port_output;
+static SLV2Value g_slv2uri_port_control;
+static SLV2Value g_slv2uri_port_audio;
+static SLV2Value g_slv2uri_port_midi;
+static SLV2Value g_slv2uri_license;
 
-char *
-zynjacku_rdf_uri_quote(const char * uri);
+/* as slv2_value_as_string() but returns NULL if value is NULL or value type is not string
+   such conditions are assumed to be error, thus this function should be
+   used only when caller expects value to be string */
+const char *
+slv2_value_as_string_smart(SLV2Value value)
+{
+  if (value == NULL)
+  {
+    LOG_ERROR("SLV2Value is NULL");
+    return NULL;
+  }
+
+  if (!slv2_value_is_string(value))
+  {
+    LOG_ERROR("SLV2Value is not string");
+    return NULL;
+  }
+
+  return slv2_value_as_string(value);
+}
+
+const char *
+slv2_value_as_uri_smart(SLV2Value value)
+{
+  if (value == NULL)
+  {
+    LOG_ERROR("SLV2Value is NULL");
+    return NULL;
+  }
+
+  if (!slv2_value_is_uri(value))
+  {
+    LOG_ERROR("SLV2Value is not string");
+    return NULL;
+  }
+
+  return slv2_value_as_uri(value);
+}
+
+const char *
+slv2_plugin_get_uri_smart(SLV2Plugin plugin)
+{
+  return slv2_value_as_uri(slv2_plugin_get_uri(plugin));
+}
+
+bool
+slv2_port_is_control(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_control);
+}
+
+bool
+slv2_port_is_audio(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_audio);
+}
+
+bool
+slv2_port_is_midi(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_midi);
+}
+
+bool
+slv2_port_is_input(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_input);
+}
+
+bool
+slv2_port_is_output(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_output);
+}
+
+
+bool
+zynjacku_plugin_repo_init()
+{
+  g_world = slv2_world_new();
+  if (g_world == NULL)
+  {
+    LOG_ERROR("slv2_world_new() failed.");
+    goto fail;
+  }
+
+  INIT_LIST_HEAD(&g_available_plugins);
+  g_plugins = NULL;
+
+  g_slv2uri_port_input = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_INPUT);
+  if (g_slv2uri_port_input == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_world;
+  }
+
+  g_slv2uri_port_output = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_OUTPUT);
+  if (g_slv2uri_port_output == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_input;
+  }
+
+  g_slv2uri_port_control = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_CONTROL);
+  if (g_slv2uri_port_control == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_output;
+  }
+
+  g_slv2uri_port_audio = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_AUDIO);
+  if (g_slv2uri_port_audio == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_control;
+  }
+
+  g_slv2uri_port_midi = slv2_value_new_uri(g_world, LV2_MIDI_PORT_URI);
+  if (g_slv2uri_port_midi == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_audio;
+  }
+
+  g_slv2uri_license = slv2_value_new_uri(g_world, LV2_RDF_LICENSE_URI);
+  if (g_slv2uri_license == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_midi;
+  }
+
+  return true;
+
+fail_free_port_midi:
+  slv2_value_free(g_slv2uri_port_midi);
+
+fail_free_port_audio:
+  slv2_value_free(g_slv2uri_port_audio);
+
+fail_free_port_control:
+  slv2_value_free(g_slv2uri_port_control);
+
+fail_free_port_output:
+  slv2_value_free(g_slv2uri_port_output);
+
+fail_free_port_input:
+  slv2_value_free(g_slv2uri_port_input);
+
+fail_free_world:
+  slv2_world_free(g_world);
+
+fail:
+  return false;
+}
 
 void
-zynjacku_plugin_repo_clear(
-  struct zynjacku_plugin_repo * repo_ptr)
+zynjacku_plugin_repo_uninit()
 {
   struct list_head * node_ptr;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
+  struct zynjacku_plugin_info * plugin_info_ptr;
 
-  while(!list_empty(&repo_ptr->available_plugins))
+  while(!list_empty(&g_available_plugins))
   {
-    node_ptr = repo_ptr->available_plugins.next;
+    node_ptr = g_available_plugins.next;
 
     list_del(node_ptr);
 
-    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
+    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_plugin_info, siblings);
 
     //LOG_DEBUG("Removing %s", plugin_info_ptr->name);
     free(plugin_info_ptr->license);
@@ -87,281 +258,18 @@ zynjacku_plugin_repo_clear(
     free(plugin_info_ptr);
   }
 
-  if (repo_ptr->scanned)
+  if (g_plugins != NULL)
   {
-    slv2_plugins_free(repo_ptr->slv2_world, repo_ptr->slv2_plugins);
-    slv2_world_free(repo_ptr->slv2_world);
-    repo_ptr->scanned = FALSE;
-  }
-}
-
-static void
-zynjacku_plugin_repo_dispose(GObject * obj)
-{
-  struct zynjacku_plugin_repo * plugin_repo_ptr;
-
-  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj);
-
-  LOG_DEBUG("zynjacku_plugin_repo_dispose() called.");
-
-  if (plugin_repo_ptr->dispose_has_run)
-  {
-    /* If dispose did already run, return. */
-    LOG_DEBUG("zynjacku_plugin_repo_dispose() already run!");
-    return;
+    slv2_plugins_free(g_world, g_plugins);
   }
 
-  /* Make sure dispose does not run twice. */
-  plugin_repo_ptr->dispose_has_run = TRUE;
-
-  /* 
-   * In dispose, you are supposed to free all types referenced from this
-   * object which might themselves hold a reference to self. Generally,
-   * the most simple solution is to unref all members on which you own a 
-   * reference.
-   */
-  zynjacku_plugin_repo_clear(plugin_repo_ptr);
-
-  /* Chain up to the parent class */
-  G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
-}
-
-static void
-zynjacku_plugin_repo_finalize(GObject * obj)
-{
-//  struct zynjacku_plugin_repo * self = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(obj);
-
-  LOG_DEBUG("zynjacku_plugin_repo_finalize() called.");
-
-  /*
-   * Here, complete object destruction.
-   * You might not need to do much...
-   */
-  //g_free(self->private);
-
-  /* Chain up to the parent class */
-  G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->finalize(obj);
-}
-
-static void
-zynjacku_plugin_repo_class_init(
-  gpointer class_ptr,
-  gpointer class_data_ptr)
-{
-  LOG_DEBUG("zynjacku_plugin_repo_class() called.");
-
-  G_OBJECT_CLASS(class_ptr)->dispose = zynjacku_plugin_repo_dispose;
-  G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_plugin_repo_finalize;
-
-  g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_plugin_repo));
-
-  g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK] =
-    g_signal_new(
-      "tick",                   /* signal_name */
-      ZYNJACKU_PLUGIN_REPO_TYPE, /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      2,                        /* n_params */
-      G_TYPE_FLOAT,             /* progress 0 .. 1 */
-      G_TYPE_STRING);           /* uri of plugin being scanned */
-
-  g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK] =
-    g_signal_new(
-      "tack",                   /* signal_name */
-      ZYNJACKU_PLUGIN_REPO_TYPE, /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      3,                        /* n_params */
-      G_TYPE_STRING,            /* plugin name */
-      G_TYPE_STRING,            /* plugin uri */
-      G_TYPE_STRING);           /* plugin license */
-}
-
-static void
-zynjacku_plugin_repo_init(
-  GTypeInstance * instance,
-  gpointer g_class)
-{
-  struct zynjacku_plugin_repo * plugin_repo_ptr;
-
-  LOG_DEBUG("zynjacku_plugin_repo_init() called.");
-
-  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(instance);
-
-  plugin_repo_ptr->dispose_has_run = FALSE;
-  INIT_LIST_HEAD(&plugin_repo_ptr->available_plugins);
-  plugin_repo_ptr->scanned = FALSE;
-}
-
-GType zynjacku_plugin_repo_get_type()
-{
-  static GType type = 0;
-  if (type == 0)
-  {
-    type = g_type_register_static_simple(
-      G_TYPE_OBJECT,
-      "zynjacku_plugin_repo_type",
-      sizeof(ZynjackuPluginRepoClass),
-      zynjacku_plugin_repo_class_init,
-      sizeof(ZynjackuPluginRepo),
-      zynjacku_plugin_repo_init,
-      0);
-  }
-
-  return type;
-}
-
-/* check whether plugin is "simple synth" */
-gboolean
-zynjacku_plugin_repo_check_plugin(
-  SLV2Plugin plugin)
-{
-  gboolean ret;
-  uint32_t audio_out_ports_count;
-  uint32_t midi_in_ports_count;
-  SLV2PortDirection direction;
-  SLV2PortDataType type;
-  char * name;
-  uint32_t ports_count;
-  uint32_t port_index;
-  SLV2Values slv2_values;
-  SLV2Value slv2_value;
-  unsigned int slv2_values_count;
-  unsigned int value_index;
-  const char * uri;
-
-  ret = FALSE;
-
-  name = slv2_plugin_get_name(plugin);
-
-  /* check required features */
-
-  slv2_values = slv2_plugin_get_required_features(plugin);
-
-  slv2_values_count = slv2_values_size(slv2_values);
-  LOG_DEBUG("Plugin \"%s\" has %u required features", name, slv2_values_count);
-  for (value_index = 0 ; value_index < slv2_values_count ; value_index++)
-  {
-    slv2_value = slv2_values_get_at(slv2_values, value_index);
-    if (!slv2_value_is_uri(slv2_value))
-    {
-      LOG_DEBUG("Plugin \"%s\" requires feature that is not URI", name);
-      slv2_values_free(slv2_values);
-      goto free;
-    }
-
-    uri = slv2_value_as_uri(slv2_value);
-
-    LOG_DEBUG("%s", uri);
-
-    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
-    {
-      continue;
-    }
-
-    if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, uri) == 0)
-    {
-      continue;
-    }
-
-    LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, uri);
-    slv2_values_free(slv2_values);
-    goto free;
-  }
-
-  slv2_values_free(slv2_values);
-
-  /* check port configuration */
-
-  ports_count = slv2_plugin_get_num_ports(plugin);
-  audio_out_ports_count = 0;
-  midi_in_ports_count = 0;
-
-  for (port_index = 0 ; port_index < ports_count ; port_index++)
-  {
-    /* Get the direction of the port (input, output, etc) */
-    direction = slv2_port_get_direction(plugin, slv2_plugin_get_port_by_index(plugin, port_index));
-
-    /* Get the type of the port (control, audio, midi, osc, etc) */
-    type = slv2_port_get_data_type(plugin, slv2_plugin_get_port_by_index(plugin, port_index));
-
-    if (type == SLV2_PORT_DATA_TYPE_CONTROL)
-    {
-      if (direction != SLV2_PORT_DIRECTION_INPUT)
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin with non-input control port", name, slv2_plugin_get_uri(plugin));
-        goto free;
-      }
-    }
-    else if (type == SLV2_PORT_DATA_TYPE_AUDIO)
-    {
-      if (direction != SLV2_PORT_DIRECTION_OUTPUT)
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin with non-output audio port", name, slv2_plugin_get_uri(plugin));
-        goto free;
-      }
-
-      if (audio_out_ports_count == 2)
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin with more than two audio output ports", name, slv2_plugin_get_uri(plugin));
-        goto free;
-      }
-
-      audio_out_ports_count++;
-    }
-    else if (type == SLV2_PORT_DATA_TYPE_MIDI)
-    {
-      if (direction != SLV2_PORT_DIRECTION_INPUT)
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin with non-input MIDI port", name, slv2_plugin_get_uri(plugin));
-        goto free;
-      }
-
-      if (midi_in_ports_count == 1)
-      {
-        LOG_DEBUG("Skipping \"%s\" %s, plugin with more than one MIDI input port", name, slv2_plugin_get_uri(plugin));
-        goto free;
-      }
-
-      midi_in_ports_count++;
-    }
-    else
-    {
-      LOG_DEBUG("Skipping \"%s\" %s, plugin with port of unknown data type", name, slv2_plugin_get_uri(plugin));
-      goto free;
-    }
-  }
-
-  if (audio_out_ports_count == 0)
-  {
-    LOG_DEBUG("Skipping \"%s\" %s, plugin without audio output ports", name, slv2_plugin_get_uri(plugin));
-    goto free;
-  }
-
-  if (midi_in_ports_count == 0)
-  {
-    LOG_DEBUG("Skipping \"%s\" %s, plugin without midi input ports", name, slv2_plugin_get_uri(plugin));
-    goto free;
-  }
-
-  LOG_DEBUG("Found \"%s\" %s", name, slv2_plugin_get_uri(plugin));
-
-  ret = TRUE;
-
-free:
-  free(name);
-
-  return ret;
+  slv2_value_free(g_slv2uri_license);
+  slv2_value_free(g_slv2uri_port_midi);
+  slv2_value_free(g_slv2uri_port_audio);
+  slv2_value_free(g_slv2uri_port_control);
+  slv2_value_free(g_slv2uri_port_output);
+  slv2_value_free(g_slv2uri_port_input);
+  slv2_world_free(g_world);
 }
 
 char *
@@ -374,8 +282,7 @@ zynjacku_plugin_repo_get_plugin_license(
 
   slv2_values = slv2_plugin_get_value(
     plugin,
-    SLV2_URI,
-    LV2_RDF_LICENSE_URI);
+    g_slv2uri_license);
 
   if (slv2_values_size(slv2_values) == 0)
   {
@@ -397,134 +304,483 @@ zynjacku_plugin_repo_get_plugin_license(
   return license;
 }
 
+/* check whether plugin is a synth, if it is, save plugin info */
+bool
+zynjacku_plugin_repo_check_plugin(
+  SLV2Plugin plugin)
+{
+  gboolean ret;
+  uint32_t audio_out_ports_count;
+  uint32_t midi_in_ports_count;
+  uint32_t control_ports_count;
+  uint32_t ports_count;
+  const char *plugin_uri;
+  const char *feature_uri;
+  const char *name;
+  SLV2Value slv2name;
+  SLV2Values slv2features;
+  SLV2Value slv2feature;
+  unsigned int features_count;
+  unsigned int feature_index;
+  struct zynjacku_plugin_info * plugin_info_ptr;
+
+  plugin_uri = slv2_plugin_get_uri_smart(plugin);
+
+  if (g_iterate_context.tick != NULL)
+  {
+    g_iterate_context.tick(g_iterate_context.context, g_iterate_context.progress, plugin_uri);
+  }
+
+  ret = FALSE;
+
+  slv2name = slv2_plugin_get_name(plugin);
+  if (slv2name == NULL)
+  {
+    LOG_ERROR("slv2_plugin_get_name() returned NULL.");
+    goto exit;
+  }
+
+  name = slv2_value_as_string_smart(slv2name);
+  if (name == NULL)
+  {
+    LOG_ERROR("slv2_value_as_string_smart() failed for plugin name value.");
+    goto free_name;
+  }
+
+  /* check required features */
+
+  slv2features = slv2_plugin_get_required_features(plugin);
+  features_count = slv2_values_size(slv2features);
+  //LOG_DEBUG("Plugin \"%s\" has %u required features", name, features_count);
+
+  for (feature_index = 0 ; feature_index < features_count ; feature_index++)
+  {
+    slv2feature = slv2_values_get_at(slv2features, feature_index);
+
+    feature_uri = slv2_value_as_uri_smart(slv2feature);
+    if (feature_uri == NULL)
+    {
+      LOG_ERROR("slv2_value_as_uri_smart() failed for plugin name value.");
+      goto free_features;
+    }
+
+    LOG_DEBUG("%s", feature_uri);
+
+    if (strcmp(LV2DYNPARAM_URI, feature_uri) == 0)
+    {
+      continue;
+    }
+
+    if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, feature_uri) == 0)
+    {
+      continue;
+    }
+
+    LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, feature_uri);
+    goto free_features;
+  }
+
+  /* check port configuration */
+
+  ports_count = slv2_plugin_get_num_ports(plugin);
+  audio_out_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_audio, g_slv2uri_port_output, NULL);
+  midi_in_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_midi, g_slv2uri_port_input, NULL);
+  control_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_control, NULL);
+
+  if (midi_in_ports_count + control_ports_count + audio_out_ports_count != ports_count ||
+      midi_in_ports_count != 1 ||
+      audio_out_ports_count == 0)
+  {
+    LOG_DEBUG("Skipping \"%s\" %s, plugin with unsupported port configuration", name, uri);
+    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+    goto free_features;
+  }
+
+  LOG_DEBUG("Found \"%s\" %s", name, uri);
+  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+
+  plugin_info_ptr = malloc(sizeof(struct zynjacku_plugin_info));
+  if (plugin_info_ptr == NULL)
+  {
+    LOG_ERROR("Cannot allocate memory for zynjacku_plugin_info structure");
+    goto free_features;
+  }
+
+  plugin_info_ptr->name = strdup(name);
+  if (plugin_info_ptr->name == NULL)
+  {
+    goto free_info;
+  }
+
+  plugin_info_ptr->uri = strdup(plugin_uri);
+  if (plugin_info_ptr->uri == NULL)
+  {
+    goto free_info_name;
+  }
+
+  plugin_info_ptr->license = zynjacku_plugin_repo_get_plugin_license(plugin);
+  if (plugin_info_ptr->license == NULL)
+  {
+    goto free_info_uri;
+  }
+
+  plugin_info_ptr->slv2info = plugin;
+
+  list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
+
+  if (g_iterate_context.tack != NULL)
+  {
+    g_iterate_context.tack(g_iterate_context.context, plugin_uri);
+  }
+
+  ret = TRUE;
+
+  goto free_features;
+
+free_info_uri:
+  free(plugin_info_ptr->uri);
+
+free_info_name:
+  free(plugin_info_ptr->name);
+
+free_info:
+  free(plugin_info_ptr);
+
+free_features:
+  slv2_values_free(slv2features);
+
+free_name:
+  slv2_value_free(slv2name);
+
+exit:
+  g_iterate_context.progress += g_iterate_context.progress_step;
+  return ret;
+}
+
 void
 zynjacku_plugin_repo_iterate(
-  ZynjackuPluginRepo * repo_obj_ptr,
-  gboolean force_scan)
+  bool force_scan,
+  void *context,
+  zynjacku_plugin_repo_tick tick,
+  zynjacku_plugin_repo_tack tack)
 {
-  struct zynjacku_plugin_repo * plugin_repo_ptr;
-  unsigned int plugins_count;
-  unsigned int index;
-  SLV2Plugin plugin;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-  float progress;
-  float progress_step;
   struct list_head * node_ptr;
+  SLV2Plugins slv2plugins;
+  struct zynjacku_plugin_info * plugin_info_ptr;
 
   LOG_DEBUG("zynjacku_plugin_repo_iterate() called.");
 
-  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(repo_obj_ptr);
-
-  /* disable force scan because if we free world/plugins using non-duplicated plugin will crash */
-  force_scan = FALSE;
-  if (force_scan || !plugin_repo_ptr->scanned)
+  if (force_scan)
   {
-    LOG_DEBUG("Scanning plugins...");
-    /* disable force scan because if we free world/plugins using non-duplicated plugin will crash */
-    //zynjacku_plugin_repo_clear(plugin_repo_ptr);
-
-    plugin_repo_ptr->slv2_world = slv2_world_new();
-    slv2_world_load_all(plugin_repo_ptr->slv2_world);
-    plugin_repo_ptr->slv2_plugins = slv2_world_get_all_plugins(plugin_repo_ptr->slv2_world);
-
-    plugins_count = slv2_plugins_size(plugin_repo_ptr->slv2_plugins);
-    progress_step = 1.0 / plugins_count;
-    progress = 0;
-
-    LOG_DEBUG("%u plugins.", plugins_count);
-
-    for (index = 0 ; index < plugins_count; index++)
-    {
-      plugin = slv2_plugins_get_at(plugin_repo_ptr->slv2_plugins, index);
-
-      g_signal_emit(
-        repo_obj_ptr,
-        g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK],
-        0,
-        progress,
-        slv2_plugin_get_uri(plugin));
-
-      if (zynjacku_plugin_repo_check_plugin(plugin))
-      {
-        plugin_info_ptr = malloc(sizeof(struct zynjacku_simple_plugin_info));
-        plugin_info_ptr->plugin = plugin;
-
-        list_add_tail(&plugin_info_ptr->siblings, &plugin_repo_ptr->available_plugins);
-
-        plugin_info_ptr->name = slv2_plugin_get_name(plugin);
-        plugin_info_ptr->license = zynjacku_plugin_repo_get_plugin_license(plugin);
-
-        LOG_DEBUG("tack emit");
-        g_signal_emit(
-          repo_obj_ptr,
-          g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK],
-          0,
-          plugin_info_ptr->name,
-          slv2_plugin_get_uri(plugin),
-          plugin_info_ptr->license);
-      }
-
-      progress += progress_step;
-    }
-
-    g_signal_emit(
-      repo_obj_ptr,
-      g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TICK],
-      0,
-      1.0,
-      "");
-
-    plugin_repo_ptr->scanned = TRUE;
+    /* scanned in past, clear world to scan again */
+    zynjacku_plugin_repo_uninit();
+    zynjacku_plugin_repo_init();
   }
-  else
+  else if (g_plugins != NULL)
   {
-    LOG_DEBUG("Iterate existing plugins!");
-    list_for_each(node_ptr, &plugin_repo_ptr->available_plugins)
+    if (tack != NULL)
     {
-      plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-      g_signal_emit(
-        repo_obj_ptr,
-        g_zynjacku_plugin_repo_signals[ZYNJACKU_PLUGIN_REPO_SIGNAL_TACK],
-        0,
-        plugin_info_ptr->name,
-        slv2_plugin_get_uri(plugin_info_ptr->plugin),
-        plugin_info_ptr->license);
+      LOG_DEBUG("Iterate existing plugins!");
+
+      list_for_each(node_ptr, &g_available_plugins)
+      {
+        plugin_info_ptr = list_entry(node_ptr, struct zynjacku_plugin_info, siblings);
+        tack(context, plugin_info_ptr->uri);
+      }
     }
+
+    return;
+  }
+
+  LOG_DEBUG("Scanning plugins...");
+
+  if (tick != NULL)
+  {
+    tick(context, 0.0, "Loading plugins (world) ...");
+  }
+
+  slv2_world_load_all(g_world);
+
+  /* get plugins count */
+  slv2plugins = slv2_world_get_all_plugins(g_world);
+  g_iterate_context.progress_step = 1.0 / slv2_plugins_size(slv2plugins);
+  slv2_plugins_free(g_world, slv2plugins);
+
+  g_iterate_context.progress = 0.0;
+  g_iterate_context.context = context;
+  g_iterate_context.tick = tick;
+  g_iterate_context.tack = tack;
+
+  slv2plugins = slv2_world_get_plugins_by_filter(g_world, zynjacku_plugin_repo_check_plugin);
+  slv2_plugins_free(g_world, slv2plugins);
+
+  if (tick != NULL)
+  {
+    tick(context, 1.0, "");
   }
 }
 
-SLV2Plugin
+static
+struct zynjacku_plugin_info *
 zynjacku_plugin_repo_lookup_by_uri(const char * uri)
 {
   struct list_head * node_ptr;
-  const char * current_uri;
-  struct zynjacku_simple_plugin_info * plugin_info_ptr;
-  struct zynjacku_plugin_repo * plugin_repo_ptr;
+  struct zynjacku_plugin_info * plugin_info_ptr;
 
-  zynjacku_plugin_repo_iterate(zynjacku_plugin_repo_get(), FALSE);
-
-  plugin_repo_ptr = ZYNJACKU_PLUGIN_REPO_GET_PRIVATE(zynjacku_plugin_repo_get());
-
-  list_for_each(node_ptr, &plugin_repo_ptr->available_plugins)
+  list_for_each(node_ptr, &g_available_plugins)
   {
-    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_simple_plugin_info, siblings);
-    current_uri = slv2_plugin_get_uri(plugin_info_ptr->plugin);
-    if (strcmp(current_uri, uri) == 0)
+    plugin_info_ptr = list_entry(node_ptr, struct zynjacku_plugin_info, siblings);
+    if (strcmp(plugin_info_ptr->uri, uri) == 0)
     {
-      return plugin_info_ptr->plugin;
+      return plugin_info_ptr;
     }
   }
 
+  LOG_ERROR("Unknown plugin '%s'", uri);
   return NULL;
 }
 
-ZynjackuPluginRepo *
-zynjacku_plugin_repo_get()
+const char *
+zynjacku_plugin_repo_get_name(
+  const char *uri)
 {
-  if (g_the_repo == NULL)
+  struct zynjacku_plugin_info * plugin_info_ptr;
+
+  plugin_info_ptr = zynjacku_plugin_repo_lookup_by_uri(uri);
+  if (plugin_info_ptr == NULL)
   {
-    g_the_repo = g_object_new(ZYNJACKU_PLUGIN_REPO_TYPE, NULL);
+    return NULL;
   }
 
-  return g_the_repo;
+  return plugin_info_ptr->name;
+}
+
+const char *
+zynjacku_plugin_repo_get_license(
+  const char *uri)
+{
+  struct zynjacku_plugin_info * plugin_info_ptr;
+
+  plugin_info_ptr = zynjacku_plugin_repo_lookup_by_uri(uri);
+  if (plugin_info_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return plugin_info_ptr->license;
+}
+
+const char *
+zynjacku_plugin_repo_get_dlpath(
+  const char *uri)
+{
+  struct zynjacku_plugin_info * info_ptr;
+
+  info_ptr = zynjacku_plugin_repo_lookup_by_uri(uri);
+  if (info_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return slv2_uri_to_path(slv2_value_as_uri(slv2_plugin_get_library_uri(info_ptr->slv2info)));
+}
+
+const char *
+zynjacku_plugin_repo_get_bundle_path(
+  const char *uri)
+{
+  struct zynjacku_plugin_info * info_ptr;
+
+  info_ptr = zynjacku_plugin_repo_lookup_by_uri(uri);
+  if (info_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return slv2_uri_to_path(slv2_value_as_uri(slv2_plugin_get_bundle_uri(info_ptr->slv2info)));
+}
+
+bool
+zynjacku_plugin_repo_create_port(
+  struct zynjacku_plugin_info *info_ptr,
+  uint32_t port_index,
+  struct zynjacku_synth *synth_ptr)
+{
+  SLV2Value symbol;
+  struct zynjacku_synth_port * port_ptr;
+  SLV2Port port;
+  SLV2Value default_value;
+  SLV2Value min_value;
+  SLV2Value max_value;
+
+  port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
+
+  /* Get the port symbol (label) for console printing */
+  symbol = slv2_port_get_symbol(info_ptr->slv2info, port);
+  if (symbol == NULL)
+  {
+    LOG_ERROR("slv2_port_get_symbol() failed.");
+    return FALSE;
+  }
+
+  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_control))
+  {
+    if (!slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_input))
+    {
+      /* ignore output control ports, we dont support them yet */
+      return true;
+    }
+
+    port_ptr = malloc(sizeof(struct zynjacku_synth_port));
+    if (port_ptr == NULL)
+    {
+      LOG_ERROR("malloc() failed.");
+      return false;
+    }
+
+    port_ptr->type = PORT_TYPE_PARAMETER;
+    port_ptr->index = port_index;
+
+    slv2_port_get_range(
+      info_ptr->slv2info,
+      port,
+      &default_value,
+      &min_value,
+      &max_value);
+
+    if (default_value != NULL)
+    {
+      port_ptr->data.parameter.value = slv2_value_as_float(default_value);
+      slv2_value_free(default_value);
+    }
+
+    if (min_value != NULL)
+    {
+      port_ptr->data.parameter.min = slv2_value_as_float(min_value);
+      slv2_value_free(min_value);
+    }
+
+    if (max_value != NULL)
+    {
+      port_ptr->data.parameter.max = slv2_value_as_float(max_value);
+      slv2_value_free(max_value);
+    }
+
+    list_add_tail(&port_ptr->plugin_siblings, &synth_ptr->parameter_ports);
+
+    return true;
+  }
+
+  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio) &&
+      slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_output))
+  {
+    if (synth_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
+    {
+      port_ptr = &synth_ptr->audio_out_left_port;
+    }
+    else if (synth_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+    {
+      port_ptr = &synth_ptr->audio_out_right_port;
+    }
+    else
+    {
+      /* ignore, we dont support more than two audio ports yet */
+      return true;
+    }
+
+    port_ptr->type = PORT_TYPE_AUDIO;
+    port_ptr->index = port_index;
+
+    return true;
+  }
+
+  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_midi) &&
+      slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_input))
+  {
+    port_ptr = &synth_ptr->midi_in_port;
+    port_ptr->type = PORT_TYPE_MIDI;
+    port_ptr->index = port_index;
+    return true;
+  }
+
+  LOG_ERROR("Unrecognized port '%s' type (index is %u)", symbol, (unsigned int)port_index);
+  return false;
+}
+
+bool
+zynjacku_plugin_repo_load_synth(
+  struct zynjacku_synth * synth_ptr)
+{
+  struct zynjacku_plugin_info * info_ptr;
+  SLV2Values slv2features;
+  SLV2Value slv2feature;
+  unsigned int features_count;
+  unsigned int feature_index;
+  bool ret;
+  const char *uri;
+  uint32_t ports_count;
+  uint32_t i;
+
+  ret = false;
+
+  synth_ptr->dynparams_supported = FALSE;
+
+  info_ptr = zynjacku_plugin_repo_lookup_by_uri(synth_ptr->uri);
+  if (info_ptr == NULL)
+  {
+    LOG_ERROR("Failed to find plugin %s", synth_ptr->uri);
+    goto exit;
+  }
+
+  synth_ptr->name = strdup(info_ptr->name);
+  if (synth_ptr->name == NULL)
+  {
+    LOG_ERROR("Failed to strdup('%s')", info_ptr->name);
+    goto exit;
+  }
+
+  slv2features = slv2_plugin_get_optional_features(info_ptr->slv2info);
+
+  features_count = slv2_values_size(slv2features);
+  LOG_DEBUG("Plugin has %u optional features", features_count);
+  for (feature_index = 0 ; feature_index < features_count ; feature_index++)
+  {
+    slv2feature = slv2_values_get_at(slv2features, feature_index);
+
+    uri = slv2_value_as_uri_smart(slv2feature);
+    if (uri == NULL)
+    {
+      LOG_ERROR("slv2_value_as_uri_smart() failed for plugin name value.");
+      goto free_features;
+    }
+
+    LOG_DEBUG("%s", uri);
+
+    if (strcmp(LV2DYNPARAM_URI, uri) == 0)
+    {
+      synth_ptr->dynparams_supported = TRUE;
+    }
+  }
+
+  ports_count  = slv2_plugin_get_num_ports(info_ptr->slv2info);
+
+  for (i = 0 ; i < ports_count ; i++)
+  {
+    if (!zynjacku_plugin_repo_create_port(info_ptr, i, synth_ptr))
+    {
+      LOG_ERROR("Failed to create plugin port");
+    }
+  }
+
+free_features:
+  slv2_values_free(slv2features);
+
+exit:
+  return ret;
 }

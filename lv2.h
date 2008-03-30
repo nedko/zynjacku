@@ -3,7 +3,7 @@
  *
  *   This file is part of zynjacku
  *
- *   Copyright (C) 2007,2008 Nedko Arnaudov <nedko@arnaudov.name>
+ *   Copyright (C) 2008 Nedko Arnaudov <nedko@arnaudov.name>
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,35 +20,46 @@
  *
  *****************************************************************************/
 
-#ifndef GTK2GUI_H__6BE36C30_2948_428C_94F3_5443FBFF32F6__INCLUDED
-#define GTK2GUI_H__6BE36C30_2948_428C_94F3_5443FBFF32F6__INCLUDED
+#ifndef LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED
+#define LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED
 
-typedef void * zynjacku_gtk2gui_handle;
-#define ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE NULL
+typedef struct { int _unused; } * zynjacku_lv2_handle;
 
-zynjacku_gtk2gui_handle
-zynjacku_gtk2gui_create(
-  const LV2_Feature * const * host_features,
-  void * context_ptr,
+zynjacku_lv2_handle
+zynjacku_lv2_load(
   const char * uri,
-  const char * synth_id,
-  const struct list_head * parameter_ports_ptr);
+  double sample_rate,
+  const LV2_Feature * const * host_features);
 
 void
-zynjacku_gtk2gui_destroy(
-  zynjacku_gtk2gui_handle gtk2gui_handle);
-
-bool
-zynjacku_gtk2gui_ui_on(
-  zynjacku_gtk2gui_handle gtk2gui_handle);
+zynjacku_lv2_unload(
+  zynjacku_lv2_handle lv2handle);
 
 void
-zynjacku_gtk2gui_ui_off(
-  zynjacku_gtk2gui_handle gtk2gui_handle);
+zynjacku_lv2_connect_port(
+  zynjacku_lv2_handle lv2handle,
+  uint32_t port,
+  void *data_location);
 
-/* callback */
 void
-zynjacku_gtk2gui_on_ui_destroyed(
-  void * context_ptr);
+zynjacku_lv2_run(
+  zynjacku_lv2_handle lv2handle,
+  uint32_t sample_count);
 
-#endif /* #ifndef GTK2GUI_H__6BE36C30_2948_428C_94F3_5443FBFF32F6__INCLUDED */
+void
+zynjacku_lv2_activate(
+  zynjacku_lv2_handle lv2handle);
+
+void
+zynjacku_lv2_deactivate(
+  zynjacku_lv2_handle lv2handle);
+
+const LV2_Descriptor *
+zynjacku_lv2_get_descriptor(
+  zynjacku_lv2_handle lv2handle);
+
+LV2_Handle
+zynjacku_lv2_get_handle(
+  zynjacku_lv2_handle lv2handle);
+
+#endif /* #ifndef LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED */
