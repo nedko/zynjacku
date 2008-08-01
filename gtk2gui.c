@@ -434,6 +434,7 @@ zynjacku_gtk2gui_callback_write(
   LV2UI_Controller ui_handle,
   uint32_t port_index,
   uint32_t buffer_size,
+  uint32_t format,
   const void * buffer)
 {
   if (port_index >= ui_ptr->ports_count || ui_ptr->ports[port_index] == NULL)
@@ -475,7 +476,6 @@ zynjacku_gtk2gui_ui_on(
       ui_ptr->bundle_path,
       zynjacku_gtk2gui_callback_write,
       ui_ptr,
-      NULL,
       &widget,
       ui_ptr->host_features);
 
@@ -517,6 +517,7 @@ zynjacku_gtk2gui_ui_on(
           ui_ptr->ui_handle,
           port_ptr->index,
           sizeof(float),
+          0,
           (const void *)&port_ptr->data.parameter.value);
       }
     }
