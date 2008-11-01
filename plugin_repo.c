@@ -774,7 +774,7 @@ zynjacku_plugin_repo_create_port(
     return true;
   }
 
-  LOG_ERROR("Unrecognized port '%s' type (index is %u)", symbol, (unsigned int)port_index);
+  LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
   return false;
 }
 
@@ -840,8 +840,11 @@ zynjacku_plugin_repo_load_synth(
     if (!zynjacku_plugin_repo_create_port(info_ptr, i, synth_ptr))
     {
       LOG_ERROR("Failed to create plugin port");
+      goto free_features;
     }
   }
+
+  ret = true;
 
 free_features:
   slv2_values_free(slv2features);

@@ -771,7 +771,7 @@ zynjacku_synth_construct(
     goto fail;
   }
 
-  if (zynjacku_plugin_repo_load_synth(synth_ptr))
+  if (!zynjacku_plugin_repo_load_synth(synth_ptr))
   {
     LOG_ERROR("Failed to load LV2 info for synth %s", synth_ptr->uri);
     goto fail;
