@@ -750,7 +750,8 @@ zynjacku_synth_free_ports(
     list_del(&plugin_ptr->audio_out_right_port.port_type_siblings);
   }
 
-  if (plugin_ptr->midi_in_port.type == PORT_TYPE_MIDI)
+  if (plugin_ptr->midi_in_port.type == PORT_TYPE_MIDI ||
+      plugin_ptr->midi_in_port.type == PORT_TYPE_EVENT_MIDI)
   {
     list_del(&plugin_ptr->midi_in_port.port_type_siblings);
   }
