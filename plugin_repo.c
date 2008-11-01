@@ -690,11 +690,14 @@ zynjacku_plugin_repo_create_port(
   struct zynjacku_synth *synth_ptr)
 {
   SLV2Value symbol;
+  SLV2Value name;
   struct zynjacku_synth_port * port_ptr;
   SLV2Port port;
   SLV2Value default_value;
   SLV2Value min_value;
   SLV2Value max_value;
+  const char * symbol_str;
+  const char * name_str;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
@@ -703,7 +706,14 @@ zynjacku_plugin_repo_create_port(
   if (symbol == NULL)
   {
     LOG_ERROR("slv2_port_get_symbol() failed.");
-    return FALSE;
+    goto fail;
+  }
+
+  symbol_str = slv2_value_as_string_smart(symbol);
+  if (symbol_str == NULL)
+  {
+    LOG_ERROR("port symbol is not string.");
+    goto fail;
   }
 
   if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_control))
@@ -718,12 +728,46 @@ zynjacku_plugin_repo_create_port(
     if (port_ptr == NULL)
     {
       LOG_ERROR("malloc() failed.");
-      return false;
+      goto fail;
     }
 
     port_ptr->type = PORT_TYPE_PARAMETER;
     port_ptr->index = port_index;
 
+    /* port symbol */
+    port_ptr->symbol = strdup(symbol_str);
+    if (port_ptr->symbol == NULL)
+    {
+      LOG_ERROR("strdup() failed.");
+      goto fail_free_port;
+    }
+
+    /* port name */
+    name = slv2_port_get_name(info_ptr->slv2info, port);
+    if (name == NULL)
+    {
+      LOG_ERROR("slv2_port_get_name() failed.");
+      goto fail_free_symbol;
+    }
+
+    name_str = slv2_value_as_string_smart(name);
+    if (name_str == NULL)
+    {
+      LOG_ERROR("port symbol is not string.");
+      goto fail_free_symbol;
+    }
+
+    port_ptr->name = strdup(name_str);
+
+    slv2_value_free(name);
+
+    if (port_ptr->name == NULL)
+    {
+      LOG_ERROR("strdup() failed.");
+      goto fail_free_symbol;
+    }
+
+    /* port range */
     slv2_port_get_range(
       info_ptr->slv2info,
       port,
@@ -797,6 +841,15 @@ zynjacku_plugin_repo_create_port(
   }
 
   LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
+  goto fail;
+
+fail_free_symbol:
+  free(port_ptr->symbol);
+
+fail_free_port:
+  free(port_ptr);
+
+fail:
   return false;
 }
 

@@ -554,7 +554,7 @@ zynjacku_synth_generic_lv2_ui_on(
     NULL,
     synth_ptr->id,
     hints_obj_ptr,
-    zynjacku_synth_context_to_string(NULL),
+    "",
     &synth_ptr->root_group_ui_context);
 
   list_for_each(node_ptr, &synth_ptr->parameter_ports)
@@ -566,12 +566,12 @@ zynjacku_synth_generic_lv2_ui_on(
       g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
       0,
       synth_ptr->root_group_ui_context,
-      port_ptr->symbol,
+      port_ptr->name,
       hints_obj_ptr,
       port_ptr->data.parameter.value,
       port_ptr->data.parameter.min,
       port_ptr->data.parameter.max,
-      zynjacku_synth_context_to_string(NULL),
+      zynjacku_synth_context_to_string(&port_ptr->data.parameter.value),
       &port_ptr->ui_context);
   }
 
@@ -729,6 +729,9 @@ zynjacku_synth_free_ports(
     assert(port_ptr->type == PORT_TYPE_PARAMETER);
 
     list_del(node_ptr);
+
+    free(port_ptr->symbol);
+    free(port_ptr->name);
     free(port_ptr);
   }
 
@@ -1198,6 +1201,10 @@ zynjacku_synth_float_set(
       synth_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
+  }
+  else
+  {
+    *(float *)context = value;
   }
 }
 
