@@ -927,3 +927,143 @@ free_features:
 exit:
   return ret;
 }
+
+static
+const char *
+uri_to_fs_path(
+  const char * uri)
+{
+  if (uri == NULL)
+  {
+    return NULL;
+  }
+
+  if (strlen(uri) <= 8 || memcmp(uri, "file:///", 8) != 0)
+  {
+    return NULL;
+  }
+
+  return uri + 7;
+}
+
+bool
+zynjacku_plugin_repo_get_ui_info(
+  const char * plugin_uri,
+  const char * ui_type_uri,
+  char ** ui_uri_ptr,
+  char ** ui_binary_path_ptr,
+  char ** ui_bundle_path_ptr)
+{
+  struct zynjacku_plugin_info * plugin_info_ptr;
+  SLV2UIs slv2uis;
+  SLV2UI slv2ui;
+  SLV2Value ui_type;
+  SLV2Value ui_uri;
+  SLV2Value ui_binary_uri;
+  SLV2Value ui_bundle_uri;
+  const char * ui_uri_str;
+  const char * ui_binary_path;
+  const char * ui_bundle_path;
+  bool ret;
+
+  ret = false;
+
+  ui_type = slv2_value_new_uri(g_world, ui_type_uri);
+  if (ui_type == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail;
+  }
+
+  plugin_info_ptr = zynjacku_plugin_repo_lookup_by_uri(plugin_uri);
+  if (plugin_info_ptr == NULL)
+  {
+    LOG_ERROR("Unknown plugin '%s'", plugin_uri);
+    goto fail_free_ui_type;
+  }
+
+  slv2uis = slv2_plugin_get_uis(plugin_info_ptr->slv2info);
+
+  if (slv2_uis_size(slv2uis) == 0)
+  {
+    LOG_ERROR("Plugin '%s' has no UIs", plugin_uri);
+    goto fail_free_uis;
+  }
+
+  slv2ui = slv2_uis_get_at(slv2uis, 0);
+  if (slv2ui == NULL)
+  {
+    LOG_ERROR("slv2_uis_get_at() failed with plugin '%s'", plugin_uri);
+    goto fail_free_uis;
+  }
+
+  if (!slv2_ui_is_a(slv2ui, ui_type))
+  {
+    LOG_ERROR("First UI of '%s' is not '%s'", plugin_uri, ui_type_uri);
+    goto fail_free_uis;
+  }
+
+  ui_uri = slv2_ui_get_uri(slv2ui);
+  ui_binary_uri = slv2_ui_get_binary_uri(slv2ui);
+  ui_bundle_uri = slv2_ui_get_bundle_uri(slv2ui);
+
+  ui_uri_str = slv2_value_as_uri_smart(ui_uri);
+  ui_binary_path = uri_to_fs_path(slv2_value_as_uri_smart(ui_binary_uri));
+  ui_bundle_path = uri_to_fs_path(slv2_value_as_uri_smart(ui_bundle_uri));
+
+  if (ui_uri_str == NULL)
+  {
+    LOG_ERROR("Failed to retrieve UI URI of '%s'", plugin_uri);
+    goto fail_free_uis;
+  }
+
+  if (ui_binary_uri == NULL)
+  {
+    LOG_ERROR("Failed to retrieve UI binary path of '%s'", plugin_uri);
+    goto fail_free_uis;
+  }
+
+  if (ui_bundle_uri == NULL)
+  {
+    LOG_ERROR("Failed to retrieve UI bundle path of '%s'", plugin_uri);
+    goto fail_free_uis;
+  }
+
+  LOG_DEBUG("UI URI is '%s'", ui_uri_str);
+  LOG_DEBUG("UI binary URI is '%s'", ui_binary_path);
+  LOG_DEBUG("UI bundle URI is '%s'", ui_bundle_path);
+
+  *ui_uri_ptr = strdup(ui_uri_str);
+  if (*ui_uri_ptr == NULL)
+  {
+    LOG_ERROR("strdup() failed");
+    goto fail_free_uis;
+  }
+
+  *ui_binary_path_ptr = strdup(ui_binary_path);
+  if (*ui_binary_path_ptr == NULL)
+  {
+    LOG_ERROR("strdup() failed");
+    free(*ui_uri_ptr);
+    goto fail_free_uis;
+  }
+
+  *ui_bundle_path_ptr = strdup(ui_bundle_path);
+  if (*ui_bundle_path_ptr == NULL)
+  {
+    LOG_ERROR("strdup() failed");
+    free(*ui_binary_path_ptr);
+    goto fail_free_uis;
+  }
+
+  ret = true;
+
+fail_free_uis:
+  slv2_uis_free(slv2uis);
+
+fail_free_ui_type:
+  slv2_value_free(ui_type);
+
+fail:
+  return ret;
+}

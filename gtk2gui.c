@@ -42,11 +42,14 @@
 #include "gtk2gui.h"
 #include "lv2.h"
 #include "zynjacku.h"
+#include "plugin_repo.h"
 
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
-#define LV2GTK2GUI_URI "http://ll-plugins.nongnu.org/lv2/ext/gui#GtkGUI"
+#define LV2_UI_URI "http://lv2plug.in/ns/extensions/ui"
+#define LV2_UI_GTK_URI LV2_UI_URI "#GtkUI"
+
 //#define LV2GTK2GUI_BINARY_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#binary"
 //#define LV2GTK2GUI_OPTIONAL_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#optionalFeature"
 //#define LV2GTK2GUI_REQUIRED_FEATURE_URI "http://ll-plugins.nongnu.org/lv2/ext/gtk2gui#requiredFeature"
@@ -309,16 +312,23 @@ zynjacku_gtk2gui_create(
   unsigned int ports_count;
   struct list_head *node_ptr;
   struct zynjacku_synth_port * port_ptr;
-  const char *ui_binary;
-  const char *ui_uri;
   LV2UI_DescriptorFunction lookup;
   uint32_t index;
+  char * ui_uri;
+  char * ui_binary_path;
+  char * ui_bundle_path;
+
+  if (!zynjacku_plugin_repo_get_ui_info(uri, LV2_UI_GTK_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
+  {
+    LOG_ERROR("zynjacku_plugin_repo_get_ui_info() failed for '%s' and GtkGUI", uri);
+    goto fail;
+  }
 
   ui_ptr = malloc(sizeof(struct zynjacku_gtk2gui));
   if (ui_ptr == NULL)
   {
     LOG_ERROR("malloc() failed.");
-    goto fail;
+    goto fail_free_ui_strings;
   }
 
   ui_ptr->host_features = host_features;
@@ -355,22 +365,19 @@ zynjacku_gtk2gui_create(
 
   ui_ptr->ports_count = ports_count;
 
-  /* TODO: retrieve these from plugin_repo */
-  ui_binary = "/usr/lib/lv2/sineshaper_gtk.lv2/sineshaper_gtk.so";
-  ui_uri = "http://ll-plugins.nongnu.org/lv2/dev/sineshaper/0.0.0/gui";
-  ui_ptr->bundle_path = "/usr/lib/lv2/sineshaper_gtk.lv2/";
+  ui_ptr->bundle_path = ui_bundle_path;
 
-  ui_ptr->dlhandle = dlopen(ui_binary, RTLD_NOW);
+  ui_ptr->dlhandle = dlopen(ui_binary_path, RTLD_NOW);
   if (ui_ptr->dlhandle == NULL)
   {
-    LOG_WARNING("Could not load \"%s\": %s", ui_binary, dlerror());
+    LOG_WARNING("Cannot load \"%s\": %s", ui_binary_path, dlerror());
     goto fail_free_ports;
   }
 
   lookup = (LV2UI_DescriptorFunction)dlsym(ui_ptr->dlhandle, "lv2ui_descriptor");
   if (lookup == NULL)
   {
-    LOG_WARNING("Could not find symbol lv2ui_descriptor");
+    LOG_WARNING("Cannot find symbol lv2ui_descriptor");
     goto fail_dlclose;
   }
 
@@ -381,7 +388,7 @@ zynjacku_gtk2gui_create(
     ui_ptr->lv2ui = lookup(index);
     if (ui_ptr->lv2ui == NULL)
     {
-      LOG_ERROR("Did not find UI %s in %s", uri, ui_binary);
+      LOG_ERROR("Did not find UI %s in %s", uri, ui_binary_path);
       goto fail_dlclose;
     }
 
@@ -393,6 +400,9 @@ zynjacku_gtk2gui_create(
   ui_ptr->widget_ptr = NULL;
   ui_ptr->window_ptr = NULL;
 
+  free(ui_uri);
+  free(ui_bundle_path);
+
   return ui_ptr;
 
 fail_dlclose:
@@ -403,6 +413,11 @@ fail_free_ports:
 
 fail_free:
   free(ui_ptr);
+
+fail_free_ui_strings:
+  free(ui_uri);
+  free(ui_bundle_path);
+  free(ui_binary_path);
 
 fail:
   return NULL;
@@ -491,7 +506,6 @@ zynjacku_gtk2gui_ui_on(
 
     ui_ptr->widget_ptr = widget;
 
-    LOG_DEBUG("instance: %p", ui_ptr->instance);
     LOG_DEBUG("widget: %p", ui_ptr->widget_ptr);
 
     assert(GTK_IS_WIDGET(ui_ptr->widget_ptr));

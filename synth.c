@@ -34,7 +34,7 @@
 #include "lv2_uri_map.h"
 
 #include "list.h"
-#define LOG_LEVEL LOG_LEVEL_DEBUG
+//#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
@@ -640,6 +640,8 @@ zynjacku_synth_supports_custom_ui(
 {
   struct zynjacku_synth * synth_ptr;
 
+  LOG_DEBUG("zynjacku_synth_supports_custom_ui() called.");
+
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
   return (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
@@ -877,9 +879,9 @@ zynjacku_synth_construct(
   g_object_ref(synth_ptr->engine_object_ptr);
 
   /* no plugins to test gtk2gui */
-  //synth_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, synth_obj_ptr, synth_ptr->uri, synth_ptr->id, &synth_ptr->parameter_ports);
+  synth_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, synth_obj_ptr, synth_ptr->uri, synth_ptr->id, &synth_ptr->parameter_ports);
 
-  LOG_DEBUG("Constructed synth <%s>", synth_ptr->uri);
+  LOG_DEBUG("Constructed synth <%s>, gtk2gui <%p>", synth_ptr->uri, synth_ptr->gtk2gui);
 
   return TRUE;
 

@@ -63,6 +63,14 @@ zynjacku_plugin_repo_get_bundle_path(
   const char *uri);
 
 bool
+zynjacku_plugin_repo_get_ui_info(
+  const char * plugin_uri,
+  const char * ui_type_uri,
+  char ** ui_uri_ptr,
+  char ** ui_binary_path_ptr,
+  char ** ui_bundle_path_ptr);
+
+bool
 zynjacku_plugin_repo_load_synth(
   struct zynjacku_synth * synth_ptr);
 
