@@ -31,6 +31,7 @@
 #include <jack/jack.h>
 
 #include "lv2-miditype.h"
+#include "lv2_event.h"
 #include "list.h"
 #include "gtk2gui.h"
 #include "lv2.h"
@@ -41,6 +42,8 @@
 
 #define LV2_RDF_LICENSE_URI "http://usefulinc.com/ns/doap#license"
 #define LV2_MIDI_PORT_URI "http://ll-plugins.nongnu.org/lv2/ext/MidiPort"
+#define LV2_EVENT_PORT_URI LV2_EVENT_URI "#EventPort"
+#define LV2_EVENT_URI_TYPE_MIDI "http://lv2plug.in/ns/ext/midi#MidiEvent"
 
 struct zynjacku_plugin_info
 {
@@ -71,7 +74,9 @@ static SLV2Value g_slv2uri_port_output;
 static SLV2Value g_slv2uri_port_control;
 static SLV2Value g_slv2uri_port_audio;
 static SLV2Value g_slv2uri_port_midi;
+static SLV2Value g_slv2uri_port_event;
 static SLV2Value g_slv2uri_license;
+static SLV2Value g_slv2uri_event_midi;
 
 /* as slv2_value_as_string() but returns NULL if value is NULL or value type is not string
    such conditions are assumed to be error, thus this function should be
@@ -143,6 +148,14 @@ slv2_port_is_midi(
 }
 
 bool
+slv2_port_is_event(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_event);
+}
+
+bool
 slv2_port_is_input(
   SLV2Plugin plugin,
   SLV2Port port)
@@ -158,6 +171,13 @@ slv2_port_is_output(
   return slv2_port_is_a(plugin, port, g_slv2uri_port_output);
 }
 
+bool
+slv2_port_is_midi_event(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_supports_event(plugin, port, g_slv2uri_event_midi);
+}
 
 bool
 zynjacku_plugin_repo_init()
@@ -214,7 +234,27 @@ zynjacku_plugin_repo_init()
     goto fail_free_port_midi;
   }
 
+  g_slv2uri_port_event = slv2_value_new_uri(g_world, LV2_EVENT_PORT_URI);
+  if (g_slv2uri_port_event == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_license;
+  }
+
+  g_slv2uri_event_midi = slv2_value_new_uri(g_world, LV2_EVENT_URI_TYPE_MIDI);
+  if (g_slv2uri_event_midi == NULL)
+  {
+    LOG_ERROR("slv2_value_new_uri() failed.");
+    goto fail_free_port_event;
+  }
+
   return true;
+
+fail_free_port_event:
+  slv2_value_free(g_slv2uri_port_event);
+
+fail_free_license:
+  slv2_value_free(g_slv2uri_license);
 
 fail_free_port_midi:
   slv2_value_free(g_slv2uri_port_midi);
@@ -263,6 +303,8 @@ zynjacku_plugin_repo_uninit()
     slv2_plugins_free(g_world, g_plugins);
   }
 
+  slv2_value_free(g_slv2uri_event_midi);
+  slv2_value_free(g_slv2uri_port_event);
   slv2_value_free(g_slv2uri_license);
   slv2_value_free(g_slv2uri_port_midi);
   slv2_value_free(g_slv2uri_port_audio);
@@ -313,7 +355,10 @@ zynjacku_plugin_repo_check_plugin(
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
   uint32_t control_ports_count;
+  uint32_t event_ports_count;
+  uint32_t midi_event_in_ports_count;
   uint32_t ports_count;
+  uint32_t port_index;
   const char *plugin_uri;
   const char *feature_uri;
   const char *name;
@@ -323,6 +368,7 @@ zynjacku_plugin_repo_check_plugin(
   unsigned int features_count;
   unsigned int feature_index;
   struct zynjacku_plugin_info * plugin_info_ptr;
+  SLV2Port port;
 
   plugin_uri = slv2_plugin_get_uri_smart(plugin);
 
@@ -386,22 +432,41 @@ zynjacku_plugin_repo_check_plugin(
   audio_out_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_audio, g_slv2uri_port_output, NULL);
   midi_in_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_midi, g_slv2uri_port_input, NULL);
   control_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_control, NULL);
+  event_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_event, NULL);
 
-  if (midi_in_ports_count + control_ports_count + audio_out_ports_count != ports_count ||
-      midi_in_ports_count != 1 ||
+  midi_event_in_ports_count = 0;
+
+  if (event_ports_count != 0)
+  {
+    for (port_index = 0 ; port_index < ports_count ; port_index++)
+    {
+      port = slv2_plugin_get_port_by_index(plugin, port_index);
+      if (slv2_port_is_midi_event(plugin, port) && slv2_port_is_input(plugin, port))
+      {
+        midi_event_in_ports_count++;
+      }
+    }
+  }
+
+  if (midi_in_ports_count + control_ports_count + event_ports_count + audio_out_ports_count != ports_count ||
+      midi_in_ports_count + midi_event_in_ports_count != 1 ||
       audio_out_ports_count == 0)
   {
-    LOG_DEBUG("Skipping \"%s\" %s, plugin with unsupported port configuration", name, uri);
+    LOG_DEBUG("Skipping \"%s\" %s, plugin with unsupported port configuration", name, plugin_uri);
     LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
     LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
     LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
     LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
     goto free_features;
   }
 
-  LOG_DEBUG("Found \"%s\" %s", name, uri);
+  LOG_DEBUG("Found \"%s\" %s", name, plugin_uri);
   LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
   LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
   LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
   LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
 
