@@ -23,12 +23,15 @@
 #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED
 #define ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED
 
-#define LV2MIDI_BUFFER_SIZE 8192
+#define LV2MIDI_BUFFER_SIZE 8192 /* bytes */
+
+#define LV2_EVENT_URI_TYPE_MIDI "http://lv2plug.in/ns/ext/midi#MidiEvent"
 
 #define PORT_TYPE_INVALID          0
 #define PORT_TYPE_AUDIO            1 /* LV2 audio out port */
 #define PORT_TYPE_MIDI             2 /* LV2 midi in port */
-#define PORT_TYPE_PARAMETER        3 /* LV2 control rate port used for synth parameters */
+#define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
+#define PORT_TYPE_PARAMETER        4 /* LV2 control rate port used for synth parameters */
 
 struct zynjacku_synth_port
 {
@@ -82,10 +85,17 @@ struct zynjacku_engine
   struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_synth_port"s linked by port_type_siblings */
   jack_port_t * jack_midi_in;
   LV2_MIDI lv2_midi_buffer;
+  LV2_Event_Buffer lv2_midi_event_buffer;
   gboolean midi_activity;
+
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
+  LV2_URI_Map_Feature uri_map;
+  LV2_Event_Feature event;
+
   LV2_Feature host_feature_rtmempool;
-  const LV2_Feature * host_features[2];
+  LV2_Feature host_feature_uri_map;
+  LV2_Feature host_feature_event_ref;
+  const LV2_Feature * host_features[4];
 };
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))

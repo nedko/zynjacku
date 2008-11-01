@@ -34,6 +34,8 @@
 #include <lv2dynparam/host.h>
 
 #include "lv2-miditype.h"
+#include "lv2_event.h"
+#include "lv2_uri_map.h"
 
 #include "list.h"
 #include "gtk2gui.h"

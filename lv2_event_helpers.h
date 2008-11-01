@@ -20,14 +20,6 @@
 #ifndef LV2_EVENT_HELPERS_H
 #define LV2_EVENT_HELPERS_H
 
-#include <assert.h>
-#include <stdbool.h>
-#include <malloc.h>
-#include <stdint.h>
-#include <string.h>
-
-#include <lv2_event.h>
-
 /** @file
  * This header defines some helper functions for the the LV2 events extension
  * with URI <http://lv2plug.in/ns/ext/event> ('lv2ev').

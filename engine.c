@@ -36,6 +36,9 @@
 #include "config.h"
 
 #include "lv2-miditype.h"
+#include "lv2_event.h"
+#include "lv2_uri_map.h"
+
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
@@ -51,10 +54,14 @@
 
 #include "rtmempool.h"
 #include "plugin_repo.h"
+#include "lv2_event_helpers.h"
 
 #define ZYNJACKU_ENGINE_SIGNAL_TICK    0 /* plugin iterated */
 #define ZYNJACKU_ENGINE_SIGNAL_TACK    1 /* "good" plugin found */
 #define ZYNJACKU_ENGINE_SIGNALS_COUNT  2
+
+/* URI map value for event MIDI type */
+#define ZYNJACKU_MIDI_EVENT_ID 1
 
 static guint g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNALS_COUNT];
 
@@ -160,6 +167,30 @@ zynjacku_engine_class_init(
 
 }
 
+static
+uint32_t
+zynjacku_uri_to_id(
+  LV2_URI_Map_Callback_Data callback_data,
+  const char * map,
+  const char * uri)
+{
+	if (strcmp(map, LV2_EVENT_URI) == 0 &&
+      strcmp(uri, LV2_EVENT_URI_TYPE_MIDI) == 0)
+  {
+		return ZYNJACKU_MIDI_EVENT_ID;
+  }
+
+  return 0;                     /* "unsupported" */
+}
+
+uint32_t
+zynjacku_event_ref_func(
+  LV2_Event_Callback_Data callback_data,
+  LV2_Event * event)
+{
+	return 0;
+}
+
 static void
 zynjacku_engine_init(
   GTypeInstance * instance,
@@ -175,13 +206,33 @@ zynjacku_engine_init(
 
   engine_ptr->jack_client = NULL;
 
+  /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&engine_ptr->mempool_allocator);
 
   engine_ptr->host_feature_rtmempool.URI = LV2_RTSAFE_MEMORY_POOL_URI;
   engine_ptr->host_feature_rtmempool.data = &engine_ptr->mempool_allocator;
 
+  /* initialize uri map host feature */
+  engine_ptr->uri_map.callback_data = engine_ptr;
+  engine_ptr->uri_map.uri_to_id = zynjacku_uri_to_id;
+
+  engine_ptr->host_feature_uri_map.URI = LV2_URI_MAP_URI;
+  engine_ptr->host_feature_uri_map.data = &engine_ptr->uri_map;
+
+  /* initialize event host feature */
+  /* We don't support type 0 events, so the ref and unref functions just point to the same empty function. */
+  engine_ptr->event.callback_data = engine_ptr;
+  engine_ptr->event.lv2_event_ref = zynjacku_event_ref_func;
+  engine_ptr->event.lv2_event_unref = zynjacku_event_ref_func;
+
+  engine_ptr->host_feature_event_ref.URI = LV2_EVENT_URI;
+  engine_ptr->host_feature_event_ref.data = &engine_ptr->event;
+
+  /* initialize host features array */
   engine_ptr->host_features[0] = &engine_ptr->host_feature_rtmempool;
-  engine_ptr->host_features[1] = NULL;
+  engine_ptr->host_features[1] = &engine_ptr->host_feature_uri_map;
+  engine_ptr->host_features[2] = &engine_ptr->host_feature_event_ref;
+  engine_ptr->host_features[3] = NULL;
 
   zynjacku_plugin_repo_init();
 }
@@ -252,13 +303,26 @@ zynjacku_engine_start_jack(
     goto fail_close_jack_client;
   }
 
+  engine_ptr->lv2_midi_event_buffer.capacity = LV2MIDI_BUFFER_SIZE;
+  engine_ptr->lv2_midi_event_buffer.header_size = sizeof(LV2_Event_Buffer);
+  engine_ptr->lv2_midi_event_buffer.stamp_type = LV2_EVENT_AUDIO_STAMP;
+  engine_ptr->lv2_midi_event_buffer.event_count = 0;
+  engine_ptr->lv2_midi_event_buffer.size = 0;
+  engine_ptr->lv2_midi_event_buffer.data = malloc(LV2MIDI_BUFFER_SIZE);
+  if (engine_ptr->lv2_midi_event_buffer.data == NULL)
+  {
+    LOG_ERROR("Failed to allocate memory for LV2 midi event data buffer.");
+    ret = FALSE;
+    goto fail_free_lv2_midi_buffer;
+  }
+
   /* register JACK MIDI input port */
   engine_ptr->jack_midi_in = jack_port_register(engine_ptr->jack_client, "midi in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
   if (engine_ptr->jack_midi_in == NULL)
   {
     LOG_ERROR("Failed to registe JACK MIDI input port.");
     ret = FALSE;
-    goto fail_free_lv2_midi_buffer;
+    goto fail_free_lv2_midi_event_buffer;
   }
 
   jack_activate(engine_ptr->jack_client);
@@ -266,6 +330,9 @@ zynjacku_engine_start_jack(
   LOG_NOTICE("JACK client activated.");
 
   return TRUE;
+
+fail_free_lv2_midi_event_buffer:
+  free(engine_ptr->lv2_midi_event_buffer.data);
 
 fail_free_lv2_midi_buffer:
   free(engine_ptr->lv2_midi_buffer.data);
@@ -310,6 +377,7 @@ zynjacku_engine_stop_jack(
 
   jack_port_unregister(engine_ptr->jack_client, engine_ptr->jack_midi_in);
 
+  free(engine_ptr->lv2_midi_event_buffer.data);
   free(engine_ptr->lv2_midi_buffer.data);
 
   jack_client_close(engine_ptr->jack_client);
@@ -320,51 +388,87 @@ zynjacku_engine_stop_jack(
   assert(list_empty(&engine_ptr->midi_ports));
 }
 
-/* Translate from a JACK MIDI buffer to an LV2 MIDI buffer. */
-gboolean jackmidi2lv2midi(jack_port_t * jack_port, LV2_MIDI * output_buf, jack_nframes_t nframes)
+/* Translate from a JACK MIDI buffer to an LV2 MIDI buffers (both old midi port and new midi event port). */
+static
+bool
+zynjacku_jackmidi_to_lv2midi(
+  jack_port_t * jack_port,
+  LV2_MIDI * midi_buf,
+  LV2_Event_Buffer * event_buf,
+  jack_nframes_t nframes)
 {
   void * input_buf;
   jack_midi_event_t input_event;
   jack_nframes_t input_event_index;
   jack_nframes_t input_event_count;
   jack_nframes_t i;
-  unsigned char * data;
+  unsigned char * midi_data;
+  LV2_Event * event_ptr;
+  uint16_t size16;
 
   input_event_index = 0;
-  output_buf->event_count = 0;
+  midi_buf->event_count = 0;
   input_buf = jack_port_get_buffer(jack_port, nframes);
   input_event_count = jack_midi_get_event_count(input_buf);
 
   /* iterate over all incoming JACK MIDI events */
-  data = output_buf->data;
+  midi_data = midi_buf->data;
+  event_buf->event_count = 0;
+  event_buf->size = 0;
+  event_ptr = (LV2_Event *)event_buf->data;
   for (i = 0; i < input_event_count; i++)
   {
     /* retrieve JACK MIDI event */
     jack_midi_event_get(&input_event, input_buf, i);
-    if ((data - output_buf->data) + sizeof(double) + sizeof(size_t) + input_event.size >= output_buf->capacity)
+
+    /* store event in midi port buffer */
+    if ((midi_data - midi_buf->data) + sizeof(double) + sizeof(size_t) + input_event.size < midi_buf->capacity)
     {
-      break;
+      /* write LV2 MIDI event */
+      *((double*)midi_data) = input_event.time;
+      midi_data += sizeof(double);
+      *((size_t*)midi_data) = input_event.size;
+      midi_data += sizeof(size_t);
+      memcpy(midi_data, input_event.buffer, input_event.size);
+
+      /* normalise note events if needed */
+      if ((input_event.size == 3) && ((midi_data[0] & 0xF0) == 0x90) &&
+          (midi_data[2] == 0))
+      {
+        midi_data[0] = 0x80 | (midi_data[0] & 0x0F);
+      }
+
+      midi_data += input_event.size;
+      midi_buf->event_count++;
+    }
+    else
+    {
+      /* no space left in destination buffer */
+      /* TODO: notify user that midi event(s) got lost */
     }
 
-    /* write LV2 MIDI event */
-    *((double*)data) = input_event.time;
-    data += sizeof(double);
-    *((size_t*)data) = input_event.size;
-    data += sizeof(size_t);
-    memcpy(data, input_event.buffer, input_event.size);
-
-    /* normalise note events if needed */
-    if ((input_event.size == 3) && ((data[0] & 0xF0) == 0x90) &&
-        (data[2] == 0))
+    /* store event in event port buffer */
+    if (event_buf->capacity - event_buf->size >= sizeof(LV2_Event) + input_event.size)
     {
-      data[0] = 0x80 | (data[0] & 0x0F);
+      event_ptr->frames = input_event.time;
+      event_ptr->subframes = 0;
+      event_ptr->type = ZYNJACKU_MIDI_EVENT_ID;
+      event_ptr->size = input_event.size;
+      memcpy(event_ptr + 1, input_event.buffer, input_event.size);
+        
+      size16 = lv2_event_pad_size(sizeof(LV2_Event) + input_event.size);
+      event_buf->size += size16;
+      event_ptr = (LV2_Event *)((char *)event_ptr + size16);
+      event_buf->event_count++;
     }
-
-    data += input_event.size;
-    output_buf->event_count++;
+    else
+    {
+      /* no space left in destination buffer */
+      /* TODO: notify user that midi event(s) got lost */
+    }
   }
 
-  output_buf->size = data - output_buf->data;
+  midi_buf->size = midi_data - midi_buf->data;
 
   return input_event_count != 0;
 }
@@ -381,7 +485,11 @@ jack_process_cb(
   struct zynjacku_synth * synth_ptr;
 
   /* Copy MIDI input data to all LV2 midi in ports */
-  if (jackmidi2lv2midi(engine_ptr->jack_midi_in, &engine_ptr->lv2_midi_buffer, nframes))
+  if (zynjacku_jackmidi_to_lv2midi(
+        engine_ptr->jack_midi_in,
+        &engine_ptr->lv2_midi_buffer,
+        &engine_ptr->lv2_midi_event_buffer,
+        nframes))
   {
     engine_ptr->midi_activity = TRUE;
   }

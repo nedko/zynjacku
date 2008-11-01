@@ -32,6 +32,8 @@
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"
+#include "lv2_uri_map.h"
+
 #include "list.h"
 #include "gtk2gui.h"
 #include "lv2.h"
@@ -43,7 +45,6 @@
 #define LV2_RDF_LICENSE_URI "http://usefulinc.com/ns/doap#license"
 #define LV2_MIDI_PORT_URI "http://ll-plugins.nongnu.org/lv2/ext/MidiPort"
 #define LV2_EVENT_PORT_URI LV2_EVENT_URI "#EventPort"
-#define LV2_EVENT_URI_TYPE_MIDI "http://lv2plug.in/ns/ext/midi#MidiEvent"
 
 struct zynjacku_plugin_info
 {
@@ -422,6 +423,17 @@ zynjacku_plugin_repo_check_plugin(
       continue;
     }
 
+    if (strcmp(LV2_URI_MAP_URI, feature_uri) == 0)
+    {
+      continue;
+    }
+
+    if (strcmp(LV2_EVENT_URI, feature_uri) == 0)
+    {
+      continue;
+    }
+
+
     LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, feature_uri);
     goto free_features;
   }
@@ -770,6 +782,16 @@ zynjacku_plugin_repo_create_port(
   {
     port_ptr = &synth_ptr->midi_in_port;
     port_ptr->type = PORT_TYPE_MIDI;
+    port_ptr->index = port_index;
+    return true;
+  }
+
+  if (slv2_port_is_event(info_ptr->slv2info, port) &&
+      slv2_port_is_midi_event(info_ptr->slv2info, port) &&
+      slv2_port_is_input(info_ptr->slv2info, port))
+  {
+    port_ptr = &synth_ptr->midi_in_port;
+    port_ptr->type = PORT_TYPE_EVENT_MIDI;
     port_ptr->index = port_index;
     return true;
   }

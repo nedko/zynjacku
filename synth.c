@@ -30,6 +30,9 @@
 #include <glib-object.h>
 
 #include "lv2-miditype.h"
+#include "lv2_event.h"
+#include "lv2_uri_map.h"
+
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -737,7 +740,7 @@ zynjacku_synth_free_ports(
 
   if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
   {
-    assert(plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO);
+    assert(plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO);
     jack_port_unregister(engine_ptr->jack_client, plugin_ptr->audio_out_right_port.data.audio);
     list_del(&plugin_ptr->audio_out_right_port.port_type_siblings);
   }
@@ -806,7 +809,19 @@ zynjacku_synth_construct(
   }
 
   /* connect midi port */
-  zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+  switch (synth_ptr->midi_in_port.type)
+  {
+  case PORT_TYPE_MIDI:
+    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+    break;
+  case PORT_TYPE_EVENT_MIDI:
+    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_event_buffer);
+    break;
+  default:
+    LOG_ERROR("don't know how to connect midi port of type %u", synth_ptr->midi_in_port.type);
+    goto fail_detach_dynparams;
+  }
+
   list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
 
   /* connect parameter ports */
@@ -868,6 +883,13 @@ zynjacku_synth_construct(
 fail_free_ports:
   zynjacku_synth_free_ports(engine_ptr, synth_ptr);
 
+fail_detach_dynparams:
+  if (synth_ptr->dynparams != NULL)
+  {
+    lv2dynparam_host_detach(synth_ptr->dynparams);
+    synth_ptr->dynparams = NULL;
+  }
+
 fail_unload:
   zynjacku_lv2_unload(synth_ptr->lv2plugin);
 
@@ -895,6 +917,12 @@ zynjacku_synth_destruct(
   }
 
   zynjacku_synth_free_ports(engine_ptr, synth_ptr);
+
+  if (synth_ptr->dynparams != NULL)
+  {
+    lv2dynparam_host_detach(synth_ptr->dynparams);
+    synth_ptr->dynparams = NULL;
+  }
 
   g_object_unref(synth_ptr->engine_object_ptr);
 
