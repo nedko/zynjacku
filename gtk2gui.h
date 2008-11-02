@@ -46,6 +46,11 @@ void
 zynjacku_gtk2gui_ui_off(
   zynjacku_gtk2gui_handle gtk2gui_handle);
 
+void
+zynjacku_gtk2gui_push_measure_ports(
+  zynjacku_gtk2gui_handle ui_handle,
+  const struct list_head * measure_ports_ptr);
+
 /* callback */
 void
 zynjacku_gtk2gui_on_ui_destroyed(

@@ -469,10 +469,7 @@ zynjacku_rack_ui_run(
   {
     effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_all);
 
-    if (effect_ptr->dynparams)
-    {
-      lv2dynparam_host_ui_run(effect_ptr->dynparams);
-    }
+    zynjacku_plugin_ui_run(effect_ptr);
   }
 }
 
@@ -603,7 +600,7 @@ zynjacku_free_effect_ports(
 
   LOG_DEBUG("zynjacku_free_effect_ports() called");
 
-  zynjacku_free_plugin_parameter_ports(plugin_ptr);
+  zynjacku_free_plugin_control_ports(plugin_ptr);
 
   if (plugin_ptr->type == PLUGIN_TYPE_EFFECT)
   {
@@ -745,6 +742,13 @@ zynjacku_plugin_construct_effect(
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
     zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
+  }
+
+  /* connect measurement ports */
+  list_for_each(node_ptr, &plugin_ptr->measure_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
   }
 
   size_name = strlen(plugin_ptr->name);

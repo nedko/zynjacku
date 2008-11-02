@@ -462,6 +462,7 @@ zynjacku_plugin_init(
 
   plugin_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
+  INIT_LIST_HEAD(&plugin_ptr->measure_ports);
 
   plugin_ptr->type = PLUGIN_TYPE_UNKNOWN;
 
@@ -677,6 +678,22 @@ zynjacku_plugin_ui_on(
 }
 
 void
+zynjacku_plugin_ui_run(
+  struct zynjacku_plugin * plugin_ptr)
+{
+
+  if (plugin_ptr->dynparams != NULL)
+  {
+    lv2dynparam_host_ui_run(plugin_ptr->dynparams);
+  }
+
+  if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  {
+    zynjacku_gtk2gui_push_measure_ports(plugin_ptr->gtk2gui, &plugin_ptr->measure_ports);
+  }
+}
+
+void
 zynjacku_plugin_ui_off(
   ZynjackuPlugin * plugin_obj_ptr)
 {
@@ -718,7 +735,7 @@ zynjacku_gtk2gui_on_ui_destroyed(
 }
 
 void
-zynjacku_free_plugin_parameter_ports(
+zynjacku_free_plugin_control_ports(
   struct zynjacku_plugin * plugin_ptr)
 {
   struct list_head * node_ptr;
@@ -735,6 +752,18 @@ zynjacku_free_plugin_parameter_ports(
 
     free(port_ptr->symbol);
     free(port_ptr->name);
+    free(port_ptr);
+  }
+
+  while (!list_empty(&plugin_ptr->measure_ports))
+  {
+    node_ptr = plugin_ptr->measure_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(port_ptr->type == PORT_TYPE_MEASURE);
+
+    list_del(node_ptr);
+
     free(port_ptr);
   }
 }

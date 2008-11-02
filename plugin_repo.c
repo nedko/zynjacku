@@ -699,6 +699,7 @@ zynjacku_plugin_repo_create_port_internal(
   const char * symbol_str;
   const char * name_str;
   unsigned int port_type;
+  bool output_port;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
@@ -717,14 +718,10 @@ zynjacku_plugin_repo_create_port_internal(
     goto fail;
   }
 
-  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_control))
-  {
-    if (!slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_input))
-    {
-      /* ignore output control ports, we dont support them yet */
-      return true;
-    }
+  output_port = slv2_port_is_output(info_ptr->slv2info, port);
 
+  if (slv2_port_is_control(info_ptr->slv2info, port))
+  {
     port_ptr = malloc(sizeof(struct zynjacku_port));
     if (port_ptr == NULL)
     {
@@ -732,69 +729,79 @@ zynjacku_plugin_repo_create_port_internal(
       goto fail;
     }
 
-    port_ptr->type = PORT_TYPE_PARAMETER;
     port_ptr->index = port_index;
 
-    /* port symbol */
-    port_ptr->symbol = strdup(symbol_str);
-    if (port_ptr->symbol == NULL)
+    if (output_port)
     {
-      LOG_ERROR("strdup() failed.");
-      goto fail_free_port;
-    }
+      port_ptr->type = PORT_TYPE_MEASURE;
 
-    /* port name */
-    name = slv2_port_get_name(info_ptr->slv2info, port);
-    if (name == NULL)
+      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->measure_ports);
+    }
+    else
     {
-      LOG_ERROR("slv2_port_get_name() failed.");
-      goto fail_free_symbol;
+      port_ptr->type = PORT_TYPE_PARAMETER;
+
+      /* port symbol */
+      port_ptr->symbol = strdup(symbol_str);
+      if (port_ptr->symbol == NULL)
+      {
+        LOG_ERROR("strdup() failed.");
+        goto fail_free_port;
+      }
+
+      /* port name */
+      name = slv2_port_get_name(info_ptr->slv2info, port);
+      if (name == NULL)
+      {
+        LOG_ERROR("slv2_port_get_name() failed.");
+        goto fail_free_symbol;
+      }
+
+      name_str = slv2_value_as_string_smart(name);
+      if (name_str == NULL)
+      {
+        LOG_ERROR("port symbol is not string.");
+        goto fail_free_symbol;
+      }
+
+      port_ptr->name = strdup(name_str);
+
+      slv2_value_free(name);
+
+      if (port_ptr->name == NULL)
+      {
+        LOG_ERROR("strdup() failed.");
+        goto fail_free_symbol;
+      }
+
+      /* port range */
+      slv2_port_get_range(
+        info_ptr->slv2info,
+        port,
+        &default_value,
+        &min_value,
+        &max_value);
+
+      if (default_value != NULL)
+      {
+        port_ptr->data.parameter.value = slv2_value_as_float(default_value);
+        slv2_value_free(default_value);
+      }
+
+      if (min_value != NULL)
+      {
+        port_ptr->data.parameter.min = slv2_value_as_float(min_value);
+        slv2_value_free(min_value);
+      }
+
+      if (max_value != NULL)
+      {
+        port_ptr->data.parameter.max = slv2_value_as_float(max_value);
+        slv2_value_free(max_value);
+      }
+
+      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
     }
-
-    name_str = slv2_value_as_string_smart(name);
-    if (name_str == NULL)
-    {
-      LOG_ERROR("port symbol is not string.");
-      goto fail_free_symbol;
-    }
-
-    port_ptr->name = strdup(name_str);
-
-    slv2_value_free(name);
-
-    if (port_ptr->name == NULL)
-    {
-      LOG_ERROR("strdup() failed.");
-      goto fail_free_symbol;
-    }
-
-    /* port range */
-    slv2_port_get_range(
-      info_ptr->slv2info,
-      port,
-      &default_value,
-      &min_value,
-      &max_value);
-
-    if (default_value != NULL)
-    {
-      port_ptr->data.parameter.value = slv2_value_as_float(default_value);
-      slv2_value_free(default_value);
-    }
-
-    if (min_value != NULL)
-    {
-      port_ptr->data.parameter.min = slv2_value_as_float(min_value);
-      slv2_value_free(min_value);
-    }
-
-    if (max_value != NULL)
-    {
-      port_ptr->data.parameter.max = slv2_value_as_float(max_value);
-      slv2_value_free(max_value);
-    }
-
-    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
 
     return true;
   }
@@ -821,7 +828,7 @@ zynjacku_plugin_repo_create_port_internal(
   if (create_port(
         context,
         port_type,
-        slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_output),
+        output_port,
         port_index))
   {
     return true;

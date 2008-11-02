@@ -330,6 +330,32 @@ zynjacku_gtk2gui_ui_on(
 }
 
 void
+zynjacku_gtk2gui_push_measure_ports(
+  zynjacku_gtk2gui_handle ui_handle,
+  const struct list_head * measure_ports_ptr)
+{
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+
+  if (ui_ptr->ui_handle == NULL)
+  {
+    return;
+  }
+
+  list_for_each(node_ptr, measure_ports_ptr)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    ui_ptr->lv2ui->port_event(
+      ui_ptr->ui_handle,
+      port_ptr->index,
+      sizeof(float),
+      0,
+      (const void *)&port_ptr->data.parameter.value);
+  }
+}
+
+void
 zynjacku_gtk2gui_ui_off(
   zynjacku_gtk2gui_handle ui_handle)
 {

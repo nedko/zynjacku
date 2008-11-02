@@ -632,10 +632,7 @@ zynjacku_engine_ui_run(
   {
     synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings_all);
 
-    if (synth_ptr->dynparams)
-    {
-      lv2dynparam_host_ui_run(synth_ptr->dynparams);
-    }
+    zynjacku_plugin_ui_run(synth_ptr);
   }
 }
 
@@ -782,7 +779,7 @@ zynjacku_free_synth_ports(
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(plugin_ptr->engine_object_ptr);
 
-  zynjacku_free_plugin_parameter_ports(plugin_ptr);
+  zynjacku_free_plugin_control_ports(plugin_ptr);
 
   if (plugin_ptr->type == PLUGIN_TYPE_SYNTH)
   {
@@ -942,6 +939,13 @@ zynjacku_plugin_construct_synth(
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
     zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
+  }
+
+  /* connect measurement ports */
+  list_for_each(node_ptr, &plugin_ptr->measure_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
   }
 
   size_name = strlen(plugin_ptr->name);
