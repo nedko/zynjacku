@@ -799,11 +799,11 @@ zynjacku_plugin_repo_create_port_internal(
     return true;
   }
 
-  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio))
+  if (slv2_port_is_audio(info_ptr->slv2info, port))
   {
     port_type = PORT_TYPE_AUDIO;
   }
-  else if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio))
+  else if (slv2_port_is_midi(info_ptr->slv2info, port))
   {
     port_type = PORT_TYPE_MIDI;
   }
@@ -814,7 +814,8 @@ zynjacku_plugin_repo_create_port_internal(
   }
   else
   {
-    goto unrecognized;
+    LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
+    goto fail;
   }
 
   if (create_port(
@@ -826,8 +827,7 @@ zynjacku_plugin_repo_create_port_internal(
     return true;
   }
 
-unrecognized:
-  LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
+  LOG_ERROR("Unmatched port '%s'. type is %u, index is %u", slv2_value_as_string_smart(symbol), (unsigned int)port_type, (unsigned int)port_index);
   goto fail;
 
 fail_free_symbol:
