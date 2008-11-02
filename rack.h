@@ -59,26 +59,12 @@ void
 zynjacku_rack_stop_jack(
   ZynjackuRack * obj_ptr);
 
-void
-zynjacku_rack_activate_synth(
-  ZynjackuRack * rack_obj_ptr,
-  GObject * synth_obj_ptr);
-
-void
-zynjacku_rack_deactivate_synth(
-  ZynjackuRack * rack_obj_ptr,
-  GObject * synth_obj_ptr);
-
 guint
 zynjacku_rack_get_sample_rate(
   ZynjackuRack * rack_obj_ptr);
 
 void
 zynjacku_rack_ui_run(
-  ZynjackuRack * rack_obj_ptr);
-
-gboolean
-zynjacku_rack_get_midi_activity(
   ZynjackuRack * rack_obj_ptr);
 
 const gchar *

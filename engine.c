@@ -832,6 +832,58 @@ zynjacku_free_synth_ports(
   }
 }
 
+#define synth_ptr (&((struct zynjacku_plugin *)context)->subtype.synth)
+
+bool
+zynjacku_synth_create_port(
+  void * context,
+  unsigned int port_type,
+  bool output,
+  uint32_t port_index)
+{
+  struct zynjacku_port * port_ptr;
+
+  switch (port_type)
+  {
+  case PORT_TYPE_AUDIO:
+    if (output)
+    {
+      if (synth_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
+      {
+        port_ptr = &synth_ptr->audio_out_left_port;
+      }
+      else if (synth_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+      {
+        port_ptr = &synth_ptr->audio_out_right_port;
+      }
+      else
+      {
+        /* ignore, we dont support more than two audio ports yet */
+        return true;
+      }
+
+      port_ptr->type = PORT_TYPE_AUDIO;
+      port_ptr->index = port_index;
+
+      return true;
+    }
+    break;
+  case PORT_TYPE_MIDI:
+  case PORT_TYPE_EVENT_MIDI:
+    if (!output)
+    {
+      port_ptr = &synth_ptr->midi_in_port;
+      port_ptr->type = port_type;
+      port_ptr->index = port_index;
+      return true;
+    }
+    break;
+  }
+
+  return false;
+}
+
+#undef synth_ptr
 #define synth_ptr (&plugin_ptr->subtype.synth)
 
 bool
@@ -855,7 +907,7 @@ zynjacku_plugin_construct_synth(
   synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  if (!zynjacku_plugin_repo_load_synth(plugin_ptr))
+  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, synth_ptr, zynjacku_synth_create_port))
   {
     LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
     goto fail;

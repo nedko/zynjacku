@@ -680,14 +680,14 @@ zynjacku_plugin_repo_get_bundle_path(
   return slv2_uri_to_path(slv2_value_as_uri(slv2_plugin_get_bundle_uri(info_ptr->slv2info)));
 }
 
-#define synth_ptr (&plugin_ptr->subtype.synth)
-
 static
 bool
-zynjacku_plugin_repo_create_port(
+zynjacku_plugin_repo_create_port_internal(
   struct zynjacku_plugin_info *info_ptr,
   uint32_t port_index,
-  struct zynjacku_plugin * plugin_ptr)
+  struct zynjacku_plugin * plugin_ptr,
+  void * context,
+  zynjacku_plugin_repo_create_port create_port)
 {
   SLV2Value symbol;
   SLV2Value name;
@@ -698,6 +698,7 @@ zynjacku_plugin_repo_create_port(
   SLV2Value max_value;
   const char * symbol_str;
   const char * name_str;
+  unsigned int port_type;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
@@ -798,48 +799,34 @@ zynjacku_plugin_repo_create_port(
     return true;
   }
 
-  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio) &&
-      slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_output))
+  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio))
   {
-    if (synth_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &synth_ptr->audio_out_left_port;
-    }
-    else if (synth_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &synth_ptr->audio_out_right_port;
-    }
-    else
-    {
-      /* ignore, we dont support more than two audio ports yet */
-      return true;
-    }
+    port_type = PORT_TYPE_AUDIO;
+  }
+  else if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_audio))
+  {
+    port_type = PORT_TYPE_MIDI;
+  }
+  else if (slv2_port_is_event(info_ptr->slv2info, port) &&
+           slv2_port_is_midi_event(info_ptr->slv2info, port))
+  {
+    port_type = PORT_TYPE_EVENT_MIDI;
+  }
+  else
+  {
+    goto unrecognized;
+  }
 
-    port_ptr->type = PORT_TYPE_AUDIO;
-    port_ptr->index = port_index;
-
+  if (create_port(
+        context,
+        port_type,
+        slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_output),
+        port_index))
+  {
     return true;
   }
 
-  if (slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_midi) &&
-      slv2_port_is_a(info_ptr->slv2info, port, g_slv2uri_port_input))
-  {
-    port_ptr = &synth_ptr->midi_in_port;
-    port_ptr->type = PORT_TYPE_MIDI;
-    port_ptr->index = port_index;
-    return true;
-  }
-
-  if (slv2_port_is_event(info_ptr->slv2info, port) &&
-      slv2_port_is_midi_event(info_ptr->slv2info, port) &&
-      slv2_port_is_input(info_ptr->slv2info, port))
-  {
-    port_ptr = &synth_ptr->midi_in_port;
-    port_ptr->type = PORT_TYPE_EVENT_MIDI;
-    port_ptr->index = port_index;
-    return true;
-  }
-
+unrecognized:
   LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
   goto fail;
 
@@ -853,11 +840,11 @@ fail:
   return false;
 }
 
-#undef synth_ptr
-
 bool
-zynjacku_plugin_repo_load_synth(
-  struct zynjacku_plugin * synth_ptr)
+zynjacku_plugin_repo_load_plugin(
+  struct zynjacku_plugin * synth_ptr,
+  void * context,
+  zynjacku_plugin_repo_create_port create_port)
 {
   struct zynjacku_plugin_info * info_ptr;
   SLV2Values slv2features;
@@ -914,7 +901,7 @@ zynjacku_plugin_repo_load_synth(
 
   for (i = 0 ; i < ports_count ; i++)
   {
-    if (!zynjacku_plugin_repo_create_port(info_ptr, i, synth_ptr))
+    if (!zynjacku_plugin_repo_create_port_internal(info_ptr, i, synth_ptr, context, create_port))
     {
       LOG_ERROR("Failed to create plugin port");
       goto free_features;

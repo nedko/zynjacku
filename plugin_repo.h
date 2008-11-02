@@ -50,6 +50,14 @@ bool
   uint32_t midi_event_in_ports_count,
   uint32_t ports_count);
 
+typedef
+bool
+(* zynjacku_plugin_repo_create_port)(
+  void * context,
+  unsigned int port_type,
+  bool output,
+  uint32_t port_index);
+
 bool
 zynjacku_plugin_repo_init();
 
@@ -87,8 +95,10 @@ zynjacku_plugin_repo_get_ui_info(
   char ** ui_bundle_path_ptr);
 
 bool
-zynjacku_plugin_repo_load_synth(
-  struct zynjacku_plugin * synth_ptr);
+zynjacku_plugin_repo_load_plugin(
+  struct zynjacku_plugin * synth_ptr,
+  void * context,
+  zynjacku_plugin_repo_create_port create_port);
 
 void
 zynjacku_plugin_repo_uninit();

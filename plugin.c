@@ -42,6 +42,7 @@
 
 #include "plugin.h"
 #include "engine.h"
+#include "rack.h"
 #include "enum.h"
 #include "gtk2gui.h"
 #include "hints.h"
@@ -50,6 +51,7 @@
 #include "zynjacku.h"
 #include "plugin_repo.h"
 #include "synth.h"
+#include "effect.h"
 
 /* signals */
 #define ZYNJACKU_PLUGIN_SIGNAL_TEST                0
@@ -760,6 +762,14 @@ zynjacku_plugin_construct(
       engine_object_ptr);
   }
 
+  if (ZYNJACKU_IS_RACK(engine_object_ptr))
+  {
+    return zynjacku_plugin_construct_effect(
+      plugin_ptr,
+      plugin_obj_ptr,
+      engine_object_ptr);
+  }
+
   LOG_ERROR("Cannot construct plugin for unknown engine type");
 
   return false;
@@ -775,15 +785,7 @@ zynjacku_plugin_destruct(
 
   LOG_DEBUG("Destructing plugin <%s>", plugin_ptr->uri);
 
-  if (ZYNJACKU_IS_ENGINE(plugin_ptr->engine_object_ptr))
-  {
-    plugin_ptr->deactivate(G_OBJECT(plugin_obj_ptr));
-  }
-  else
-  {
-    LOG_ERROR("Cannot destruct plugin for unknown engine type");
-    return;
-  }
+  plugin_ptr->deactivate(G_OBJECT(plugin_obj_ptr));
 
   if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
