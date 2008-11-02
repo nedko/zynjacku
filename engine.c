@@ -595,31 +595,6 @@ jack_process_cb(
 #undef engine_ptr
 
 void
-zynjacku_engine_activate_synth(
-  ZynjackuEngine * engine_obj_ptr,
-  GObject * synth_obj_ptr)
-{
-  struct zynjacku_engine * engine_ptr;
-  struct zynjacku_plugin * synth_ptr;
-
-  LOG_DEBUG("zynjacku_engine_add_synth() called.");
-
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
-  synth_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(synth_obj_ptr);
-
-  /* Activate plugin */
-  zynjacku_lv2_activate(synth_ptr->lv2plugin);
-
-  synth_ptr->recycle = false;
-
-  list_add_tail(&synth_ptr->siblings_all, &engine_ptr->plugins_all);
-
-  pthread_mutex_lock(&engine_ptr->active_plugins_lock);
-  list_add_tail(&synth_ptr->siblings_active, &engine_ptr->plugins_pending_activation);
-  pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
-}
-
-void
 zynjacku_engine_deactivate_synth(
   GObject * synth_obj_ptr)
 {
@@ -843,6 +818,8 @@ zynjacku_synth_create_port(
 {
   struct zynjacku_port * port_ptr;
 
+  LOG_NOTICE("creating synth %s port of type %u, index %u", output ? "output" : "input", (unsigned int)port_type, (unsigned int)port_index);
+
   switch (port_type)
   {
   case PORT_TYPE_AUDIO:
@@ -907,7 +884,7 @@ zynjacku_plugin_construct_synth(
   synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, synth_ptr, zynjacku_synth_create_port))
+  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, plugin_ptr, zynjacku_synth_create_port))
   {
     LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
     goto fail;
@@ -1003,7 +980,16 @@ zynjacku_plugin_construct_synth(
 
   id++;
 
-  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(plugin_obj_ptr));
+  /* Activate plugin */
+  zynjacku_lv2_activate(plugin_ptr->lv2plugin);
+
+  plugin_ptr->recycle = false;
+
+  list_add_tail(&plugin_ptr->siblings_all, &engine_ptr->plugins_all);
+
+  pthread_mutex_lock(&engine_ptr->active_plugins_lock);
+  list_add_tail(&plugin_ptr->siblings_active, &engine_ptr->plugins_pending_activation);
+  pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
 
   g_object_ref(plugin_ptr->engine_object_ptr);
 
