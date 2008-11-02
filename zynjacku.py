@@ -942,6 +942,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         plugin_repo_widget = self.glade_xml.get_widget("treeview_available_plugins")
         progressbar = self.glade_xml.get_widget("progressbar")
 
+        dialog.set_title("LV2 synth plugins")
+
         plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
         store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)

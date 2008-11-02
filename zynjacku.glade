@@ -185,7 +185,7 @@
   <widget class="GtkDialog" id="zynjacku_plugin_repo">
     <property name="width_request">600</property>
     <property name="height_request">500</property>
-    <property name="title" translatable="yes">Synth Plugins</property>
+    <property name="title" translatable="yes">Plugins</property>
     <property name="modal">True</property>
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
