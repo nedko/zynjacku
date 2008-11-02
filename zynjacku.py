@@ -722,13 +722,13 @@ class PluginUIFactory:
     def plugin_ui_available(self, plugin):
         return plugin.supports_custom_ui() or plugin.supports_generic_ui()
 
-class ZynjackuHost(PluginUIFactory):
-    def __init__(self, client_name):
+class host(PluginUIFactory):
+    def __init__(self, engine, client_name):
         #print "ZynjackuHost constructor called."
 
         PluginUIFactory.__init__(self)
 
-        self.engine = zynjacku.Engine()
+        self.engine = engine
 
         if not self.engine.start_jack(client_name):
             print "Failed to initialize zynjacku engine"
@@ -752,6 +752,12 @@ class ZynjackuHost(PluginUIFactory):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
         print repr(obj1)
         print repr(obj2)
+
+class ZynjackuHost(host):
+    def __init__(self, client_name):
+        #print "ZynjackuHost constructor called."
+
+        host.__init__(self, zynjacku.Engine(), client_name)
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, data_dir, glade_xml, client_name, the_license, uris):

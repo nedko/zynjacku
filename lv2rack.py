@@ -33,10 +33,10 @@ sys.path = old_path
 
 import zynjacku as zynjacku
 
-class lv2rack(zynjacku.ZynjackuHost):
+class lv2rack(zynjacku.host):
     def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
         #print "lv2rack constructor called."
-        zynjacku.ZynjackuHost.__init__(self, client_name)
+        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name)
         
         self.effects = []
 
@@ -94,7 +94,7 @@ class lv2rack(zynjacku.ZynjackuHost):
         for effect in self.effects:
             effect.destruct()
 
-        zynjacku.ZynjackuHost.__del__(self)
+        zynjacku.host.__del__(self)
 
     def add_effect(self, uri):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
@@ -115,7 +115,7 @@ class lv2rack(zynjacku.ZynjackuHost):
     def run(self):
         toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
 
-        zynjacku.ZynjackuHost.run(self)
+        zynjacku.host.run(self)
 
         for effect in self.effects:
             if effect.ui_win:
@@ -128,7 +128,7 @@ class lv2rack(zynjacku.ZynjackuHost):
         row[0] = False
 
     def create_plugin_ui(self, effect, row):
-        if not zynjacku.ZynjackuHost.create_plugin_ui(self, effect):
+        if not zynjacku.host.create_plugin_ui(self, effect):
             return False
 
         effect.ui_win.destroy_connect_id = effect.ui_win.connect("destroy", self.on_effect_ui_window_destroyed, effect, row)

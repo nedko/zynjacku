@@ -64,8 +64,40 @@
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
 
+struct zynjacku_engine
+{
+  gboolean dispose_has_run;
+
+  jack_client_t * jack_client;  /* the jack client */
+
+  struct list_head plugins_all; /* accessed only from ui thread */
+  struct list_head plugins_active; /* accessed only from rt thread */
+
+  pthread_mutex_t active_plugins_lock;
+  struct list_head plugins_pending_activation; /* protected using active_plugins_lock */
+
+  struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_port"s linked by port_type_siblings */
+  struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_port"s linked by port_type_siblings */
+  jack_port_t * jack_midi_in;
+  LV2_MIDI lv2_midi_buffer;
+  LV2_Event_Buffer lv2_midi_event_buffer;
+  gboolean midi_activity;
+
+  struct lv2_rtsafe_memory_pool_provider mempool_allocator;
+  LV2_URI_Map_Feature uri_map;
+  LV2_Event_Feature event;
+
+  LV2_Feature host_feature_rtmempool;
+  LV2_Feature host_feature_uri_map;
+  LV2_Feature host_feature_event_ref;
+  const LV2_Feature * host_features[4];
+};
+
+#define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
+
 static guint g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNALS_COUNT];
 
+static
 int
 jack_process_cb(
   jack_nframes_t nframes,
@@ -184,6 +216,7 @@ zynjacku_uri_to_id(
   return 0;                     /* "unsupported" */
 }
 
+static
 uint32_t
 zynjacku_event_ref_func(
   LV2_Event_Callback_Data callback_data,
@@ -479,6 +512,7 @@ zynjacku_jackmidi_to_lv2midi(
 #define engine_ptr ((struct zynjacku_engine *)context_ptr)
 
 /* Jack process callback. */
+static
 int
 jack_process_cb(
   jack_nframes_t nframes,
@@ -582,7 +616,6 @@ zynjacku_engine_activate_synth(
 
 void
 zynjacku_engine_deactivate_synth(
-  ZynjackuEngine * engine_obj_ptr,
   GObject * synth_obj_ptr)
 {
   struct zynjacku_plugin * synth_ptr;
@@ -709,3 +742,191 @@ zynjacku_engine_iterate_plugins(
 {
   zynjacku_plugin_repo_iterate(force, engine_obj_ptr, zynjacku_engine_tick, zynjacku_engine_tack);
 }
+
+void
+zynjacku_free_synth_ports(
+  GObject * plugin_object_ptr)
+{
+  struct zynjacku_engine * engine_ptr;
+  struct zynjacku_plugin * plugin_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(plugin_ptr->engine_object_ptr);
+
+  zynjacku_free_plugin_parameter_ports(plugin_ptr);
+
+  if (plugin_ptr->type == PLUGIN_TYPE_SYNTH)
+  {
+    if (plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO)
+    {
+      jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_left_port.data.audio);
+      list_del(&plugin_ptr->subtype.synth.audio_out_left_port.port_type_siblings);
+    }
+
+    if (plugin_ptr->subtype.synth.audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
+    {
+      assert(plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO);
+      jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_right_port.data.audio);
+      list_del(&plugin_ptr->subtype.synth.audio_out_right_port.port_type_siblings);
+    }
+
+    if (plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_MIDI ||
+        plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_EVENT_MIDI)
+    {
+      list_del(&plugin_ptr->subtype.synth.midi_in_port.port_type_siblings);
+    }
+  }
+}
+
+#define synth_ptr (&plugin_ptr->subtype.synth)
+
+bool
+zynjacku_plugin_construct_synth(
+  struct zynjacku_plugin * plugin_ptr,
+  ZynjackuPlugin * plugin_obj_ptr,
+  GObject * engine_object_ptr)
+{
+  static unsigned int id;
+  char * port_name;
+  size_t size_name;
+  size_t size_id;
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+  struct zynjacku_engine * engine_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
+
+  plugin_ptr->type = PLUGIN_TYPE_SYNTH;
+  synth_ptr->midi_in_port.type = PORT_TYPE_INVALID;
+  synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
+  synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
+
+  if (!zynjacku_plugin_repo_load_synth(plugin_ptr))
+  {
+    LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
+    goto fail;
+  }
+
+  plugin_ptr->lv2plugin = zynjacku_lv2_load(
+    plugin_ptr->uri,
+    zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr)),
+    engine_ptr->host_features);
+  if (plugin_ptr->lv2plugin == NULL)
+  {
+    LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
+    goto fail;
+  }
+
+  if (plugin_ptr->dynparams_supported)
+  {
+    if (!lv2dynparam_host_attach(
+          zynjacku_lv2_get_descriptor(plugin_ptr->lv2plugin),
+          zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
+          &engine_ptr->mempool_allocator,
+          plugin_obj_ptr,
+          &plugin_ptr->dynparams))
+    {
+      LOG_ERROR("Failed to instantiate dynparams extension.");
+      goto fail_unload;
+    }
+  }
+  else
+  {
+    plugin_ptr->dynparams = NULL;
+  }
+
+  plugin_ptr->engine_object_ptr = engine_object_ptr;
+
+  /* connect midi port */
+  switch (synth_ptr->midi_in_port.type)
+  {
+  case PORT_TYPE_MIDI:
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+    break;
+  case PORT_TYPE_EVENT_MIDI:
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_event_buffer);
+    break;
+  default:
+    LOG_ERROR("don't know how to connect midi port of type %u", synth_ptr->midi_in_port.type);
+    goto fail_detach_dynparams;
+  }
+
+  list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
+
+  /* connect parameter ports */
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
+  }
+
+  size_name = strlen(plugin_ptr->name);
+  port_name = malloc(size_name + 1024);
+  if (port_name == NULL)
+  {
+    LOG_ERROR("Failed to allocate memory for port name");
+    goto fail_free_ports;
+  }
+
+  /* setup audio ports (they are connected in jack process callback */
+  size_id = sprintf(port_name, "%u:", id);
+  memcpy(port_name + size_id, plugin_ptr->name, size_name);
+
+  if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
+      synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+  {
+    strcpy(port_name + size_id + size_name, " L");
+    synth_ptr->audio_out_left_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&synth_ptr->audio_out_left_port.port_type_siblings, &engine_ptr->audio_ports);
+
+    strcpy(port_name + size_id + size_name, " R");
+    synth_ptr->audio_out_right_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&synth_ptr->audio_out_right_port.port_type_siblings, &engine_ptr->audio_ports);
+  }
+  else if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
+           synth_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+  {
+    port_name[size_id + size_name] = 0;
+    synth_ptr->audio_out_left_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    list_add_tail(&synth_ptr->audio_out_left_port.port_type_siblings, &engine_ptr->audio_ports);
+  }
+
+  port_name[size_id + size_name] = 0;
+  plugin_ptr->id = port_name;
+
+  id++;
+
+  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(plugin_obj_ptr));
+
+  g_object_ref(plugin_ptr->engine_object_ptr);
+
+  /* no plugins to test gtk2gui */
+  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
+
+  plugin_ptr->deactivate = zynjacku_engine_deactivate_synth;
+  plugin_ptr->free_ports = zynjacku_free_synth_ports;
+
+  LOG_DEBUG("Constructed plugin <%s>, gtk2gui <%p>", plugin_ptr->uri, plugin_ptr->gtk2gui);
+
+  return true;
+
+fail_free_ports:
+  zynjacku_free_synth_ports(G_OBJECT(plugin_obj_ptr));
+  plugin_ptr->engine_object_ptr = NULL;
+
+fail_detach_dynparams:
+  if (plugin_ptr->dynparams != NULL)
+  {
+    lv2dynparam_host_detach(plugin_ptr->dynparams);
+    plugin_ptr->dynparams = NULL;
+  }
+
+fail_unload:
+  zynjacku_lv2_unload(plugin_ptr->lv2plugin);
+
+fail:
+  return false;
+}
+
+#undef synth_ptr

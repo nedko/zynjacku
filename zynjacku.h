@@ -97,39 +97,15 @@ struct zynjacku_plugin
       struct zynjacku_port audio_out_right_port;
     } effect;
   } subtype;
+
+  void (* deactivate)(GObject * synth_obj_ptr);
+  void (* free_ports)(GObject * synth_obj_ptr);
 };
-
-struct zynjacku_engine
-{
-  gboolean dispose_has_run;
-
-  jack_client_t * jack_client;  /* the jack client */
-
-  struct list_head plugins_all; /* accessed only from ui thread */
-  struct list_head plugins_active; /* accessed only from rt thread */
-
-  pthread_mutex_t active_plugins_lock;
-  struct list_head plugins_pending_activation; /* protected using active_plugins_lock */
-
-  struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_port"s linked by port_type_siblings */
-  struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_port"s linked by port_type_siblings */
-  jack_port_t * jack_midi_in;
-  LV2_MIDI lv2_midi_buffer;
-  LV2_Event_Buffer lv2_midi_event_buffer;
-  gboolean midi_activity;
-
-  struct lv2_rtsafe_memory_pool_provider mempool_allocator;
-  LV2_URI_Map_Feature uri_map;
-  LV2_Event_Feature event;
-
-  LV2_Feature host_feature_rtmempool;
-  LV2_Feature host_feature_uri_map;
-  LV2_Feature host_feature_event_ref;
-  const LV2_Feature * host_features[4];
-};
-
-#define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
 
 #define ZYNJACKU_PLUGIN_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_TYPE, struct zynjacku_plugin))
+
+void
+zynjacku_free_plugin_parameter_ports(
+  struct zynjacku_plugin * plugin_ptr);
 
 #endif /* #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED */
