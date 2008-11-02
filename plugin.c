@@ -761,28 +761,19 @@ zynjacku_plugin_free_ports(
 
 #define synth_ptr (&plugin_ptr->subtype.synth)
 
-gboolean
-zynjacku_plugin_construct(
+bool
+zynjacku_plugin_construct_synth(
+  struct zynjacku_plugin * plugin_ptr,
   ZynjackuPlugin * plugin_obj_ptr,
+  struct zynjacku_engine * engine_ptr,
   GObject * engine_object_ptr)
 {
   static unsigned int id;
   char * port_name;
   size_t size_name;
   size_t size_id;
-  struct zynjacku_plugin * plugin_ptr;
-  struct zynjacku_engine * engine_ptr;
   struct list_head * node_ptr;
   struct zynjacku_port * port_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
-
-  if (plugin_ptr->uri == NULL)
-  {
-    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
-    goto fail;
-  }
 
   plugin_ptr->type = PLUGIN_TYPE_SYNTH;
   synth_ptr->midi_in_port.type = PORT_TYPE_INVALID;
@@ -893,7 +884,7 @@ zynjacku_plugin_construct(
 
   LOG_DEBUG("Constructed plugin <%s>, gtk2gui <%p>", plugin_ptr->uri, plugin_ptr->gtk2gui);
 
-  return TRUE;
+  return true;
 
 fail_free_ports:
   zynjacku_plugin_free_ports(engine_ptr, plugin_ptr);
@@ -909,7 +900,36 @@ fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);
 
 fail:
-  return FALSE;
+  return false;
+}
+
+gboolean
+zynjacku_plugin_construct(
+  ZynjackuPlugin * plugin_obj_ptr,
+  GObject * engine_object_ptr)
+{
+  struct zynjacku_plugin * plugin_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  if (plugin_ptr->uri == NULL)
+  {
+    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
+    return false;
+  }
+
+  if (ZYNJACKU_IS_ENGINE(engine_object_ptr))
+  {
+    return zynjacku_plugin_construct_synth(
+      plugin_ptr,
+      plugin_obj_ptr,
+      ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr),
+      engine_object_ptr);
+  }
+
+  LOG_ERROR("Cannot cosntruct plugin for unknown engine type");
+
+  return false;
 }
 
 #undef synth_ptr
