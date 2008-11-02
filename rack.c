@@ -39,7 +39,7 @@
 #include "lv2_uri_map.h"
 
 #include "list.h"
-//#define LOG_LEVEL LOG_LEVEL_ERROR
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #include "plugin.h"
