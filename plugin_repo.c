@@ -59,11 +59,14 @@ struct zynjacku_iterate_context
 {
   float progress;
   float progress_step;
-  void *context;
+  const LV2_Feature * const * supported_features;
+  void * context;
+  zynjacku_plugin_repo_check_plugin check_plugin;
   zynjacku_plugin_repo_tick tick;
   zynjacku_plugin_repo_tack tack;
 };
 
+/* I would be useful if slv2_world_get_plugins_by_filter() had callback user context... */
 /* this should really be parameter of slv2 filter plugins callback */
 struct zynjacku_iterate_context g_iterate_context;
 
@@ -348,11 +351,13 @@ zynjacku_plugin_repo_get_plugin_license(
 }
 
 /* check whether plugin is a synth, if it is, save plugin info */
+static
 bool
-zynjacku_plugin_repo_check_plugin(
+zynjacku_plugin_repo_check_and_maybe_init_plugin(
   SLV2Plugin plugin)
 {
   gboolean ret;
+  uint32_t audio_in_ports_count;
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
   uint32_t control_ports_count;
@@ -370,6 +375,7 @@ zynjacku_plugin_repo_check_plugin(
   unsigned int feature_index;
   struct zynjacku_plugin_info * plugin_info_ptr;
   SLV2Port port;
+  const LV2_Feature * const * feature_ptr_ptr;
 
   plugin_uri = slv2_plugin_get_uri_smart(plugin);
 
@@ -413,34 +419,28 @@ zynjacku_plugin_repo_check_plugin(
 
     LOG_DEBUG("%s", feature_uri);
 
-    if (strcmp(LV2DYNPARAM_URI, feature_uri) == 0)
+    feature_ptr_ptr = g_iterate_context.supported_features;
+    while (*feature_ptr_ptr != NULL)
     {
-      continue;
+      if (strcmp((*feature_ptr_ptr)->URI, feature_uri) == 0)
+      {
+        break;
+      }
+
+      feature_ptr_ptr++;
     }
 
-    if (strcmp(LV2_RTSAFE_MEMORY_POOL_URI, feature_uri) == 0)
+    if (*feature_ptr_ptr == NULL)
     {
-      continue;
+      LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, feature_uri);
+      goto free_features;
     }
-
-    if (strcmp(LV2_URI_MAP_URI, feature_uri) == 0)
-    {
-      continue;
-    }
-
-    if (strcmp(LV2_EVENT_URI, feature_uri) == 0)
-    {
-      continue;
-    }
-
-
-    LOG_DEBUG("Plugin \"%s\" requires unsupported feature \"%s\"", name, feature_uri);
-    goto free_features;
   }
 
   /* check port configuration */
 
   ports_count = slv2_plugin_get_num_ports(plugin);
+  audio_in_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_audio, g_slv2uri_port_input, NULL);
   audio_out_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_audio, g_slv2uri_port_output, NULL);
   midi_in_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_midi, g_slv2uri_port_input, NULL);
   control_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_control, NULL);
@@ -460,27 +460,20 @@ zynjacku_plugin_repo_check_plugin(
     }
   }
 
-  if (midi_in_ports_count + control_ports_count + event_ports_count + audio_out_ports_count != ports_count ||
-      midi_in_ports_count + midi_event_in_ports_count != 1 ||
-      audio_out_ports_count == 0)
+  if (!g_iterate_context.check_plugin(
+        g_iterate_context.context,
+        plugin_uri,
+        name,
+        audio_in_ports_count,
+        audio_out_ports_count,
+        midi_in_ports_count,
+        control_ports_count,
+        event_ports_count,
+        midi_event_in_ports_count,
+        ports_count))
   {
-    LOG_DEBUG("Skipping \"%s\" %s, plugin with unsupported port configuration", name, plugin_uri);
-    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
     goto free_features;
   }
-
-  LOG_DEBUG("Found \"%s\" %s", name, plugin_uri);
-  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
 
   plugin_info_ptr = malloc(sizeof(struct zynjacku_plugin_info));
   if (plugin_info_ptr == NULL)
@@ -543,7 +536,9 @@ exit:
 void
 zynjacku_plugin_repo_iterate(
   bool force_scan,
-  void *context,
+  const LV2_Feature * const * supported_features,
+  void * context,
+  zynjacku_plugin_repo_check_plugin check_plugin,
   zynjacku_plugin_repo_tick tick,
   zynjacku_plugin_repo_tack tack)
 {
@@ -590,11 +585,13 @@ zynjacku_plugin_repo_iterate(
   slv2_plugins_free(g_world, slv2plugins);
 
   g_iterate_context.progress = 0.0;
+  g_iterate_context.supported_features = supported_features;
   g_iterate_context.context = context;
+  g_iterate_context.check_plugin = check_plugin;
   g_iterate_context.tick = tick;
   g_iterate_context.tack = tack;
 
-  slv2plugins = slv2_world_get_plugins_by_filter(g_world, zynjacku_plugin_repo_check_plugin);
+  slv2plugins = slv2_world_get_plugins_by_filter(g_world, zynjacku_plugin_repo_check_and_maybe_init_plugin);
   slv2_plugins_free(g_world, slv2plugins);
 
   if (tick != NULL)

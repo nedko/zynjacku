@@ -26,15 +26,29 @@
 typedef
 void
 (* zynjacku_plugin_repo_tick)(
-  void *context,
+  void * context,
   float progress,               /* 0..1 */
-  const char *message);
+  const char * message);
 
 typedef
 void
-( *zynjacku_plugin_repo_tack)(
-  void *context,
-  const char *uri);
+(* zynjacku_plugin_repo_tack)(
+  void * context,
+  const char * uri);
+
+typedef
+bool
+(* zynjacku_plugin_repo_check_plugin)(
+  void * context,
+  const char * plugin_uri,
+  const char * plugin_name,
+  uint32_t audio_in_ports_count,
+  uint32_t audio_out_ports_count,
+  uint32_t midi_in_ports_count,
+  uint32_t control_ports_count,
+  uint32_t event_ports_count,
+  uint32_t midi_event_in_ports_count,
+  uint32_t ports_count);
 
 bool
 zynjacku_plugin_repo_init();
@@ -42,25 +56,27 @@ zynjacku_plugin_repo_init();
 void
 zynjacku_plugin_repo_iterate(
   bool force_scan,
-  void *context,
+  const LV2_Feature * const * supported_features,
+  void * context,
+  zynjacku_plugin_repo_check_plugin check_plugin,
   zynjacku_plugin_repo_tick tick,
   zynjacku_plugin_repo_tack tack);
 
 const char *
 zynjacku_plugin_repo_get_name(
-  const char *uri);
+  const char * uri);
 
 const char *
 zynjacku_plugin_repo_get_license(
-  const char *uri);
+  const char * uri);
 
 const char *
 zynjacku_plugin_repo_get_dlpath(
-  const char *uri);
+  const char * uri);
 
 const char *
 zynjacku_plugin_repo_get_bundle_path(
-  const char *uri);
+  const char * uri);
 
 bool
 zynjacku_plugin_repo_get_ui_info(

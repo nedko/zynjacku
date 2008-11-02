@@ -90,7 +90,8 @@ struct zynjacku_engine
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_uri_map;
   LV2_Feature host_feature_event_ref;
-  const LV2_Feature * host_features[4];
+  LV2_Feature host_feature_dynparams;
+  const LV2_Feature * host_features[5];
 };
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
@@ -262,11 +263,15 @@ zynjacku_engine_init(
   engine_ptr->host_feature_event_ref.URI = LV2_EVENT_URI;
   engine_ptr->host_feature_event_ref.data = &engine_ptr->event;
 
+  engine_ptr->host_feature_dynparams.URI = LV2DYNPARAM_URI;
+  engine_ptr->host_feature_dynparams.data = NULL;
+
   /* initialize host features array */
   engine_ptr->host_features[0] = &engine_ptr->host_feature_rtmempool;
   engine_ptr->host_features[1] = &engine_ptr->host_feature_uri_map;
   engine_ptr->host_features[2] = &engine_ptr->host_feature_event_ref;
-  engine_ptr->host_features[3] = NULL;
+  engine_ptr->host_features[3] = &engine_ptr->host_feature_dynparams;
+  engine_ptr->host_features[4] = NULL;
 
   zynjacku_plugin_repo_init();
 }
@@ -699,6 +704,45 @@ zynjacku_get_version()
 
 #define engine_obj_ptr ((ZynjackuEngine *)context)
 
+bool
+zynjacku_check_plugin(
+  void * context,
+  const char * plugin_uri,
+  const char * plugin_name,
+  uint32_t audio_in_ports_count,
+  uint32_t audio_out_ports_count,
+  uint32_t midi_in_ports_count,
+  uint32_t control_ports_count,
+  uint32_t event_ports_count,
+  uint32_t midi_event_in_ports_count,
+  uint32_t ports_count)
+{
+  if (midi_in_ports_count + control_ports_count + event_ports_count + audio_out_ports_count != ports_count ||
+      midi_in_ports_count + midi_event_in_ports_count != 1 ||
+      audio_out_ports_count == 0)
+  {
+    LOG_DEBUG("Skipping 's' %s, [synth] plugin with unsupported port configuration", name, plugin_uri);
+    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
+    LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
+    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+    return false;
+  }
+
+  LOG_DEBUG("Found \"simple\" synth plugin '%s' %s", name, plugin_uri);
+  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
+  LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
+  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+  return true;
+}
+
 void
 zynjacku_engine_tick(
   void *context,
@@ -740,7 +784,17 @@ zynjacku_engine_iterate_plugins(
   ZynjackuEngine * engine_obj_ptr,
   gboolean force)
 {
-  zynjacku_plugin_repo_iterate(force, engine_obj_ptr, zynjacku_engine_tick, zynjacku_engine_tack);
+  struct zynjacku_engine * engine_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  zynjacku_plugin_repo_iterate(
+    force,
+    engine_ptr->host_features,
+    engine_obj_ptr,
+    zynjacku_check_plugin,
+    zynjacku_engine_tick,
+    zynjacku_engine_tack);
 }
 
 void

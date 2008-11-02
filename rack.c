@@ -700,6 +700,44 @@ zynjacku_rack_get_version()
 
 #define rack_obj_ptr ((ZynjackuRack *)context)
 
+bool
+zynjacku_rack_check_plugin(
+  void * context,
+  const char * plugin_uri,
+  const char * plugin_name,
+  uint32_t audio_in_ports_count,
+  uint32_t audio_out_ports_count,
+  uint32_t midi_in_ports_count,
+  uint32_t control_ports_count,
+  uint32_t event_ports_count,
+  uint32_t midi_event_in_ports_count,
+  uint32_t ports_count)
+{
+  if ((audio_in_ports_count != 1 && audio_in_ports_count != 2) ||
+      (audio_out_ports_count != 1 && audio_out_ports_count != 2))
+  {
+    LOG_DEBUG("Skipping 's' %s, [synth] plugin with unsupported port configuration", name, plugin_uri);
+    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
+    LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
+    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+    return false;
+  }
+
+  LOG_DEBUG("Found \"simple\" synth plugin '%s' %s", name, plugin_uri);
+  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
+  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
+  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
+  LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
+  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
+  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
+  return true;
+}
+
 void
 zynjacku_rack_tick(
   void *context,
@@ -741,5 +779,15 @@ zynjacku_rack_iterate_plugins(
   ZynjackuRack * rack_obj_ptr,
   gboolean force)
 {
-  zynjacku_plugin_repo_iterate(force, rack_obj_ptr, zynjacku_rack_tick, zynjacku_rack_tack);
+  struct lv2rack_engine * rack_ptr;
+
+  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_obj_ptr);
+
+  zynjacku_plugin_repo_iterate(
+    force,
+    rack_ptr->host_features,
+    rack_obj_ptr,
+    zynjacku_rack_check_plugin,
+    zynjacku_rack_tick,
+    zynjacku_rack_tack);
 }
