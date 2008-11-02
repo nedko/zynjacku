@@ -744,7 +744,7 @@ class host(PluginUIFactory):
         return True
 
     def run(self):
-        ui_run_callback_id = gobject.timeout_add(100, self.ui_run)
+        ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
 
