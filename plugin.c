@@ -792,10 +792,7 @@ zynjacku_plugin_destruct(
     zynjacku_gtk2gui_destroy(plugin_ptr->gtk2gui);
   }
 
-  if (ZYNJACKU_IS_ENGINE(plugin_ptr->engine_object_ptr))
-  {
-    plugin_ptr->free_ports(G_OBJECT(plugin_obj_ptr));
-  }
+  plugin_ptr->free_ports(G_OBJECT(plugin_obj_ptr));
 
   if (plugin_ptr->dynparams != NULL)
   {

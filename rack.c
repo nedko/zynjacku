@@ -437,8 +437,6 @@ zynjacku_rack_deactivate_effect(
 {
   struct zynjacku_plugin * effect_ptr;
 
-  return;
-
   effect_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(effect_obj_ptr);
 
   effect_ptr->recycle = true;
@@ -602,6 +600,8 @@ zynjacku_free_effect_ports(
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
   rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(plugin_ptr->engine_object_ptr);
+
+  LOG_DEBUG("zynjacku_free_effect_ports() called");
 
   zynjacku_free_plugin_parameter_ports(plugin_ptr);
 
