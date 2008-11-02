@@ -63,7 +63,8 @@ struct zynjacku_synth
   GObject * engine_object_ptr;
   gchar * uri;
 
-  struct list_head siblings;
+  struct list_head siblings_all;
+  struct list_head siblings_active;
   zynjacku_lv2_handle lv2plugin;
   bool dynparams_supported;
   struct zynjacku_synth_port midi_in_port;
@@ -74,6 +75,8 @@ struct zynjacku_synth
   zynjacku_gtk2gui_handle gtk2gui;
   char * id;
   char * name;
+
+  bool recycle;
 };
 
 struct zynjacku_engine
@@ -81,7 +84,13 @@ struct zynjacku_engine
   gboolean dispose_has_run;
 
   jack_client_t * jack_client;  /* the jack client */
-  struct list_head plugins;
+
+  struct list_head plugins_all; /* accessed only from ui thread */
+  struct list_head plugins_active; /* accessed only from rt thread */
+
+  pthread_mutex_t active_plugins_lock;
+  struct list_head plugins_pending_activation; /* protected using active_plugins_lock */
+
   struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_synth_port"s linked by port_type_siblings */
   struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_synth_port"s linked by port_type_siblings */
   jack_port_t * jack_midi_in;

@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 #include <lv2.h>
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -274,7 +275,9 @@ zynjacku_engine_start_jack(
     goto fail;
   }
 
-  INIT_LIST_HEAD(&engine_ptr->plugins);
+  INIT_LIST_HEAD(&engine_ptr->plugins_all);
+  INIT_LIST_HEAD(&engine_ptr->plugins_active);
+  INIT_LIST_HEAD(&engine_ptr->plugins_pending_activation);
   INIT_LIST_HEAD(&engine_ptr->midi_ports);
   INIT_LIST_HEAD(&engine_ptr->audio_ports);
 
@@ -364,7 +367,7 @@ zynjacku_engine_stop_jack(
     return;
   }
 
-  if (!list_empty(&engine_ptr->plugins))
+  if (!list_empty(&engine_ptr->plugins_active))
   {
     LOG_ERROR("Cannot stop JACK client when there are active synths");
     return;
@@ -482,6 +485,7 @@ jack_process_cb(
   void * context_ptr)
 {
   struct list_head * synth_node_ptr;
+  struct list_head * temp_node_ptr;
   struct zynjacku_synth * synth_ptr;
 
   /* Copy MIDI input data to all LV2 midi in ports */
@@ -494,10 +498,30 @@ jack_process_cb(
     engine_ptr->midi_activity = TRUE;
   }
 
-  /* Iterate over plugins */
-  list_for_each(synth_node_ptr, &engine_ptr->plugins)
+  if (pthread_mutex_trylock(&engine_ptr->active_plugins_lock) == 0)
   {
-    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
+    /* Iterate over plugins pending activation */
+    while (!list_empty(&engine_ptr->plugins_pending_activation))
+    {
+      synth_node_ptr = engine_ptr->plugins_pending_activation.next;
+      list_del(synth_node_ptr); /* remove from engine_ptr->plugins_pending_activation */
+      list_add_tail(synth_node_ptr, &engine_ptr->plugins_active);
+    }
+
+    pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
+  }
+
+  /* Iterate over plugins */
+  list_for_each_safe(synth_node_ptr, temp_node_ptr, &engine_ptr->plugins_active)
+  {
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings_active);
+
+    if (synth_ptr->recycle)
+    {
+      list_del(synth_node_ptr);
+      synth_ptr->recycle = false;
+      continue;
+    }
 
     if (synth_ptr->dynparams)
     {
@@ -544,10 +568,16 @@ zynjacku_engine_activate_synth(
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  list_add_tail(&synth_ptr->siblings, &engine_ptr->plugins);
-
   /* Activate plugin */
   zynjacku_lv2_activate(synth_ptr->lv2plugin);
+
+  synth_ptr->recycle = false;
+
+  list_add_tail(&synth_ptr->siblings_all, &engine_ptr->plugins_all);
+
+  pthread_mutex_lock(&engine_ptr->active_plugins_lock);
+  list_add_tail(&synth_ptr->siblings_active, &engine_ptr->plugins_pending_activation);
+  pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
 }
 
 void
@@ -559,9 +589,17 @@ zynjacku_engine_deactivate_synth(
 
   synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
 
-  zynjacku_lv2_deactivate(synth_ptr->lv2plugin);
+  synth_ptr->recycle = true;
 
-  list_del(&synth_ptr->siblings);
+  /* unfortunately condvars dont always work with realtime threads */
+  while (synth_ptr->recycle)
+  {
+    usleep(10000);
+  }
+
+  list_del(&synth_ptr->siblings_all); /* remove from engine_ptr->plugins_all */
+
+  zynjacku_lv2_deactivate(synth_ptr->lv2plugin);
 }
 
 void
@@ -577,9 +615,9 @@ zynjacku_engine_ui_run(
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
   /* Iterate over plugins */
-  list_for_each(synth_node_ptr, &engine_ptr->plugins)
+  list_for_each(synth_node_ptr, &engine_ptr->plugins_all)
   {
-    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings_all);
 
     if (synth_ptr->dynparams)
     {
