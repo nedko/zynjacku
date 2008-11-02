@@ -92,16 +92,17 @@ zynjacku_wrap.c: zynjacku.defs zynjacku.override
 	--override zynjacku.override \
 	zynjacku.defs > $@
 
-CLEANFILES = zynjacku_wrap.c zynjacku.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py
+CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py
 
-bin_SCRIPTS = zynjacku.py
+bin_SCRIPTS = zynjacku.py lv2rack.py
 
 zynjackudir = $(pkgdatadir)
 dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
 
 install-exec-hook:
 	ln -vfs zynjacku.py $(DESTDIR)$(bindir)/zynjacku
+	ln -vfs lv2rack.py $(DESTDIR)$(bindir)/lv2rack
 
 uninstall-hook:
 	rm -vf $(DESTDIR)$(bindir)/zynjacku
