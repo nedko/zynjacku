@@ -55,7 +55,7 @@ class midi_led(gtk.EventBox):
         self.label.set_text(" MIDI ")
 
 # Synth window abstraction
-class SynthWindow(gobject.GObject):
+class PluginUI(gobject.GObject):
 
     __gsignals__ = {
         'destroy':                      # signal name
@@ -75,9 +75,9 @@ class SynthWindow(gobject.GObject):
     def hide(self):
         '''Hide synth window'''
 
-class SynthWindowCustom(SynthWindow):
+class PluginUICustom(PluginUI):
     def __init__(self, synth):
-        SynthWindow.__init__(self, synth)
+        PluginUI.__init__(self, synth)
 
         self.synth.connect("custom-gui-off", self.on_window_destroy)
 
@@ -94,7 +94,7 @@ class SynthWindowCustom(SynthWindow):
 
         self.synth.ui_off()
 
-class SynthWindowUniversalGroup(gobject.GObject):
+class PluginUIUniversalGroup(gobject.GObject):
     def __init__(self, window, parent_group, name, hints, context):
         gobject.GObject.__init__(self)
         self.window = window
@@ -120,17 +120,17 @@ class SynthWindowUniversalGroup(gobject.GObject):
 
     def on_child_group_appeared(self, group_name, hints, context):
         if hints.has_key(hint_uris['togglefloat']):
-            group = SynthWindowUniversalGroupToggleFloat(self.window, self, group_name, hints, context)
+            group = PluginUIUniversalGroupToggleFloat(self.window, self, group_name, hints, context)
             self.window.defered.append(group)
             return group
         elif hints.has_key(hint_uris['onesubgroup']):
-            group = SynthWindowUniversalGroupOneSubGroup(self.window, self, group_name, hints, context)
+            group = PluginUIUniversalGroupOneSubGroup(self.window, self, group_name, hints, context)
             self.window.defered.append(group)
             return group
         else:
-            return SynthWindowUniversalGroupGeneric(self.window, self, group_name, hints, context)
+            return PluginUIUniversalGroupGeneric(self.window, self, group_name, hints, context)
 
-class SynthWindowUniversalParameter(gobject.GObject):
+class PluginUIUniversalParameter(gobject.GObject):
     def __init__(self, window, parent_group, name, context):
         gobject.GObject.__init__(self)
         self.window = window
@@ -145,14 +145,14 @@ class SynthWindowUniversalParameter(gobject.GObject):
         self.parent_group.child_param_remove(self)
 
 # Generic/Universal window UI, as opposed to custom UI privided by synth itself
-class SynthWindowUniversal(SynthWindow):
+class PluginUIUniversal(PluginUI):
 
     # enum for layout types
     layout_type_vertical = 0
     layout_type_horizontal = 1
 
     def __init__(self, synth, group_shadow_type, layout_type):
-        SynthWindow.__init__(self, synth)
+        PluginUI.__init__(self, synth)
 
         self.group_shadow_type = group_shadow_type
         self.layout_type = layout_type
@@ -240,7 +240,7 @@ class SynthWindowUniversal(SynthWindow):
         #print "context: %s" % repr(context)
 
         if not parent:
-            return SynthWindowUniversalGroupGeneric(self, parent, group_name, hints_hash, context)
+            return PluginUIUniversalGroupGeneric(self, parent, group_name, hints_hash, context)
 
         return parent.on_child_group_appeared(group_name, hints_hash, context)
 
@@ -323,11 +323,11 @@ class SynthWindowUniversal(SynthWindow):
         #print repr(obj)
         obj.remove()
 
-class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
+class PluginUIUniversalGroupGeneric(PluginUIUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
-        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
+        PluginUIUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
-        if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+        if self.window.layout_type == PluginUIUniversal.layout_type_horizontal:
             self.box_params = gtk.VBox()
             self.box_top = gtk.HBox()
         else:
@@ -346,7 +346,7 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
 
                 frame.add(self.box_top)
 
-                if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+                if self.window.layout_type == PluginUIUniversal.layout_type_horizontal:
                     frame.set_label_align(0.5, 0.5)
 
             align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
@@ -386,22 +386,22 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
         pass
 
     def on_bool_appeared(self, window, name, hints, value, context):
-        parameter = SynthWindowUniversalParameterBool(self.window, self, name, value, context)
+        parameter = PluginUIUniversalParameterBool(self.window, self, name, value, context)
         self.child_param_add(parameter)
         return parameter
 
     def on_float_appeared(self, window, name, hints, value, min, max, context):
-        parameter = SynthWindowUniversalParameterFloat(self.window, self, name, value, min, max, context)
+        parameter = PluginUIUniversalParameterFloat(self.window, self, name, value, min, max, context)
         self.child_param_add(parameter)
         return parameter
 
     def on_int_appeared(self, window, name, hints, value, min, max, context):
-        parameter = SynthWindowUniversalParameterInt(self.window, self, name, value, min, max, context)
+        parameter = PluginUIUniversalParameterInt(self.window, self, name, value, min, max, context)
         self.child_param_add(parameter)
         return parameter
 
     def on_enum_appeared(self, window, name, hints, selected_value_index, valid_values, context):
-        parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
+        parameter = PluginUIUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
         self.child_param_add(parameter)
         return parameter
 
@@ -411,11 +411,11 @@ class SynthWindowUniversalGroupGeneric(SynthWindowUniversalGroup):
     def change_display_name(self, name):
         self.frame.set_label(name)
 
-class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
+class PluginUIUniversalGroupToggleFloat(PluginUIUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
-        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
+        PluginUIUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
-        if self.window.layout_type == SynthWindowUniversal.layout_type_horizontal:
+        if self.window.layout_type == PluginUIUniversal.layout_type_horizontal:
             self.box = gtk.VBox()
         else:
             self.box = gtk.HBox()
@@ -431,10 +431,10 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
 
         m = re.match(r"([^:]+):(.*)", group_name)
 
-        self.bool = SynthWindowUniversalParameterBool(self.window, self, m.group(1), False, None)
+        self.bool = PluginUIUniversalParameterBool(self.window, self, m.group(1), False, None)
         self.child_param_add(self.bool)
 
-        self.float = SynthWindowUniversalParameterFloat(self.window, self, m.group(2), 0, 0, 1, None)
+        self.float = PluginUIUniversalParameterFloat(self.window, self, m.group(2), 0, 0, 1, None)
         self.float.set_sensitive(False)
         self.child_param_add(self.float)
 
@@ -465,9 +465,9 @@ class SynthWindowUniversalGroupToggleFloat(SynthWindowUniversalGroup):
         self.float.set(name, value, min, max)
         return self.float
 
-class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
+class PluginUIUniversalGroupOneSubGroup(PluginUIUniversalGroup):
     def __init__(self, window, parent, group_name, hints, context):
-        SynthWindowUniversalGroup.__init__(self, window, parent, group_name, hints, context)
+        PluginUIUniversalGroup.__init__(self, window, parent, group_name, hints, context)
 
         self.box = gtk.VBox()
 
@@ -494,7 +494,7 @@ class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
 
     def on_enum_appeared(self, window, name, hints, selected_value_index, valid_values, context):
         #print "enum appeared"
-        parameter = SynthWindowUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
+        parameter = PluginUIUniversalParameterEnum(self.window, self, name, selected_value_index, valid_values, context)
         self.enum = parameter
         return parameter
 
@@ -527,9 +527,9 @@ class SynthWindowUniversalGroupOneSubGroup(SynthWindowUniversalGroup):
                 group.get_top_widget().show_all()
                 self.selected_group = group
 
-class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
+class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
     def __init__(self, window, parent_group, name, value, min, max, context):
-        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+        PluginUIUniversalParameter.__init__(self, window, parent_group, name, context)
 
         self.box = gtk.VBox()
 
@@ -587,9 +587,9 @@ class SynthWindowUniversalParameterFloat(SynthWindowUniversalParameter):
         self.knob.set_adjustment(self.adjustment)
         self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
 
-class SynthWindowUniversalParameterInt(SynthWindowUniversalParameter):
+class PluginUIUniversalParameterInt(PluginUIUniversalParameter):
     def __init__(self, window, parent_group, name, value, min, max, context):
-        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+        PluginUIUniversalParameter.__init__(self, window, parent_group, name, context)
 
         self.box = gtk.HBox()
 
@@ -636,9 +636,9 @@ class SynthWindowUniversalParameterInt(SynthWindowUniversalParameter):
         self.knob.set_adjustment(self.adjustment)
         self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
 
-class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
+class PluginUIUniversalParameterBool(PluginUIUniversalParameter):
     def __init__(self, window, parent_group, name, value, context):
-        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+        PluginUIUniversalParameter.__init__(self, window, parent_group, name, context)
 
         widget = gtk.CheckButton(name)
 
@@ -656,9 +656,9 @@ class SynthWindowUniversalParameterBool(SynthWindowUniversalParameter):
         #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
         self.window.synth.bool_set(self.context, widget.get_active())
 
-class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
+class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
     def __init__(self, window, parent_group, name, selected_value_index, valid_values, context):
-        SynthWindowUniversalParameter.__init__(self, window, parent_group, name, context)
+        PluginUIUniversalParameter.__init__(self, window, parent_group, name, context)
 
         label = gtk.Label(name)
 
@@ -703,30 +703,30 @@ class SynthWindowUniversalParameterEnum(SynthWindowUniversalParameter):
     def get_selection(self):
         return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
-class SynthWindowFactory:
+class PluginUIFactory:
     def __init__(self):
         self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
-        self.layout_type = SynthWindowUniversal.layout_type_horizontal
+        self.layout_type = PluginUIUniversal.layout_type_horizontal
 
-    def create_synth_window(self, synth):
-        if not self.synth_window_available(synth):
+    def create_plugin_ui(self, plugin):
+        if not self.plugin_ui_available(plugin):
             return False
 
-        if synth.supports_custom_ui():
-            synth.ui_win = SynthWindowCustom(synth)
+        if plugin.supports_custom_ui():
+            plugin.ui_win = PluginUICustom(plugin)
         else:
-            synth.ui_win = SynthWindowUniversal(synth, self.group_shadow_type, self.layout_type)
+            plugin.ui_win = PluginUIUniversal(plugin, self.group_shadow_type, self.layout_type)
 
         return True
 
-    def synth_window_available(self, synth):
-        return synth.supports_custom_ui() or synth.supports_generic_ui()
+    def plugin_ui_available(self, plugin):
+        return plugin.supports_custom_ui() or plugin.supports_generic_ui()
 
-class ZynjackuHost(SynthWindowFactory):
+class ZynjackuHost(PluginUIFactory):
     def __init__(self, client_name):
         #print "ZynjackuHost constructor called."
 
-        SynthWindowFactory.__init__(self)
+        PluginUIFactory.__init__(self)
 
         self.engine = zynjacku.Engine()
 
@@ -862,8 +862,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         synth.ui_win = None
         row[0] = False
 
-    def create_synth_window(self, synth, row):
-        if not ZynjackuHost.create_synth_window(self, synth):
+    def create_plugin_ui(self, synth, row):
+        if not ZynjackuHost.create_plugin_ui(self, synth):
             return False
 
         synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
@@ -876,7 +876,7 @@ class ZynjackuHostMulti(ZynjackuHost):
             model[path][0] = False
         else:
             if not model[path][4].ui_win:
-                if not self.create_synth_window(model[path][4], model[path]):
+                if not self.create_plugin_ui(model[path][4], model[path]):
                     return
 
             statusbar_context_id = self.statusbar.get_context_id("loading plugin UI")
@@ -933,7 +933,7 @@ class ZynjackuHostMulti(ZynjackuHost):
 
     def on_synth_load(self, widget):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
-        plugin_repo_widget = self.glade_xml.get_widget("treeview_available_synths")
+        plugin_repo_widget = self.glade_xml.get_widget("treeview_available_plugins")
         progressbar = self.glade_xml.get_widget("progressbar")
 
         plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
@@ -987,13 +987,13 @@ class ZynjackuHostOne(ZynjackuHost):
             del(self.synth)
             self.synth = None
         else:
-            if not ZynjackuHost.synth_window_available(self, self.synth):
+            if not ZynjackuHost.plugin_ui_available(self, self.synth):
                 print"Synth window not available"
                 self.synth.destruct()
                 del(self.synth)
                 self.synth = None
             else:
-                if not ZynjackuHost.create_synth_window(self, self.synth):
+                if not ZynjackuHost.create_plugin_ui(self, self.synth):
                     print"Failed to create synth window"
                     self.synth.destruct()
                     del(self.synth)
@@ -1010,7 +1010,7 @@ class ZynjackuHostOne(ZynjackuHost):
             self.synth.ui_off()
             del(self.synth.ui_win)
 
-            if not ZynjackuHost.create_synth_window(self, self.synth):
+            if not ZynjackuHost.create_plugin_ui(self, self.synth):
                 print"Failed to create synth window"
                 return
 
@@ -1035,7 +1035,7 @@ class ZynjackuHostOne(ZynjackuHost):
 
         ZynjackuHost.__del__(self)
 
-def main():
+def file_setup():
     data_dir = os.path.dirname(sys.argv[0])
 
     # since ppl tend to run "python zynjacku.py", lets assume that it is in current directory
@@ -1056,12 +1056,21 @@ def main():
 
     glade_xml = gtk.glade.XML(glade_file)
 
-    gobject.type_register(SynthWindow)
-    gobject.type_register(SynthWindowUniversal)
-    gobject.type_register(SynthWindowUniversalGroupGeneric)
-    gobject.type_register(SynthWindowUniversalGroupToggleFloat)
-    gobject.type_register(SynthWindowUniversalParameterFloat)
-    gobject.type_register(SynthWindowUniversalParameterBool)
+    return data_dir, glade_xml, the_license
+
+def register_types():
+    gobject.signal_new("zynjacku-parameter-changed", PluginUIUniversalParameter, gobject.SIGNAL_RUN_FIRST | gobject.SIGNAL_ACTION, gobject.TYPE_NONE, [])
+    gobject.type_register(PluginUI)
+    gobject.type_register(PluginUIUniversal)
+    gobject.type_register(PluginUIUniversalGroupGeneric)
+    gobject.type_register(PluginUIUniversalGroupToggleFloat)
+    gobject.type_register(PluginUIUniversalParameterFloat)
+    gobject.type_register(PluginUIUniversalParameterBool)
+
+def main():
+    data_dir, glade_xml, the_license = file_setup()
+
+    register_types()
 
     client_name = "zynjacku"
 
@@ -1072,6 +1081,5 @@ def main():
 
     host.run()
 
-gobject.signal_new("zynjacku-parameter-changed", SynthWindowUniversalParameter, gobject.SIGNAL_RUN_FIRST | gobject.SIGNAL_ACTION, gobject.TYPE_NONE, [])
-
-main()
+if __name__ == '__main__':
+    main()
