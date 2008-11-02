@@ -72,7 +72,7 @@ zynjacku_plugin_repo_get_ui_info(
 
 bool
 zynjacku_plugin_repo_load_synth(
-  struct zynjacku_synth * synth_ptr);
+  struct zynjacku_plugin * synth_ptr);
 
 void
 zynjacku_plugin_repo_uninit();

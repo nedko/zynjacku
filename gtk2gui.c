@@ -62,7 +62,7 @@ struct zynjacku_gtk2gui
   const char *plugin_uri;
   char *bundle_path;
   unsigned int ports_count;
-  struct zynjacku_synth_port ** ports;
+  struct zynjacku_port ** ports;
   void * context_ptr;
   const char * synth_id;
   bool resizable;
@@ -311,7 +311,7 @@ zynjacku_gtk2gui_create(
   struct zynjacku_gtk2gui * ui_ptr;
   unsigned int ports_count;
   struct list_head *node_ptr;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
   LV2UI_DescriptorFunction lookup;
   uint32_t index;
   char * ui_uri;
@@ -341,25 +341,25 @@ zynjacku_gtk2gui_create(
 
   list_for_each(node_ptr, parameter_ports_ptr)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
     if (port_ptr->index >= ports_count)
     {
       ports_count = port_ptr->index + 1;
     }
   }
 
-  ui_ptr->ports = malloc(ports_count * sizeof(struct zynjacku_synth_port *));
+  ui_ptr->ports = malloc(ports_count * sizeof(struct zynjacku_port *));
   if (ui_ptr->ports == NULL)
   {
     LOG_ERROR("malloc() failed.");
     goto fail_free;
   }
 
-  memset(ui_ptr->ports, 0, ports_count * sizeof(struct zynjacku_synth_port *));
+  memset(ui_ptr->ports, 0, ports_count * sizeof(struct zynjacku_port *));
 
   list_for_each(node_ptr, parameter_ports_ptr)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
     ui_ptr->ports[port_ptr->index] = port_ptr;
   }
 
@@ -475,7 +475,7 @@ zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle ui_handle)
 {
   LV2_Feature * features[1];
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
   unsigned int port_index;
   LV2UI_Widget widget;
 

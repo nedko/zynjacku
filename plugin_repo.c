@@ -683,15 +683,18 @@ zynjacku_plugin_repo_get_bundle_path(
   return slv2_uri_to_path(slv2_value_as_uri(slv2_plugin_get_bundle_uri(info_ptr->slv2info)));
 }
 
+#define synth_ptr (&plugin_ptr->subtype.synth)
+
+static
 bool
 zynjacku_plugin_repo_create_port(
   struct zynjacku_plugin_info *info_ptr,
   uint32_t port_index,
-  struct zynjacku_synth *synth_ptr)
+  struct zynjacku_plugin * plugin_ptr)
 {
   SLV2Value symbol;
   SLV2Value name;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
   SLV2Port port;
   SLV2Value default_value;
   SLV2Value min_value;
@@ -724,7 +727,7 @@ zynjacku_plugin_repo_create_port(
       return true;
     }
 
-    port_ptr = malloc(sizeof(struct zynjacku_synth_port));
+    port_ptr = malloc(sizeof(struct zynjacku_port));
     if (port_ptr == NULL)
     {
       LOG_ERROR("malloc() failed.");
@@ -793,7 +796,7 @@ zynjacku_plugin_repo_create_port(
       slv2_value_free(max_value);
     }
 
-    list_add_tail(&port_ptr->plugin_siblings, &synth_ptr->parameter_ports);
+    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
 
     return true;
   }
@@ -853,9 +856,11 @@ fail:
   return false;
 }
 
+#undef synth_ptr
+
 bool
 zynjacku_plugin_repo_load_synth(
-  struct zynjacku_synth * synth_ptr)
+  struct zynjacku_plugin * synth_ptr)
 {
   struct zynjacku_plugin_info * info_ptr;
   SLV2Values slv2features;

@@ -40,7 +40,7 @@
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 
-#include "synth.h"
+#include "plugin.h"
 #include "engine.h"
 #include "enum.h"
 #include "gtk2gui.h"
@@ -51,24 +51,24 @@
 #include "plugin_repo.h"
 
 /* signals */
-#define ZYNJACKU_SYNTH_SIGNAL_TEST                0
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED      1
-#define ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED   2
-#define ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED       3
-#define ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED    4
-#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED      5
-#define ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED   6
-#define ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED       7
-#define ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED    8
-#define ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED        9
-#define ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED    10
-#define ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF      11
-#define ZYNJACKU_SYNTH_SIGNALS_COUNT             12
+#define ZYNJACKU_PLUGIN_SIGNAL_TEST                0
+#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED      1
+#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED   2
+#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED       3
+#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED    4
+#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED      5
+#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED   6
+#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED       7
+#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED    8
+#define ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED        9
+#define ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED    10
+#define ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF      11
+#define ZYNJACKU_PLUGIN_SIGNALS_COUNT             12
 
 /* properties */
-#define ZYNJACKU_SYNTH_PROP_URI                1
+#define ZYNJACKU_PLUGIN_PROP_URI                1
 
-static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
+static guint g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNALS_COUNT];
 
 /* UGLY: We convert dynparam context poitners to string to pass them
    as opaque types through Python. Silly, but codegen fails to create
@@ -77,7 +77,7 @@ static guint g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNALS_COUNT];
    and GValue. */
 
 gchar *
-zynjacku_synth_context_to_string(
+zynjacku_plugin_context_to_string(
   void * void_context)
 {
   /* we reuse this array because we call this function only from the UI thread,
@@ -92,7 +92,7 @@ zynjacku_synth_context_to_string(
 }
 
 void *
-zynjacku_synth_context_from_string(
+zynjacku_plugin_context_from_string(
   gchar * string_context)
 {
   void * void_context;
@@ -109,23 +109,23 @@ zynjacku_synth_context_from_string(
 }
 
 static void
-zynjacku_synth_dispose(GObject * obj)
+zynjacku_plugin_dispose(GObject * obj)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(obj);
 
-  LOG_DEBUG("zynjacku_synth_dispose() called.");
+  LOG_DEBUG("zynjacku_plugin_dispose() called.");
 
-  if (synth_ptr->dispose_has_run)
+  if (plugin_ptr->dispose_has_run)
   {
     /* If dispose did already run, return. */
-    LOG_DEBUG("zynjacku_synth_dispose() already run!");
+    LOG_DEBUG("zynjacku_plugin_dispose() already run!");
     return;
   }
 
   /* Make sure dispose does not run twice. */
-  synth_ptr->dispose_has_run = TRUE;
+  plugin_ptr->dispose_has_run = TRUE;
 
   /* 
    * In dispose, you are supposed to free all types referenced from this
@@ -133,15 +133,15 @@ zynjacku_synth_dispose(GObject * obj)
    * the most simple solution is to unref all members on which you own a 
    * reference.
    */
-  if (synth_ptr->lv2plugin != NULL)
+  if (plugin_ptr->lv2plugin != NULL)
   {
-    zynjacku_synth_destruct(ZYNJACKU_SYNTH(obj));
+    zynjacku_plugin_destruct(ZYNJACKU_PLUGIN(obj));
   }
 
-  if (synth_ptr->uri != NULL)
+  if (plugin_ptr->uri != NULL)
   {
-    g_free(synth_ptr->uri);
-    synth_ptr->uri = NULL;
+    g_free(plugin_ptr->uri);
+    plugin_ptr->uri = NULL;
   }
 
   /* Chain up to the parent class */
@@ -149,11 +149,11 @@ zynjacku_synth_dispose(GObject * obj)
 }
 
 static void
-zynjacku_synth_finalize(GObject * obj)
+zynjacku_plugin_finalize(GObject * obj)
 {
-//  struct zynjacku_synth * self = ZYNJACKU_SYNTH_GET_PRIVATE(obj);
+//  struct zynjacku_plugin * self = ZYNJACKU_PLUGIN_GET_PRIVATE(obj);
 
-  LOG_DEBUG("zynjacku_synth_finalize() called.");
+  LOG_DEBUG("zynjacku_plugin_finalize() called.");
 
   /*
    * Here, complete object destruction.
@@ -166,27 +166,27 @@ zynjacku_synth_finalize(GObject * obj)
 }
 
 static void
-zynjacku_synth_set_property(
+zynjacku_plugin_set_property(
   GObject * object_ptr,
   guint property_id,
   const GValue * value_ptr,
   GParamSpec * param_spec_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(object_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(object_ptr);
 
   switch (property_id)
   {
-  case ZYNJACKU_SYNTH_PROP_URI:
-    //LOG_DEBUG("setting synth uri to: \"%s\"", g_value_get_string(value_ptr));
+  case ZYNJACKU_PLUGIN_PROP_URI:
+    //LOG_DEBUG("setting plugin uri to: \"%s\"", g_value_get_string(value_ptr));
     //break;
-    if (synth_ptr->uri != NULL)
+    if (plugin_ptr->uri != NULL)
     {
-      g_free(synth_ptr->uri);
+      g_free(plugin_ptr->uri);
     }
-    synth_ptr->uri = g_value_dup_string(value_ptr);
-    LOG_DEBUG("synth uri set to: \"%s\"", synth_ptr->uri);
+    plugin_ptr->uri = g_value_dup_string(value_ptr);
+    LOG_DEBUG("plugin uri set to: \"%s\"", plugin_ptr->uri);
     break;
   default:
     /* We don't have any other property... */
@@ -196,22 +196,22 @@ zynjacku_synth_set_property(
 }
 
 static void
-zynjacku_synth_get_property(
+zynjacku_plugin_get_property(
   GObject * object_ptr,
   guint property_id,
   GValue * value_ptr,
   GParamSpec * param_spec_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(object_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(object_ptr);
 
   switch (property_id)
   {
-  case ZYNJACKU_SYNTH_PROP_URI:
-    if (synth_ptr->uri != NULL)
+  case ZYNJACKU_PLUGIN_PROP_URI:
+    if (plugin_ptr->uri != NULL)
     {
-      g_value_set_string(value_ptr, synth_ptr->uri);
+      g_value_set_string(value_ptr, plugin_ptr->uri);
     }
     else
     {
@@ -226,23 +226,23 @@ zynjacku_synth_get_property(
 }
 
 static void
-zynjacku_synth_class_init(
+zynjacku_plugin_class_init(
   gpointer class_ptr,
   gpointer class_data_ptr)
 {
   GParamSpec * uri_param_spec;
 
-  LOG_DEBUG("zynjacku_synth_class_init() called.");
+  LOG_DEBUG("zynjacku_plugin_class_init() called.");
 
-  G_OBJECT_CLASS(class_ptr)->dispose = zynjacku_synth_dispose;
-  G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_synth_finalize;
+  G_OBJECT_CLASS(class_ptr)->dispose = zynjacku_plugin_dispose;
+  G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_plugin_finalize;
 
-  g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_synth));
+  g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_plugin));
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_TEST] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_TEST] =
     g_signal_new(
       "test",                   /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -253,10 +253,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED] =
     g_signal_new(
       "group-appeared",         /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -270,10 +270,10 @@ zynjacku_synth_class_init(
       G_TYPE_OBJECT,            /* hints */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED] =
     g_signal_new(
       "group-disappeared",      /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -284,10 +284,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED] =
     g_signal_new(
       "bool-appeared",          /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -302,10 +302,10 @@ zynjacku_synth_class_init(
       G_TYPE_BOOLEAN,           /* value */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED] =
     g_signal_new(
       "bool-disappeared",       /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -316,10 +316,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED] =
     g_signal_new(
       "float-appeared",         /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -336,10 +336,10 @@ zynjacku_synth_class_init(
       G_TYPE_FLOAT,             /* max */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED] =
     g_signal_new(
       "float-disappeared",      /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -350,10 +350,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED] =
     g_signal_new(
       "enum-appeared",          /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -369,10 +369,10 @@ zynjacku_synth_class_init(
       G_TYPE_OBJECT,            /* valid values (ZynjackuEnum) */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED] =
     g_signal_new(
       "enum-disappeared",       /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -383,10 +383,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED] =
     g_signal_new(
       "int-appeared",           /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -403,10 +403,10 @@ zynjacku_synth_class_init(
       G_TYPE_INT,               /* max */
       G_TYPE_STRING);           /* context */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED] =
     g_signal_new(
       "int-disappeared",        /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -417,10 +417,10 @@ zynjacku_synth_class_init(
       1,                        /* n_params */
       G_TYPE_OBJECT);           /* object */
 
-  g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF] =
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF] =
     g_signal_new(
       "custom-gui-off",         /* signal_name */
-      ZYNJACKU_SYNTH_TYPE,      /* itype */
+      ZYNJACKU_PLUGIN_TYPE,      /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -430,57 +430,56 @@ zynjacku_synth_class_init(
       G_TYPE_NONE,              /* return type */
       0);                       /* n_params */
 
-  G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_synth_get_property;
-  G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_synth_set_property;
+  G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_plugin_get_property;
+  G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_plugin_set_property;
 
   uri_param_spec = g_param_spec_string(
     "uri",
-    "Synth LV2 URI construct property",
-    "Synth LV2 URI construct property",
+    "Plugin LV2 URI construct property",
+    "Plugin LV2 URI construct property",
     "" /* default value */,
     G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
 
   g_object_class_install_property(
     G_OBJECT_CLASS(class_ptr),
-    ZYNJACKU_SYNTH_PROP_URI,
+    ZYNJACKU_PLUGIN_PROP_URI,
     uri_param_spec);
 }
 
 static void
-zynjacku_synth_init(
+zynjacku_plugin_init(
   GTypeInstance * instance,
   gpointer g_class)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_synth_init() called.");
+  LOG_DEBUG("zynjacku_plugin_init() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(instance);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(instance);
 
-  synth_ptr->dispose_has_run = FALSE;
-  INIT_LIST_HEAD(&synth_ptr->parameter_ports);
-  synth_ptr->midi_in_port.type = PORT_TYPE_INVALID;
-  synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
-  synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
+  plugin_ptr->dispose_has_run = FALSE;
+  INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
 
-  synth_ptr->uri = NULL;
-  synth_ptr->lv2plugin = NULL;
+  plugin_ptr->type = PLUGIN_TYPE_UNKNOWN;
 
-  synth_ptr->root_group_ui_context = NULL;
+  plugin_ptr->uri = NULL;
+  plugin_ptr->lv2plugin = NULL;
+
+  plugin_ptr->root_group_ui_context = NULL;
 }
 
-GType zynjacku_synth_get_type()
+GType zynjacku_plugin_get_type()
 {
   static GType type = 0;
   if (type == 0)
   {
     type = g_type_register_static_simple(
       G_TYPE_OBJECT,
-      "zynjacku_synth_type",
-      sizeof(ZynjackuSynthClass),
-      zynjacku_synth_class_init,
-      sizeof(ZynjackuSynth),
-      zynjacku_synth_init,
+      "zynjacku_plugin_type",
+      sizeof(ZynjackuPluginClass),
+      zynjacku_plugin_class_init,
+      sizeof(ZynjackuPlugin),
+      zynjacku_plugin_init,
       0);
   }
 
@@ -488,52 +487,52 @@ GType zynjacku_synth_get_type()
 }
 
 const char *
-zynjacku_synth_get_instance_name(
-  ZynjackuSynth * obj_ptr)
+zynjacku_plugin_get_instance_name(
+  ZynjackuPlugin * obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(obj_ptr);
 
-  return synth_ptr->id;
+  return plugin_ptr->id;
 }
 
 const char *
-zynjacku_synth_get_name(
-  ZynjackuSynth * obj_ptr)
+zynjacku_plugin_get_name(
+  ZynjackuPlugin * obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(obj_ptr);
 
-  return synth_ptr->name;
+  return plugin_ptr->name;
 }
 
 const char *
-zynjacku_synth_get_uri(
-  ZynjackuSynth * obj_ptr)
+zynjacku_plugin_get_uri(
+  ZynjackuPlugin * obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(obj_ptr);
 
-  return synth_ptr->uri;
+  return plugin_ptr->uri;
 }
 
 void
-zynjacku_synth_generic_lv2_ui_on(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_generic_lv2_ui_on(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   struct list_head * node_ptr;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
   ZynjackuHints * hints_obj_ptr;
 
-  LOG_DEBUG("zynjacku_synth_generic_lv2_ui_on() called.");
+  LOG_DEBUG("zynjacku_plugin_generic_lv2_ui_on() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  if (synth_ptr->root_group_ui_context != NULL)
+  if (plugin_ptr->root_group_ui_context != NULL)
   {
     LOG_DEBUG("ui on ignored - already shown");
     return;                     /* already shown */
@@ -548,30 +547,30 @@ zynjacku_synth_generic_lv2_ui_on(
     NULL);
 
   g_signal_emit(
-    synth_obj_ptr,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED],
+    plugin_obj_ptr,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED],
     0,
     NULL,
-    synth_ptr->id,
+    plugin_ptr->id,
     hints_obj_ptr,
     "",
-    &synth_ptr->root_group_ui_context);
+    &plugin_ptr->root_group_ui_context);
 
-  list_for_each(node_ptr, &synth_ptr->parameter_ports)
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     g_signal_emit(
-      synth_obj_ptr,
-      g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
+      plugin_obj_ptr,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
       0,
-      synth_ptr->root_group_ui_context,
+      plugin_ptr->root_group_ui_context,
       port_ptr->name,
       hints_obj_ptr,
       port_ptr->data.parameter.value,
       port_ptr->data.parameter.min,
       port_ptr->data.parameter.max,
-      zynjacku_synth_context_to_string(&port_ptr->data.parameter.value),
+      zynjacku_plugin_context_to_string(&port_ptr->data.parameter.value),
       &port_ptr->ui_context);
   }
 
@@ -579,30 +578,30 @@ zynjacku_synth_generic_lv2_ui_on(
 }
 
 void
-zynjacku_synth_generic_lv2_ui_off(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_generic_lv2_ui_off(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   struct list_head * node_ptr;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
 
-  LOG_DEBUG("zynjacku_synth_generic_lv2_ui_off() called.");
+  LOG_DEBUG("zynjacku_plugin_generic_lv2_ui_off() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  if (synth_ptr->root_group_ui_context == NULL)
+  if (plugin_ptr->root_group_ui_context == NULL)
   {
     LOG_DEBUG("ui off ignored - not shown");
     return;                     /* not shown */
   }
 
-  list_for_each(node_ptr, &synth_ptr->parameter_ports)
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     g_signal_emit(
-      synth_obj_ptr,
-      g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED],
+      plugin_obj_ptr,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED],
       0,
       port_ptr->ui_context);
 
@@ -611,90 +610,90 @@ zynjacku_synth_generic_lv2_ui_off(
   }
 
   g_signal_emit(
-    synth_obj_ptr,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED],
+    plugin_obj_ptr,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED],
     0,
-    synth_ptr->root_group_ui_context);
+    plugin_ptr->root_group_ui_context);
 
-  g_object_unref(synth_ptr->root_group_ui_context);
-  synth_ptr->root_group_ui_context = NULL;
+  g_object_unref(plugin_ptr->root_group_ui_context);
+  plugin_ptr->root_group_ui_context = NULL;
 }
 
 gboolean
-zynjacku_synth_supports_generic_ui(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_supports_generic_ui(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-//  struct zynjacku_synth * synth_ptr;
+//  struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_synth_supports_generic_ui() called.");
+  LOG_DEBUG("zynjacku_plugin_supports_generic_ui() called.");
 
-//  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+//  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
   /* we can generate it always */
   return TRUE;
 }
 
 gboolean
-zynjacku_synth_supports_custom_ui(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_supports_custom_ui(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_synth_supports_custom_ui() called.");
+  LOG_DEBUG("zynjacku_plugin_supports_custom_ui() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  return (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
+  return (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
 }
 
 gboolean
-zynjacku_synth_ui_on(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_ui_on(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_synth_ui_on() called.");
+  LOG_DEBUG("zynjacku_plugin_ui_on() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    return zynjacku_gtk2gui_ui_on(synth_ptr->gtk2gui);
+    return zynjacku_gtk2gui_ui_on(plugin_ptr->gtk2gui);
   }
 
-  if (synth_ptr->dynparams)
+  if (plugin_ptr->dynparams)
   {
-    lv2dynparam_host_ui_on(synth_ptr->dynparams);
+    lv2dynparam_host_ui_on(plugin_ptr->dynparams);
   }
   else
   {
-    zynjacku_synth_generic_lv2_ui_on(synth_obj_ptr);
+    zynjacku_plugin_generic_lv2_ui_on(plugin_obj_ptr);
   }
 
   return true;
 }
 
 void
-zynjacku_synth_ui_off(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_ui_off(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_synth_ui_off() called.");
+  LOG_DEBUG("zynjacku_plugin_ui_off() called.");
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_ui_off(synth_ptr->gtk2gui);
+    zynjacku_gtk2gui_ui_off(plugin_ptr->gtk2gui);
   }
-  else if (synth_ptr->dynparams)
+  else if (plugin_ptr->dynparams)
   {
-    lv2dynparam_host_ui_off(synth_ptr->dynparams);
+    lv2dynparam_host_ui_off(plugin_ptr->dynparams);
   }
   else
   {
-    zynjacku_synth_generic_lv2_ui_off(synth_obj_ptr);
+    zynjacku_plugin_generic_lv2_ui_off(plugin_obj_ptr);
   }
 }
 
@@ -702,31 +701,31 @@ void
 zynjacku_gtk2gui_on_ui_destroyed(
   void * context_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(context_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(context_ptr);
 
-  LOG_DEBUG("%s gtk2gui window destroyed", synth_ptr->id);
+  LOG_DEBUG("%s gtk2gui window destroyed", plugin_ptr->id);
 
   g_signal_emit(
-    (ZynjackuSynth *)context_ptr,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_CUSTOM_GUI_OF],
+    (ZynjackuPlugin *)context_ptr,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF],
     0,
     NULL);
 }
 
 void
-zynjacku_synth_free_ports(
+zynjacku_plugin_free_ports(
   struct zynjacku_engine * engine_ptr,
-  struct zynjacku_synth * plugin_ptr)
+  struct zynjacku_plugin * plugin_ptr)
 {
   struct list_head * node_ptr;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
 
   while (!list_empty(&plugin_ptr->parameter_ports))
   {
     node_ptr = plugin_ptr->parameter_ports.next;
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     assert(port_ptr->type == PORT_TYPE_PARAMETER);
 
@@ -737,73 +736,83 @@ zynjacku_synth_free_ports(
     free(port_ptr);
   }
 
-  if (plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
+  if (plugin_ptr->type == PLUGIN_TYPE_SYNTH)
   {
-    jack_port_unregister(engine_ptr->jack_client, plugin_ptr->audio_out_left_port.data.audio);
-    list_del(&plugin_ptr->audio_out_left_port.port_type_siblings);
-  }
+    if (plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO)
+    {
+      jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_left_port.data.audio);
+      list_del(&plugin_ptr->subtype.synth.audio_out_left_port.port_type_siblings);
+    }
 
-  if (plugin_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
-  {
-    assert(plugin_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO);
-    jack_port_unregister(engine_ptr->jack_client, plugin_ptr->audio_out_right_port.data.audio);
-    list_del(&plugin_ptr->audio_out_right_port.port_type_siblings);
-  }
+    if (plugin_ptr->subtype.synth.audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
+    {
+      assert(plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO);
+      jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_right_port.data.audio);
+      list_del(&plugin_ptr->subtype.synth.audio_out_right_port.port_type_siblings);
+    }
 
-  if (plugin_ptr->midi_in_port.type == PORT_TYPE_MIDI ||
-      plugin_ptr->midi_in_port.type == PORT_TYPE_EVENT_MIDI)
-  {
-    list_del(&plugin_ptr->midi_in_port.port_type_siblings);
+    if (plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_MIDI ||
+        plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_EVENT_MIDI)
+    {
+      list_del(&plugin_ptr->subtype.synth.midi_in_port.port_type_siblings);
+    }
   }
 }
 
+#define synth_ptr (&plugin_ptr->subtype.synth)
+
 gboolean
-zynjacku_synth_construct(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_construct(
+  ZynjackuPlugin * plugin_obj_ptr,
   GObject * engine_object_ptr)
 {
   static unsigned int id;
   char * port_name;
   size_t size_name;
   size_t size_id;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_engine * engine_ptr;
   struct list_head * node_ptr;
-  struct zynjacku_synth_port * port_ptr;
+  struct zynjacku_port * port_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
 
-  if (synth_ptr->uri == NULL)
+  if (plugin_ptr->uri == NULL)
   {
     LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
     goto fail;
   }
 
-  if (!zynjacku_plugin_repo_load_synth(synth_ptr))
+  plugin_ptr->type = PLUGIN_TYPE_SYNTH;
+  synth_ptr->midi_in_port.type = PORT_TYPE_INVALID;
+  synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
+  synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
+
+  if (!zynjacku_plugin_repo_load_synth(plugin_ptr))
   {
-    LOG_ERROR("Failed to load LV2 info for synth %s", synth_ptr->uri);
+    LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
     goto fail;
   }
 
-  synth_ptr->lv2plugin = zynjacku_lv2_load(
-    synth_ptr->uri,
+  plugin_ptr->lv2plugin = zynjacku_lv2_load(
+    plugin_ptr->uri,
     zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr)),
     engine_ptr->host_features);
-  if (synth_ptr->lv2plugin == NULL)
+  if (plugin_ptr->lv2plugin == NULL)
   {
-    LOG_ERROR("Failed to load LV2 plugin %s", synth_ptr->uri);
+    LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
     goto fail;
   }
 
-  if (synth_ptr->dynparams_supported)
+  if (plugin_ptr->dynparams_supported)
   {
     if (!lv2dynparam_host_attach(
-          zynjacku_lv2_get_descriptor(synth_ptr->lv2plugin),
-          zynjacku_lv2_get_handle(synth_ptr->lv2plugin),
+          zynjacku_lv2_get_descriptor(plugin_ptr->lv2plugin),
+          zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
           &engine_ptr->mempool_allocator,
-          synth_obj_ptr,
-          &synth_ptr->dynparams))
+          plugin_obj_ptr,
+          &plugin_ptr->dynparams))
     {
       LOG_ERROR("Failed to instantiate dynparams extension.");
       goto fail_unload;
@@ -811,17 +820,17 @@ zynjacku_synth_construct(
   }
   else
   {
-    synth_ptr->dynparams = NULL;
+    plugin_ptr->dynparams = NULL;
   }
 
   /* connect midi port */
   switch (synth_ptr->midi_in_port.type)
   {
   case PORT_TYPE_MIDI:
-    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
     break;
   case PORT_TYPE_EVENT_MIDI:
-    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_event_buffer);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_event_buffer);
     break;
   default:
     LOG_ERROR("don't know how to connect midi port of type %u", synth_ptr->midi_in_port.type);
@@ -831,14 +840,14 @@ zynjacku_synth_construct(
   list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
 
   /* connect parameter ports */
-  list_for_each(node_ptr, &synth_ptr->parameter_ports)
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_synth_port, plugin_siblings);
-    zynjacku_lv2_connect_port(synth_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
   }
 
-  size_name = strlen(synth_ptr->name);
+  size_name = strlen(plugin_ptr->name);
   port_name = malloc(size_name + 1024);
   if (port_name == NULL)
   {
@@ -848,7 +857,7 @@ zynjacku_synth_construct(
 
   /* setup audio ports (they are connected in jack process callback */
   size_id = sprintf(port_name, "%u:", id);
-  memcpy(port_name + size_id, synth_ptr->name, size_name);
+  memcpy(port_name + size_id, plugin_ptr->name, size_name);
 
   if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
       synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
@@ -870,73 +879,75 @@ zynjacku_synth_construct(
   }
 
   port_name[size_id + size_name] = 0;
-  synth_ptr->id = port_name;
+  plugin_ptr->id = port_name;
 
   id++;
 
-  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(synth_obj_ptr));
+  zynjacku_engine_activate_synth(ZYNJACKU_ENGINE(engine_object_ptr), G_OBJECT(plugin_obj_ptr));
 
-  synth_ptr->engine_object_ptr = engine_object_ptr;
-  g_object_ref(synth_ptr->engine_object_ptr);
+  plugin_ptr->engine_object_ptr = engine_object_ptr;
+  g_object_ref(plugin_ptr->engine_object_ptr);
 
   /* no plugins to test gtk2gui */
-  synth_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, synth_obj_ptr, synth_ptr->uri, synth_ptr->id, &synth_ptr->parameter_ports);
+  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
 
-  LOG_DEBUG("Constructed synth <%s>, gtk2gui <%p>", synth_ptr->uri, synth_ptr->gtk2gui);
+  LOG_DEBUG("Constructed plugin <%s>, gtk2gui <%p>", plugin_ptr->uri, plugin_ptr->gtk2gui);
 
   return TRUE;
 
 fail_free_ports:
-  zynjacku_synth_free_ports(engine_ptr, synth_ptr);
+  zynjacku_plugin_free_ports(engine_ptr, plugin_ptr);
 
 fail_detach_dynparams:
-  if (synth_ptr->dynparams != NULL)
+  if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_host_detach(synth_ptr->dynparams);
-    synth_ptr->dynparams = NULL;
+    lv2dynparam_host_detach(plugin_ptr->dynparams);
+    plugin_ptr->dynparams = NULL;
   }
 
 fail_unload:
-  zynjacku_lv2_unload(synth_ptr->lv2plugin);
+  zynjacku_lv2_unload(plugin_ptr->lv2plugin);
 
 fail:
   return FALSE;
 }
 
+#undef synth_ptr
+
 void
-zynjacku_synth_destruct(
-  ZynjackuSynth * synth_obj_ptr)
+zynjacku_plugin_destruct(
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_engine * engine_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(synth_ptr->engine_object_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(plugin_ptr->engine_object_ptr);
 
-  LOG_DEBUG("Destructing plugin <%s>", synth_ptr->uri);
+  LOG_DEBUG("Destructing plugin <%s>", plugin_ptr->uri);
 
-  zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(synth_ptr->engine_object_ptr), G_OBJECT(synth_obj_ptr));
+  zynjacku_engine_deactivate_synth(ZYNJACKU_ENGINE(plugin_ptr->engine_object_ptr), G_OBJECT(plugin_obj_ptr));
 
-  if (synth_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
+  if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
-    zynjacku_gtk2gui_destroy(synth_ptr->gtk2gui);
+    zynjacku_gtk2gui_destroy(plugin_ptr->gtk2gui);
   }
 
-  zynjacku_synth_free_ports(engine_ptr, synth_ptr);
+  zynjacku_plugin_free_ports(engine_ptr, plugin_ptr);
 
-  if (synth_ptr->dynparams != NULL)
+  if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_host_detach(synth_ptr->dynparams);
-    synth_ptr->dynparams = NULL;
+    lv2dynparam_host_detach(plugin_ptr->dynparams);
+    plugin_ptr->dynparams = NULL;
   }
 
-  g_object_unref(synth_ptr->engine_object_ptr);
+  g_object_unref(plugin_ptr->engine_object_ptr);
 
-  zynjacku_lv2_unload(synth_ptr->lv2plugin);
-  synth_ptr->lv2plugin = NULL;
+  zynjacku_lv2_unload(plugin_ptr->lv2plugin);
+  plugin_ptr->lv2plugin = NULL;
 
-  free(synth_ptr->id);
-  synth_ptr->id = NULL;
+  free(plugin_ptr->id);
+  plugin_ptr->id = NULL;
 }
 
 void
@@ -948,11 +959,11 @@ dynparam_group_appeared(
   const struct lv2dynparam_hints * hints_ptr,
   void ** group_ui_context)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   GObject * ret_obj_ptr;
   ZynjackuHints * hints_obj_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE((ZynjackuSynth *)instance_ui_context);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_ui_context);
 
   LOG_DEBUG("Group \"%s\" appeared, handle %p", group_name, group_handle);
 
@@ -965,13 +976,13 @@ dynparam_group_appeared(
     (const gchar * const *)hints_ptr->values);
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_APPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED],
     0,
     parent_group_ui_context,
     group_name,
     hints_obj_ptr,
-    zynjacku_synth_context_to_string(group_handle),
+    zynjacku_plugin_context_to_string(group_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("group-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -990,8 +1001,8 @@ dynparam_group_disappeared(
   LOG_DEBUG("dynparam_generic_group_disappeared() called.");
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_GROUP_DISAPPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED],
     0,
     group_ui_context);
 
@@ -1007,8 +1018,8 @@ dynparam_parameter_boolean_disappeared(
   LOG_DEBUG("dynparam_parameter_boolean_disappeared() called.");
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_DISAPPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED],
     0,
     parameter_ui_context);
 
@@ -1024,8 +1035,8 @@ dynparam_parameter_float_disappeared(
   LOG_DEBUG("dynparam_parameter_float_disappeared() called.");
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_DISAPPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED],
     0,
     parameter_ui_context);
 
@@ -1041,8 +1052,8 @@ dynparam_parameter_enum_disappeared(
   LOG_DEBUG("dynparam_parameter_enum_disappeared() called.");
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_DISAPPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED],
     0,
     parameter_ui_context);
 
@@ -1058,8 +1069,8 @@ dynparam_parameter_int_disappeared(
   LOG_DEBUG("dynparam_parameter_int_disappeared() called.");
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_DISAPPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED],
     0,
     parameter_ui_context);
 
@@ -1094,14 +1105,14 @@ dynparam_parameter_boolean_appeared(
     (const gchar * const *)hints_ptr->values);
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_BOOL_APPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED],
     0,
     group_ui_context,
     parameter_name,
     hints_obj_ptr,
     (gboolean)value,
-    zynjacku_synth_context_to_string(parameter_handle),
+    zynjacku_plugin_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -1112,22 +1123,22 @@ dynparam_parameter_boolean_appeared(
 }
 
 void
-zynjacku_synth_bool_set(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_bool_set(
+  ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   gboolean value)
 {
   void * context;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_synth_context_from_string(string_context);
+  context = zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_synth_bool_set() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", context);
 
   dynparam_parameter_boolean_change(
-    synth_ptr->dynparams,
+    plugin_ptr->dynparams,
     (lv2dynparam_host_parameter)context,
     value);
 }
@@ -1164,8 +1175,8 @@ dynparam_parameter_float_appeared(
     (const gchar * const *)hints_ptr->values);
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_FLOAT_APPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
     0,
     group_ui_context,
     parameter_name,
@@ -1173,7 +1184,7 @@ dynparam_parameter_float_appeared(
     (gfloat)value,
     (gfloat)min,
     (gfloat)max,
-    zynjacku_synth_context_to_string(parameter_handle),
+    zynjacku_plugin_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("float-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -1184,24 +1195,24 @@ dynparam_parameter_float_appeared(
 }
 
 void
-zynjacku_synth_float_set(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_float_set(
+  ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   gfloat value)
 {
   void * context;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_synth_context_from_string(string_context);
+  context = zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_synth_float_set() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", context);
 
-  if (synth_ptr->dynparams != NULL)
+  if (plugin_ptr->dynparams != NULL)
   {
     dynparam_parameter_float_change(
-      synth_ptr->dynparams,
+      plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
   }
@@ -1252,15 +1263,15 @@ dynparam_parameter_enum_appeared(
   zynjacku_enum_set(enum_ptr, values, values_count);
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_ENUM_APPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED],
     0,
     group_ui_context,
     parameter_name,
     hints_obj_ptr,
     (guint)selected_value,
     enum_ptr,
-    zynjacku_synth_context_to_string(parameter_handle),
+    zynjacku_plugin_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("enum-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -1273,24 +1284,24 @@ dynparam_parameter_enum_appeared(
 }
 
 void
-zynjacku_synth_enum_set(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_enum_set(
+  ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   guint value)
 {
   void * context;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_synth_context_from_string(string_context);
+  context = zynjacku_plugin_context_from_string(string_context);
 
-  LOG_NOTICE("zynjacku_synth_enum_set() called, context %p, value %u", context, value);
+  LOG_NOTICE("zynjacku_plugin_enum_set() called, context %p, value %u", context, value);
 
-  if (synth_ptr->dynparams != NULL)
+  if (plugin_ptr->dynparams != NULL)
   {
     dynparam_parameter_enum_change(
-      synth_ptr->dynparams,
+      plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
   }
@@ -1328,8 +1339,8 @@ dynparam_parameter_int_appeared(
     (const gchar * const *)hints_ptr->values);
 
   g_signal_emit(
-    (ZynjackuSynth *)instance_ui_context,
-    g_zynjacku_synth_signals[ZYNJACKU_SYNTH_SIGNAL_INT_APPEARED],
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED],
     0,
     group_ui_context,
     parameter_name,
@@ -1337,7 +1348,7 @@ dynparam_parameter_int_appeared(
     (gint)value,
     (gint)min,
     (gint)max,
-    zynjacku_synth_context_to_string(parameter_handle),
+    zynjacku_plugin_context_to_string(parameter_handle),
     &ret_obj_ptr);
 
   LOG_DEBUG("int-appeared signal returned object ptr is %p", ret_obj_ptr);
@@ -1348,24 +1359,24 @@ dynparam_parameter_int_appeared(
 }
 
 void
-zynjacku_synth_int_set(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_int_set(
+  ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   gint value)
 {
   void * context;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_synth_context_from_string(string_context);
+  context = zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_synth_int_set() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_int_set() called, context %p", context);
 
-  if (synth_ptr->dynparams != NULL)
+  if (plugin_ptr->dynparams != NULL)
   {
     dynparam_parameter_int_change(
-      synth_ptr->dynparams,
+      plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
   }

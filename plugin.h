@@ -20,97 +20,97 @@
  *
  *****************************************************************************/
 
-#ifndef SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED
-#define SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED
+#ifndef PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED
+#define PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED
 
 G_BEGIN_DECLS
 
-#define ZYNJACKU_SYNTH_TYPE (zynjacku_synth_get_type())
-#define ZYNJACKU_SYNTH(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), ZYNJACKU_TYPE_SYNTH, ZynjackuSynth))
-#define ZYNJACKU_SYNTH_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), ZYNJACKU_TYPE_SYNTH, ZynjackuSynthClass))
-#define ZYNJACKU_IS_SYNTH(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), ZYNJACKU_TYPE_SYNTH))
-#define ZYNJACKU_IS_SYNTH_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), ZYNJACKU_TYPE_SYNTH))
-#define ZYNJACKU_SYNTH_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), ZYNJACKU_TYPE_SYNTH, ZynjackuSynthClass))
+#define ZYNJACKU_PLUGIN_TYPE (zynjacku_plugin_get_type())
+#define ZYNJACKU_PLUGIN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), ZYNJACKU_TYPE_PLUGIN, ZynjackuPlugin))
+#define ZYNJACKU_PLUGIN_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), ZYNJACKU_TYPE_PLUGIN, ZynjackuPluginClass))
+#define ZYNJACKU_IS_PLUGIN(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), ZYNJACKU_TYPE_PLUGIN))
+#define ZYNJACKU_IS_PLUGIN_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), ZYNJACKU_TYPE_PLUGIN))
+#define ZYNJACKU_PLUGIN_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), ZYNJACKU_TYPE_PLUGIN, ZynjackuPluginClass))
 
-#define ZYNJACKU_TYPE_SYNTH ZYNJACKU_SYNTH_TYPE
+#define ZYNJACKU_TYPE_PLUGIN ZYNJACKU_PLUGIN_TYPE
 
-typedef struct _ZynjackuSynth ZynjackuSynth;
-typedef struct _ZynjackuSynthClass ZynjackuSynthClass;
+typedef struct _ZynjackuPlugin ZynjackuPlugin;
+typedef struct _ZynjackuPluginClass ZynjackuPluginClass;
 
-struct _ZynjackuSynth {
+struct _ZynjackuPlugin {
   GObject parent;
   /* instance members */
 };
 
-struct _ZynjackuSynthClass {
+struct _ZynjackuPluginClass {
   GObjectClass parent;
   /* class members */
 };
 
-/* used by ZYNJACKU_TYPE_SYNTH */
-GType zynjacku_synth_get_type();
+/* used by ZYNJACKU_TYPE_PLUGIN */
+GType zynjacku_plugin_get_type();
 
 gboolean
-zynjacku_synth_construct(
-  ZynjackuSynth * synth_obj_ptr,
+zynjacku_plugin_construct(
+  ZynjackuPlugin * plugin_obj_ptr,
   GObject * engine_obj_ptr);
 
 void
-zynjacku_synth_destruct(
-  ZynjackuSynth * synth_obj_ptr);
+zynjacku_plugin_destruct(
+  ZynjackuPlugin * plugin_obj_ptr);
 
 gboolean
-zynjacku_synth_supports_generic_ui(
-  ZynjackuSynth * synth_obj_ptr);
+zynjacku_plugin_supports_generic_ui(
+  ZynjackuPlugin * plugin_obj_ptr);
 
 gboolean
-zynjacku_synth_supports_custom_ui(
-  ZynjackuSynth * synth_obj_ptr);
+zynjacku_plugin_supports_custom_ui(
+  ZynjackuPlugin * plugin_obj_ptr);
 
 const char *
-zynjacku_synth_get_instance_name(
-  ZynjackuSynth * obj_ptr);
+zynjacku_plugin_get_instance_name(
+  ZynjackuPlugin * obj_ptr);
 
 const char *
-zynjacku_synth_get_name(
-  ZynjackuSynth * obj_ptr);
+zynjacku_plugin_get_name(
+  ZynjackuPlugin * obj_ptr);
 
 const char *
-zynjacku_synth_get_uri(
-  ZynjackuSynth * obj_ptr);
+zynjacku_plugin_get_uri(
+  ZynjackuPlugin * obj_ptr);
 
 gboolean
-zynjacku_synth_ui_on(
-  ZynjackuSynth * synth_obj_ptr);
+zynjacku_plugin_ui_on(
+  ZynjackuPlugin * plugin_obj_ptr);
 
 void
-zynjacku_synth_ui_off(
-  ZynjackuSynth * obj_ptr);
+zynjacku_plugin_ui_off(
+  ZynjackuPlugin * obj_ptr);
 
 void
-zynjacku_synth_bool_set(
-  ZynjackuSynth * obj_ptr,
+zynjacku_plugin_bool_set(
+  ZynjackuPlugin * obj_ptr,
   gchar * context,
   gboolean value);
 
 void
-zynjacku_synth_float_set(
-  ZynjackuSynth * obj_ptr,
+zynjacku_plugin_float_set(
+  ZynjackuPlugin * obj_ptr,
   gchar * context,
   gfloat value);
 
 void
-zynjacku_synth_int_set(
-  ZynjackuSynth * obj_ptr,
+zynjacku_plugin_int_set(
+  ZynjackuPlugin * obj_ptr,
   gchar * context,
   gint value);
 
 void
-zynjacku_synth_enum_set(
-  ZynjackuSynth * obj_ptr,
+zynjacku_plugin_enum_set(
+  ZynjackuPlugin * obj_ptr,
   gchar * context,
   guint value);
 
 G_END_DECLS
 
-#endif /* #ifndef SYNTH_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */
+#endif /* #ifndef PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */

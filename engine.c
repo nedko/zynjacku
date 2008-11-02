@@ -43,7 +43,7 @@
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
-#include "synth.h"
+#include "plugin.h"
 #include "engine.h"
 #include "gtk2gui.h"
 #include "lv2.h"
@@ -482,7 +482,7 @@ jack_process_cb(
   void * context_ptr)
 {
   struct list_head * synth_node_ptr;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * synth_ptr;
 
   /* Copy MIDI input data to all LV2 midi in ports */
   if (zynjacku_jackmidi_to_lv2midi(
@@ -497,7 +497,7 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each(synth_node_ptr, &engine_ptr->plugins)
   {
-    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings);
 
     if (synth_ptr->dynparams)
     {
@@ -505,21 +505,21 @@ jack_process_cb(
     }
 
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
-    if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO)
+    if (synth_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO)
     {
       zynjacku_lv2_connect_port(
         synth_ptr->lv2plugin,
-        synth_ptr->audio_out_left_port.index,
-        jack_port_get_buffer(synth_ptr->audio_out_left_port.data.audio, nframes));
+        synth_ptr->subtype.synth.audio_out_left_port.index,
+        jack_port_get_buffer(synth_ptr->subtype.synth.audio_out_left_port.data.audio, nframes));
     }
 
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
-    if (synth_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+    if (synth_ptr->subtype.synth.audio_out_right_port.type == PORT_TYPE_AUDIO)
     {
       zynjacku_lv2_connect_port(
         synth_ptr->lv2plugin,
-        synth_ptr->audio_out_right_port.index,
-        jack_port_get_buffer(synth_ptr->audio_out_right_port.data.audio, nframes));
+        synth_ptr->subtype.synth.audio_out_right_port.index,
+        jack_port_get_buffer(synth_ptr->subtype.synth.audio_out_right_port.data.audio, nframes));
     }
 
     /* Run plugin for this cycle */
@@ -537,12 +537,12 @@ zynjacku_engine_activate_synth(
   GObject * synth_obj_ptr)
 {
   struct zynjacku_engine * engine_ptr;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * synth_ptr;
 
   LOG_DEBUG("zynjacku_engine_add_synth() called.");
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  synth_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(synth_obj_ptr);
 
   list_add_tail(&synth_ptr->siblings, &engine_ptr->plugins);
 
@@ -555,9 +555,9 @@ zynjacku_engine_deactivate_synth(
   ZynjackuEngine * engine_obj_ptr,
   GObject * synth_obj_ptr)
 {
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * synth_ptr;
 
-  synth_ptr = ZYNJACKU_SYNTH_GET_PRIVATE(synth_obj_ptr);
+  synth_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(synth_obj_ptr);
 
   zynjacku_lv2_deactivate(synth_ptr->lv2plugin);
 
@@ -569,7 +569,7 @@ zynjacku_engine_ui_run(
   ZynjackuEngine * engine_obj_ptr)
 {
   struct list_head * synth_node_ptr;
-  struct zynjacku_synth * synth_ptr;
+  struct zynjacku_plugin * synth_ptr;
   struct zynjacku_engine * engine_ptr;
 
 //  LOG_DEBUG("zynjacku_engine_ui_run() called.");
@@ -579,7 +579,7 @@ zynjacku_engine_ui_run(
   /* Iterate over plugins */
   list_for_each(synth_node_ptr, &engine_ptr->plugins)
   {
-    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_synth, siblings);
+    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings);
 
     if (synth_ptr->dynparams)
     {

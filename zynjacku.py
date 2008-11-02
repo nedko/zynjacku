@@ -832,7 +832,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
-        synth = zynjacku.Synth(uri=uri)
+        synth = zynjacku.Plugin(uri=uri)
         self.statusbar.pop(statusbar_id)
         if not synth.construct(self.engine):
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
@@ -981,7 +981,7 @@ class ZynjackuHostOne(ZynjackuHost):
         #print "ZynjackuHostOne constructor called."
         ZynjackuHost.__init__(self, client_name)
 
-        self.synth = zynjacku.Synth(uri=uri)
+        self.synth = zynjacku.Plugin(uri=uri)
         if not self.synth.construct(self.engine):
             print"Failed to construct %s" % uri
             del(self.synth)

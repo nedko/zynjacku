@@ -50,8 +50,8 @@ zynjacku_c_la_SOURCES = zynjacku.h
 zynjacku_c_la_SOURCES += engine.c
 zynjacku_c_la_SOURCES += engine.h
 zynjacku_c_la_SOURCES += jack_compat.c
-zynjacku_c_la_SOURCES += synth.c
-zynjacku_c_la_SOURCES += synth.h
+zynjacku_c_la_SOURCES += plugin.c
+zynjacku_c_la_SOURCES += plugin.h
 zynjacku_c_la_SOURCES += lv2.c
 zynjacku_c_la_SOURCES += lv2.h
 zynjacku_c_la_SOURCES += plugin_repo.c
@@ -77,7 +77,7 @@ zynjacku_c_la_SOURCES += rtmempool.h
 PYGTK_DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 PYGTK_CODEGEN=`pkg-config --variable=codegendir pygtk-2.0`
 
-zynjacku.defs: engine.h synth.h enum.h hints.h
+zynjacku.defs: engine.h plugin.h enum.h hints.h
 	python $(PYGTK_CODEGEN)/h2def.py $^ > $@
 
 # Generate the C wrapper from the defs and our override file

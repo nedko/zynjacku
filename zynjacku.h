@@ -33,7 +33,7 @@
 #define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
 #define PORT_TYPE_PARAMETER        4 /* LV2 control rate port used for synth parameters */
 
-struct zynjacku_synth_port
+struct zynjacku_port
 {
   struct list_head plugin_siblings;
   struct list_head port_type_siblings;
@@ -55,7 +55,11 @@ struct zynjacku_synth_port
   GObject * ui_context;
 };
 
-struct zynjacku_synth
+#define PLUGIN_TYPE_UNKNOWN  0
+#define PLUGIN_TYPE_SYNTH    1
+#define PLUGIN_TYPE_EFFECT   2
+
+struct zynjacku_plugin
 {
   gboolean dispose_has_run;
 
@@ -66,14 +70,30 @@ struct zynjacku_synth
   struct list_head siblings;
   zynjacku_lv2_handle lv2plugin;
   bool dynparams_supported;
-  struct zynjacku_synth_port midi_in_port;
-  struct zynjacku_synth_port audio_out_left_port;
-  struct zynjacku_synth_port audio_out_right_port;
   struct list_head parameter_ports;
   lv2dynparam_host_instance dynparams;
   zynjacku_gtk2gui_handle gtk2gui;
   char * id;
   char * name;
+
+  unsigned int type;
+
+  union
+  {
+    struct
+    {
+      struct zynjacku_port midi_in_port;
+      struct zynjacku_port audio_out_left_port;
+      struct zynjacku_port audio_out_right_port;
+    } synth;
+    struct
+    {
+      struct zynjacku_port audio_in_left_port;
+      struct zynjacku_port audio_in_right_port;
+      struct zynjacku_port audio_out_left_port;
+      struct zynjacku_port audio_out_right_port;
+    } effect;
+  } subtype;
 };
 
 struct zynjacku_engine
@@ -82,8 +102,8 @@ struct zynjacku_engine
 
   jack_client_t * jack_client;  /* the jack client */
   struct list_head plugins;
-  struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_synth_port"s linked by port_type_siblings */
-  struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_synth_port"s linked by port_type_siblings */
+  struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_port"s linked by port_type_siblings */
+  struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_port"s linked by port_type_siblings */
   jack_port_t * jack_midi_in;
   LV2_MIDI lv2_midi_buffer;
   LV2_Event_Buffer lv2_midi_event_buffer;
@@ -101,6 +121,6 @@ struct zynjacku_engine
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
 
-#define ZYNJACKU_SYNTH_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_SYNTH_TYPE, struct zynjacku_synth))
+#define ZYNJACKU_PLUGIN_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_TYPE, struct zynjacku_plugin))
 
 #endif /* #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED */
