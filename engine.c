@@ -693,7 +693,7 @@ zynjacku_check_plugin(
       midi_in_ports_count + midi_event_in_ports_count != 1 ||
       audio_out_ports_count == 0)
   {
-    LOG_DEBUG("Skipping 's' %s, [synth] plugin with unsupported port configuration", name, plugin_uri);
+    LOG_DEBUG("Skipping 's' %s, [synth] plugin with unsupported port configuration", plugin_name, plugin_uri);
     LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
     LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
     LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
@@ -704,7 +704,7 @@ zynjacku_check_plugin(
     return false;
   }
 
-  LOG_DEBUG("Found \"simple\" synth plugin '%s' %s", name, plugin_uri);
+  LOG_DEBUG("Found \"simple\" synth plugin '%s' %s", plugin_name, plugin_uri);
   LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
   LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
   LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
