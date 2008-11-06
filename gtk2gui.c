@@ -37,10 +37,11 @@
 #include "lv2-miditype.h"
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
+#include "lv2_data_access.h"
 
 #include "list.h"
-#include "gtk2gui.h"
 #include "lv2.h"
+#include "gtk2gui.h"
 #include "zynjacku.h"
 #include "plugin_repo.h"
 
@@ -52,7 +53,7 @@
 
 struct zynjacku_gtk2gui
 {
-  const LV2_Feature * const * host_features;
+  const LV2_Feature ** host_features;
   const char *plugin_uri;
   char *bundle_path;
   unsigned int ports_count;
@@ -65,11 +66,17 @@ struct zynjacku_gtk2gui
   LV2UI_Handle ui_handle;
   GtkWidget * widget_ptr;
   GtkWidget * window_ptr;
+  zynjacku_lv2_handle lv2plugin;
+  LV2_Extension_Data_Feature data_access;
+  LV2_Feature gui_feature_instance_access;
+  LV2_Feature gui_feature_data_access;
 };
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_create(
   const LV2_Feature * const * host_features,
+  unsigned int host_feature_count,
+  zynjacku_lv2_handle plugin_handle,
   void *context_ptr,
   const char *uri,
   const char *synth_id,
@@ -98,11 +105,18 @@ zynjacku_gtk2gui_create(
     goto fail_free_ui_strings;
   }
 
-  ui_ptr->host_features = host_features;
   ui_ptr->plugin_uri = uri;
   ui_ptr->context_ptr = context_ptr;
   ui_ptr->synth_id = synth_id;
   ui_ptr->resizable = true;
+  ui_ptr->lv2plugin = plugin_handle;
+  ui_ptr->data_access.data_access = zynjacku_lv2_get_descriptor(plugin_handle)->extension_data;
+  
+  ui_ptr->gui_feature_instance_access.URI = "http://lv2plug.in/ns/ext/instance-access";
+  ui_ptr->gui_feature_instance_access.data = zynjacku_lv2_get_handle(ui_ptr->lv2plugin);
+  ui_ptr->gui_feature_data_access.URI = LV2_DATA_ACCESS_URI;
+  ui_ptr->gui_feature_data_access.data = &ui_ptr->data_access;
+  
 
   ports_count = 0;
 
@@ -123,7 +137,7 @@ zynjacku_gtk2gui_create(
   }
 
   memset(ui_ptr->ports, 0, ports_count * sizeof(struct zynjacku_port *));
-
+  
   list_for_each(node_ptr, parameter_ports_ptr)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
@@ -132,13 +146,26 @@ zynjacku_gtk2gui_create(
 
   ui_ptr->ports_count = ports_count;
 
+  assert(host_features[host_feature_count] == NULL);
+  
+  ui_ptr->host_features = malloc((host_feature_count + 3) * sizeof(struct LV2_Feature *));
+  if (ui_ptr->host_features == NULL)
+  {
+    LOG_WARNING("malloc() failed");
+    goto fail_free_ports;
+  }
+  memcpy(ui_ptr->host_features, host_features, host_feature_count * sizeof(struct LV2_Feature *));
+  ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_data_access;
+  ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_instance_access;
+  ui_ptr->host_features[host_feature_count++] = NULL;
+
   ui_ptr->bundle_path = ui_bundle_path;
 
   ui_ptr->dlhandle = dlopen(ui_binary_path, RTLD_NOW);
   if (ui_ptr->dlhandle == NULL)
   {
     LOG_WARNING("Cannot load \"%s\": %s", ui_binary_path, dlerror());
-    goto fail_free_ports;
+    goto fail_free_features;
   }
 
   lookup = (LV2UI_DescriptorFunction)dlsym(ui_ptr->dlhandle, "lv2ui_descriptor");
@@ -174,6 +201,9 @@ zynjacku_gtk2gui_create(
 
 fail_dlclose:
   dlclose(ui_ptr->dlhandle);
+
+fail_free_features:
+  free(ui_ptr->host_features);
 
 fail_free_ports:
   free(ui_ptr->ports);

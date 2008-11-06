@@ -44,9 +44,9 @@
 #include "engine.h"
 #include "rack.h"
 #include "enum.h"
-#include "gtk2gui.h"
 #include "hints.h"
 #include "lv2.h"
+#include "gtk2gui.h"
 
 #include "zynjacku.h"
 #include "plugin_repo.h"

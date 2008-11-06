@@ -38,8 +38,8 @@
 #include "lv2_uri_map.h"
 
 #include "list.h"
-#include "gtk2gui.h"
 #include "lv2.h"
+#include "gtk2gui.h"
 #include "zynjacku.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"

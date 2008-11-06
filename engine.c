@@ -46,8 +46,8 @@
 
 #include "plugin.h"
 #include "engine.h"
-#include "gtk2gui.h"
 #include "lv2.h"
+#include "gtk2gui.h"
 
 #include "zynjacku.h"
 
@@ -63,6 +63,8 @@
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
+
+#define ZYNJACKU_ENGINE_FEATURES 4
 
 struct zynjacku_engine
 {
@@ -91,7 +93,7 @@ struct zynjacku_engine
   LV2_Feature host_feature_uri_map;
   LV2_Feature host_feature_event_ref;
   LV2_Feature host_feature_dynparams;
-  const LV2_Feature * host_features[5];
+  const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
 };
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
@@ -232,6 +234,7 @@ zynjacku_engine_init(
   gpointer g_class)
 {
   struct zynjacku_engine * engine_ptr;
+  int count;
 
   LOG_DEBUG("zynjacku_engine_init() called.");
 
@@ -267,11 +270,14 @@ zynjacku_engine_init(
   engine_ptr->host_feature_dynparams.data = NULL;
 
   /* initialize host features array */
-  engine_ptr->host_features[0] = &engine_ptr->host_feature_rtmempool;
-  engine_ptr->host_features[1] = &engine_ptr->host_feature_uri_map;
-  engine_ptr->host_features[2] = &engine_ptr->host_feature_event_ref;
-  engine_ptr->host_features[3] = &engine_ptr->host_feature_dynparams;
-  engine_ptr->host_features[4] = NULL;
+  count = 0;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_rtmempool;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_uri_map;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_event_ref;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_dynparams;
+  assert(ZYNJACKU_ENGINE_FEATURES == count);
+  engine_ptr->host_features[count] = NULL;
+  /* keep in mind to update the constant when adding things here */
 
   zynjacku_plugin_repo_init();
 }
@@ -998,7 +1004,8 @@ zynjacku_plugin_construct_synth(
   g_object_ref(plugin_ptr->engine_object_ptr);
 
   /* no plugins to test gtk2gui */
-  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
+  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, ZYNJACKU_ENGINE_FEATURES, plugin_ptr->lv2plugin, 
+    plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
 
   plugin_ptr->deactivate = zynjacku_engine_deactivate_synth;
   plugin_ptr->free_ports = zynjacku_free_synth_ports;

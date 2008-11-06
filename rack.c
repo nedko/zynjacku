@@ -44,8 +44,8 @@
 
 #include "plugin.h"
 #include "rack.h"
-#include "gtk2gui.h"
 #include "lv2.h"
+#include "gtk2gui.h"
 
 #include "zynjacku.h"
 
@@ -87,6 +87,8 @@ struct lv2rack_engine
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
+
+#define ZYNJACKU_RACK_ENGINE_FEATURES 2
 
 static guint g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNALS_COUNT];
 
@@ -199,6 +201,7 @@ zynjacku_rack_init(
   gpointer g_class)
 {
   struct lv2rack_engine * rack_ptr;
+  int count;
 
   LOG_DEBUG("zynjacku_rack_init() called.");
 
@@ -218,9 +221,11 @@ zynjacku_rack_init(
   rack_ptr->host_feature_dynparams.data = NULL;
 
   /* initialize host features array */
-  rack_ptr->host_features[0] = &rack_ptr->host_feature_rtmempool;
-  rack_ptr->host_features[1] = &rack_ptr->host_feature_dynparams;
-  rack_ptr->host_features[2] = NULL;
+  count = 0;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_rtmempool;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_dynparams;
+  assert(ZYNJACKU_RACK_ENGINE_FEATURES == count);
+  rack_ptr->host_features[count] = NULL;
 
   zynjacku_plugin_repo_init();
 }
@@ -798,7 +803,8 @@ zynjacku_plugin_construct_effect(
   g_object_ref(plugin_ptr->engine_object_ptr);
 
   /* no plugins to test gtk2gui */
-  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(rack_ptr->host_features, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
+  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(rack_ptr->host_features, ZYNJACKU_RACK_ENGINE_FEATURES, plugin_ptr->lv2plugin, 
+    plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
 
   plugin_ptr->deactivate = zynjacku_rack_deactivate_effect;
   plugin_ptr->free_ports = zynjacku_free_effect_ports;
