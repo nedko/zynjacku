@@ -1329,10 +1329,35 @@ zynjacku_plugin_set_parameter(
   gchar * value)
 {
   struct zynjacku_plugin * plugin_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+  char * locale;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
   LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s') called.", parameter, value);
 
-  return TRUE;
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    if (strcmp(port_ptr->symbol, parameter) == 0)
+    {
+      locale = strdup(setlocale(LC_NUMERIC, NULL));
+      setlocale(LC_NUMERIC, "POSIX");
+
+      if (sscanf(value, "%f", &port_ptr->data.parameter.value) != 1)
+      {
+        LOG_ERROR("failed to convert value '%s' of parameter '%s' to float", value, parameter);
+      }
+
+      setlocale(LC_NUMERIC, locale);
+
+      free(locale);
+
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }

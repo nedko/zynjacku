@@ -25,6 +25,7 @@ import gobject
 import phat
 import re
 import time
+import xml.dom.minidom
 
 old_path = sys.path
 sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
@@ -736,10 +737,15 @@ class host:
     def plugin_ui_available(self, plugin):
         return plugin.supports_custom_ui() or plugin.supports_generic_ui()
 
-    def new_plugin(self, uri):
+    def new_plugin(self, uri, parameters=[]):
         plugin = zynjacku.Plugin(uri=uri)
         if not plugin.construct(self.engine):
             return False
+
+        for parameter in parameters:
+            name = parameter[0]
+            value = parameter[1]
+            plugin.set_parameter(name, value)
 
         plugin.uri = uri
         plugin.ui_win = None
@@ -867,13 +873,13 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.midi_led.set(self.engine.get_midi_activity())
         return True
 
-    def add_synth(self, uri):
+    def add_synth(self, uri, parameters=[]):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
         self.statusbar.pop(statusbar_id)
-        synth = self.new_plugin(uri)
+        synth = self.new_plugin(uri, parameters)
         if not synth:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:
@@ -931,7 +937,47 @@ class ZynjackuHostMulti(ZynjackuHost):
         about.hide()
 
     def on_preset_load(self, widget):
-        print "Preset load not implemented yet!"
+        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK)
+        file_dialog = gtk.FileChooserDialog(title="Save synth stack", action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=dialog_buttons)
+
+        # Create and add the filter
+        filter = gtk.FileFilter()
+        filter.set_name('synth stack (*.zynjacku)')
+        filter.add_pattern("*.zynjacku")
+        file_dialog.add_filter(filter)
+
+        # Create and add the 'all files' filter
+        filter = gtk.FileFilter()
+        filter.set_name("All files")
+        filter.add_pattern("*")
+        file_dialog.add_filter(filter)
+
+        # Init the return value
+        filename = ""
+
+        if file_dialog.run() == gtk.RESPONSE_OK:
+            filename = file_dialog.get_filename()
+        file_dialog.destroy()
+
+        if not filename:
+            return
+
+        # TODO: handle exceptions
+
+        doc = xml.dom.minidom.parse(filename)
+        for plugin in doc.getElementsByTagName("plugin"):
+            uri = plugin.getAttribute("uri")
+            name = None
+            parameters = []
+            for node in plugin.childNodes:
+                if node.nodeType == node.ELEMENT_NODE:
+                    name = node.getAttribute("name")
+                    node.normalize()
+                    value = node.childNodes[0].data
+                    #print "%s='%f'" % (name, value)
+                    parameters.append([name, value])
+
+            self.add_synth(uri, parameters)
 
     def on_preset_save_as(self, widget):
         dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
