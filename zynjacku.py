@@ -783,7 +783,7 @@ class host:
 
         for plugin in self.plugins:
             if plugin.ui_win:
-                plguin.ui_win.disconnect(plugin.ui_win.destroy_connect_id) # signal connection holds reference to plugin object...
+                plugin.ui_win.disconnect(plugin.ui_win.destroy_connect_id) # signal connection holds reference to plugin object...
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
