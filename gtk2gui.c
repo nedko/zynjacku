@@ -228,15 +228,19 @@ zynjacku_on_gtk2gui_window_destroy_internal(
   GtkWidget * widget,
   gpointer ui_handle)
 {
-  gtk_container_remove(GTK_CONTAINER(ui_ptr->window_ptr), ui_ptr->widget_ptr);
+  LOG_DEBUG("zynjacku_on_gtk2gui_window_destroy_internal() called");
+  //gtk_container_remove(GTK_CONTAINER(ui_ptr->window_ptr), ui_ptr->widget_ptr);
   zynjacku_gtk2gui_on_ui_destroyed(ui_ptr->context_ptr);
   ui_ptr->window_ptr = NULL;
+  ui_ptr->lv2ui->cleanup(ui_ptr->ui_handle);
+  ui_ptr->ui_handle = NULL;
 }
 
 void
 zynjacku_gtk2gui_destroy(
   zynjacku_gtk2gui_handle ui_handle)
 {
+  LOG_DEBUG("zynjacku_on_gtk2gui_destroy() called");
   dlclose(ui_ptr->dlhandle);
   free(ui_ptr->ports);
   free(ui_ptr);
