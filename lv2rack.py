@@ -112,7 +112,7 @@ class lv2rack(zynjacku.host):
 
         self.toggle_renderer.disconnect(toggled_connect_id)
 
-    def on_effect_ui_window_destroyed(self, window, effect, row):
+    def on_plugin_ui_window_destroyed(self, window, effect, row):
         effect.ui_win.disconnect(effect.ui_win.destroy_connect_id) # signal connection holds reference to effect object...
         effect.ui_win = None
         row[0] = False
