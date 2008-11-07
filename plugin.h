@@ -111,6 +111,16 @@ zynjacku_plugin_enum_set(
   gchar * context,
   guint value);
 
+void
+zynjacku_plugin_get_parameters(
+  ZynjackuPlugin * obj_ptr);
+
+gboolean
+zynjacku_plugin_set_parameter(
+  ZynjackuPlugin * obj_ptr,
+  gchar * parameter,
+  gchar * value);
+
 G_END_DECLS
 
 #endif /* #ifndef PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */

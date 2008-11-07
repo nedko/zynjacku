@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <locale.h>
 #include <slv2/slv2.h>
 //#include <slv2/query.h>
 #include <jack/jack.h>
@@ -66,7 +67,8 @@
 #define ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED        9
 #define ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED    10
 #define ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF      11
-#define ZYNJACKU_PLUGIN_SIGNALS_COUNT             12
+#define ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE    12
+#define ZYNJACKU_PLUGIN_SIGNALS_COUNT             13
 
 /* properties */
 #define ZYNJACKU_PLUGIN_PROP_URI                1
@@ -432,6 +434,21 @@ zynjacku_plugin_class_init(
       NULL,                     /* c_marshaller */
       G_TYPE_NONE,              /* return type */
       0);                       /* n_params */
+
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE] =
+    g_signal_new(
+      "parameter-value",        /* signal_name */
+      ZYNJACKU_PLUGIN_TYPE,     /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      2,                        /* n_params */
+      G_TYPE_STRING,            /* parameter name */
+      G_TYPE_STRING);           /* parameter value */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_plugin_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_plugin_set_property;
@@ -1268,4 +1285,54 @@ zynjacku_plugin_int_set(
       (lv2dynparam_host_parameter)context,
       value);
   }
+}
+
+void
+zynjacku_plugin_get_parameters(
+  ZynjackuPlugin * plugin_obj_ptr)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+  char value[100];
+  char * locale;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  LOG_DEBUG("zynjacku_plugin_get_parameters() called.");
+
+  locale = strdup(setlocale(LC_NUMERIC, NULL));
+
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    setlocale(LC_NUMERIC, "POSIX");
+    sprintf(value, "%f", port_ptr->data.parameter.value);
+    setlocale(LC_NUMERIC, locale);
+
+    g_signal_emit(
+      plugin_obj_ptr,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
+      0,
+      port_ptr->symbol,
+      value);
+  }
+
+  free(locale);
+}
+
+gboolean
+zynjacku_plugin_set_parameter(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * parameter,
+  gchar * value)
+{
+  struct zynjacku_plugin * plugin_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s') called.", parameter, value);
+
+  return TRUE;
 }

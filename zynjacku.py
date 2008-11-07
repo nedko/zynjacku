@@ -741,9 +741,25 @@ class host:
         if not plugin.construct(self.engine):
             return False
 
-        self.plugins.append(plugin)
+        plugin.uri = uri
         plugin.ui_win = None
+        self.plugins.append(plugin)
         return plugin
+
+    def on_plugin_parameter_value(self, plugin, parameter, value):
+        self.xml += "%s<parameter name='%s'>%s</parameter>\n" % (self.xml_indent, parameter, value)
+
+    def get_plugins_xml(self, indent):
+        self.xml = ""
+        self.xml_indent = indent + "  "
+        for plugin in self.plugins:
+            self.xml += "%s<plugin uri='%s'>\n" % (indent, plugin.uri)
+            cbid = plugin.connect("parameter-value", self.on_plugin_parameter_value)
+            plugin.get_parameters()
+            plugin.disconnect(cbid)
+            self.xml += "%s</plugin>\n" % indent
+
+        return self.xml
 
     def clear_plugins(self):
         for plugin in self.plugins:
@@ -838,6 +854,8 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
 
+        self.preset_filename = None
+
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
 
@@ -916,7 +934,50 @@ class ZynjackuHostMulti(ZynjackuHost):
         print "Preset load not implemented yet!"
 
     def on_preset_save_as(self, widget):
-        print "Preset saving not implemented yet!"
+        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
+        file_dialog = gtk.FileChooserDialog(title="Save synth stack", action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=dialog_buttons)
+
+        # set the filename
+        if self.preset_filename:
+            file_dialog.set_current_name(self.preset_filename)
+
+        # Create and add the filter
+        filter = gtk.FileFilter()
+        filter.set_name('synth stack (*.zynjacku)')
+        filter.add_pattern("*.zynjacku")
+        file_dialog.add_filter(filter)
+
+        # Create and add the 'all files' filter
+        filter = gtk.FileFilter()
+        filter.set_name("All files")
+        filter.add_pattern("*")
+        file_dialog.add_filter(filter)
+
+        # Init the return value
+        filename = ""
+
+        if file_dialog.run() == gtk.RESPONSE_OK:
+            filename = file_dialog.get_filename()
+        file_dialog.destroy()
+
+        # We have a path, ensure the proper extension
+        filename, extension = os.path.splitext(filename)
+        filename += ".zynjacku"
+
+        # TODO: check for overwrite and handle exceptions
+        store = open(filename, 'w')
+
+        xml = "<?xml version=\"1.0\"?>\n"
+        xml += "<zynjacku>\n"
+        xml += "  <plugins>\n"
+        xml += self.get_plugins_xml("    ")
+        xml += "  </plugins>\n"
+        xml += "</zynjacku>\n"
+
+        store.write(xml)
+        store.close()
+
+        self.preset_filename = filename
 
     def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
         if progress == 1.0:
