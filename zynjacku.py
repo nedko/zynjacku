@@ -703,12 +703,22 @@ class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
     def get_selection(self):
         return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
-class PluginUIFactory:
-    def __init__(self):
+class host:
+    def __init__(self, engine, client_name):
+        #print "host constructor called."
+
         self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
         self.layout_type = PluginUIUniversal.layout_type_horizontal
 
-    def create_plugin_ui(self, plugin):
+        self.engine = engine
+
+        self.plugins = []
+
+        if not self.engine.start_jack(client_name):
+            print "Failed to initialize zynjacku engine"
+            sys.exit(1)
+
+    def create_plugin_ui(self, plugin, data):
         if not self.plugin_ui_available(plugin):
             return False
 
@@ -717,25 +727,32 @@ class PluginUIFactory:
         else:
             plugin.ui_win = PluginUIUniversal(plugin, self.group_shadow_type, self.layout_type)
 
+        plugin.ui_win.destroy_connect_id = plugin.ui_win.connect("destroy", self.on_plugin_ui_window_destroyed, plugin, data)
         return True
+
+    def on_plugin_ui_window_destroyed(self, window, plugin, data):
+        return
 
     def plugin_ui_available(self, plugin):
         return plugin.supports_custom_ui() or plugin.supports_generic_ui()
 
-class host(PluginUIFactory):
-    def __init__(self, engine, client_name):
-        #print "ZynjackuHost constructor called."
+    def new_plugin(self, uri):
+        plugin = zynjacku.Plugin(uri=uri)
+        if not plugin.construct(self.engine):
+            return False
 
-        PluginUIFactory.__init__(self)
+        self.plugins.append(plugin)
+        plugin.ui_win = None
+        return plugin
 
-        self.engine = engine
-
-        if not self.engine.start_jack(client_name):
-            print "Failed to initialize zynjacku engine"
-            sys.exit(1)
+    def clear_plugins(self):
+        for plugin in self.plugins:
+            plugin.destruct()
+        self.plugins = []
 
     def __del__(self):
-        #print "ZynjackuHost destructor called."
+        #print "host destructor called."
+        self.clear_plugins()
 
         self.engine.stop_jack()
 
@@ -747,6 +764,10 @@ class host(PluginUIFactory):
         ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
+
+        for plugin in self.plugins:
+            if plugin.ui_win:
+                plguin.ui_win.disconnect(plugin.ui_win.destroy_connect_id) # signal connection holds reference to plugin object...
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
@@ -764,8 +785,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         #print "ZynjackuHostMulti constructor called."
         ZynjackuHost.__init__(self, client_name)
         
-        self.synths = []
-
         self.data_dir = data_dir
         self.glade_xml = glade_xml
 
@@ -824,9 +843,6 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.store.clear()
 
-        for synth in self.synths:
-            synth.destruct()
-
         ZynjackuHost.__del__(self)
 
     def update_midi_led(self):
@@ -838,13 +854,11 @@ class ZynjackuHostMulti(ZynjackuHost):
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
-        synth = zynjacku.Plugin(uri=uri)
         self.statusbar.pop(statusbar_id)
-        if not synth.construct(self.engine):
+        synth = self.new_plugin(uri)
+        if not synth:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:
-            self.synths.append(synth)
-            synth.ui_win = None
             row = False, synth.get_instance_name(), synth.get_name(), synth.get_uri(), synth
             self.store.append(row)
             self.statusbar.remove(statusbar_context_id, statusbar_id)
@@ -858,22 +872,12 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         gobject.source_remove(update_midi_led_callback_id)
 
-        for synth in self.synths:
-            if synth.ui_win:
-                synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
         self.toggle_renderer.disconnect(toggled_connect_id)
 
-    def on_synth_ui_window_destroyed(self, window, synth, row):
+    def on_plugin_ui_window_destroyed(self, window, synth, row):
         synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
         synth.ui_win = None
         row[0] = False
-
-    def create_plugin_ui(self, synth, row):
-        if not ZynjackuHost.create_plugin_ui(self, synth):
-            return False
-
-        synth.ui_win.destroy_connect_id = synth.ui_win.connect("destroy", self.on_synth_ui_window_destroyed, synth, row)
-        return True
 
     def on_ui_visible_toggled(self, cell, path, model):
         #print "on_ui_visible_toggled() called."
@@ -980,9 +984,7 @@ class ZynjackuHostMulti(ZynjackuHost):
 
     def on_synth_clear(self, widget):
         self.store.clear();
-        for synth in self.synths:
-            synth.destruct()
-        self.synths = []
+        self.clear_plugins()
 
 class ZynjackuHostOne(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uri):

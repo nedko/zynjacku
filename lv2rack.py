@@ -38,8 +38,6 @@ class lv2rack(zynjacku.host):
         #print "lv2rack constructor called."
         zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name)
         
-        self.effects = []
-
         self.data_dir = data_dir
         self.glade_xml = glade_xml
 
@@ -91,9 +89,6 @@ class lv2rack(zynjacku.host):
 
         self.store.clear()
 
-        for effect in self.effects:
-            effect.destruct()
-
         zynjacku.host.__del__(self)
 
     def add_effect(self, uri):
@@ -101,13 +96,11 @@ class lv2rack(zynjacku.host):
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
-        effect = zynjacku_c.Plugin(uri=uri)
         self.statusbar.pop(statusbar_id)
-        if not effect.construct(self.engine):
+        effect = self.new_plugin(uri)
+        if not effect:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:
-            self.effects.append(effect)
-            effect.ui_win = None
             row = False, effect.get_instance_name(), effect.get_name(), effect.get_uri(), effect
             self.store.append(row)
             self.statusbar.remove(statusbar_context_id, statusbar_id)
@@ -117,22 +110,12 @@ class lv2rack(zynjacku.host):
 
         zynjacku.host.run(self)
 
-        for effect in self.effects:
-            if effect.ui_win:
-                effect.ui_win.disconnect(effect.ui_win.destroy_connect_id) # signal connection holds reference to effect object...
         self.toggle_renderer.disconnect(toggled_connect_id)
 
     def on_effect_ui_window_destroyed(self, window, effect, row):
         effect.ui_win.disconnect(effect.ui_win.destroy_connect_id) # signal connection holds reference to effect object...
         effect.ui_win = None
         row[0] = False
-
-    def create_plugin_ui(self, effect, row):
-        if not zynjacku.host.create_plugin_ui(self, effect):
-            return False
-
-        effect.ui_win.destroy_connect_id = effect.ui_win.connect("destroy", self.on_effect_ui_window_destroyed, effect, row)
-        return True
 
     def on_ui_visible_toggled(self, cell, path, model):
         #print "on_ui_visible_toggled() called."
@@ -239,9 +222,7 @@ class lv2rack(zynjacku.host):
 
     def on_effect_clear(self, widget):
         self.store.clear();
-        for effect in self.effects:
-            effect.destruct()
-        self.effects = []
+        self.clear_plugins()
 
 def main():
     data_dir, glade_xml, the_license = zynjacku.file_setup()
