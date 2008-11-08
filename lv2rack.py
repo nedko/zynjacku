@@ -36,7 +36,7 @@ import zynjacku as zynjacku
 class lv2rack(zynjacku.host):
     def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
         #print "lv2rack constructor called."
-        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name)
+        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, "lv2rack", "effect stack")
         
         self.data_dir = data_dir
         self.glade_xml = glade_xml
@@ -77,7 +77,7 @@ class lv2rack(zynjacku.host):
         #self.effects_widget.append_column(column_uri)
 
         for uri in uris:
-            self.add_effect(uri)
+            self.load_plugin(uri)
 
         self.effects_widget.set_model(self.store)
 
@@ -91,13 +91,13 @@ class lv2rack(zynjacku.host):
 
         zynjacku.host.__del__(self)
 
-    def add_effect(self, uri):
+    def load_plugin(self, uri, parameters=[]):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
         self.statusbar.pop(statusbar_id)
-        effect = self.new_plugin(uri)
+        effect = self.new_plugin(uri, parameters)
         if not effect:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:
@@ -151,10 +151,20 @@ class lv2rack(zynjacku.host):
         about.hide()
 
     def on_preset_load(self, widget):
-        print "Preset load not implemented yet!"
+        self.preset_load_ask()
+
+    def preset_get_pre_plugins_xml(self):
+        xml = "<lv2rack>\n"
+        xml += "  <plugins>\n"
+        return xml
+
+    def preset_get_post_plugins_xml(self):
+        xml = "  </plugins>\n"
+        xml += "</lv2rack>\n"
+        return xml
 
     def on_preset_save_as(self, widget):
-        print "Preset saving not implemented yet!"
+        self.preset_save_ask()
 
     def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
         if progress == 1.0:
@@ -180,10 +190,7 @@ class lv2rack(zynjacku.host):
         self.engine.disconnect(tick)
 
     def on_effect_load(self, widget):
-        plugin_uris = self.plugins_load("LV2 effect plugins")
-        if plugin_uris:
-            for uri in plugin_uris:
-                self.add_effect(uri)
+        self.plugins_load("LV2 effect plugins")
 
     def on_effect_clear(self, widget):
         self.store.clear();
