@@ -1073,6 +1073,9 @@ class ZynjackuHostMulti(ZynjackuHost):
         #plugin_repo_widget.append_column(column_license)
 
         plugin_repo_widget.set_model(store)
+        def on_row_activated(widget, path, column):
+            dialog.response(0)
+        plugin_repo_widget.connect("row-activated", on_row_activated)
 
         dialog.show()
         self.rescan_plugins(store, progressbar, False)
