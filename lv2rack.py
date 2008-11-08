@@ -76,13 +76,16 @@ class lv2rack(zynjacku.host):
         self.effects_widget.append_column(column_name)
         #self.effects_widget.append_column(column_uri)
 
-        for uri in uris:
-            self.load_plugin(uri)
-
         self.effects_widget.set_model(self.store)
 
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
+
+        if len(uris) == 1 and uris[0][-8:] == ".lv2rack":
+            self.preset_load(uris[0])
+        else:
+            for uri in uris:
+                self.load_plugin(uri)
 
     def __del__(self):
         #print "lv2rack destructor called."

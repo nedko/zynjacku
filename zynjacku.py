@@ -1014,13 +1014,16 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.synths_widget.append_column(column_name)
         #self.synths_widget.append_column(column_uri)
 
-        for uri in uris:
-            self.load_plugin(uri)
-
         self.synths_widget.set_model(self.store)
 
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
+
+        if len(uris) == 1 and uris[0][-9:] == ".zynjacku":
+            self.preset_load(uris[0])
+        else:
+            for uri in uris:
+                self.load_plugin(uri)
 
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
@@ -1222,7 +1225,7 @@ def main():
 
     client_name = "zynjacku"
 
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 2 and sys.argv[1][-9:] != ".zynjacku":
         host = ZynjackuHostOne(glade_xml, client_name, sys.argv[1])
     else:
         host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:])
