@@ -705,7 +705,7 @@ class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
         return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
 class host:
-    def __init__(self, engine, client_name):
+    def __init__(self, engine, client_name, preset_extension=None, preset_name=None):
         #print "host constructor called."
 
         self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
@@ -718,6 +718,11 @@ class host:
         if not self.engine.start_jack(client_name):
             print "Failed to initialize zynjacku engine"
             sys.exit(1)
+
+        self.preset_filename = None
+
+        self.preset_extension = preset_extension
+        self.preset_name = preset_name
 
     def create_plugin_ui(self, plugin, data=None):
         if not self.plugin_ui_available(plugin):
@@ -787,15 +792,14 @@ class host:
             ret = dialog.run()
             if ret == 0:
                 dialog.hide()
-                plugin_uris = [] 
                 for path in plugin_repo_widget.get_selection().get_selected_rows()[1]:
-                    plugin_uris.append(store.get(store.get_iter(path), 1)[0])
-                return plugin_uris
+                    self.load_plugin(store.get(store.get_iter(path), 1)[0])
+                return
             elif ret == 1:
                 self.rescan_plugins(store, progressbar, True)
             else:
                 dialog.hide()
-                return None
+                return
 
     def on_plugin_parameter_value(self, plugin, parameter, value):
         self.xml += "%s<parameter name='%s'>%s</parameter>\n" % (self.xml_indent, parameter, value)
@@ -811,6 +815,119 @@ class host:
             self.xml += "%s</plugin>\n" % indent
 
         return self.xml
+
+    def load_plugin(self, uri, parameters=[]):
+        pass
+
+    def preset_load(self, filename):
+        # TODO: handle exceptions
+
+        self.preset_filename = filename
+
+        doc = xml.dom.minidom.parse(filename)
+        for plugin in doc.getElementsByTagName("plugin"):
+            uri = plugin.getAttribute("uri")
+            name = None
+            parameters = []
+            for node in plugin.childNodes:
+                if node.nodeType == node.ELEMENT_NODE:
+                    name = node.getAttribute("name")
+                    node.normalize()
+                    value = node.childNodes[0].data
+                    #print "%s='%f'" % (name, value)
+                    parameters.append([name, value])
+
+            self.load_plugin(uri, parameters)
+
+    def setup_file_dialog_filters(self, file_dialog):
+        # Create and add the filter
+        filter = gtk.FileFilter()
+        pattern = '*.' + self.preset_extension
+        if self.preset_name:
+            filter.set_name(self.preset_name + ' (' + pattern + ')')
+        else:
+            filter.set_name(pattern)
+        filter.add_pattern(pattern)
+        file_dialog.add_filter(filter)
+
+        # Create and add the 'all files' filter
+        filter = gtk.FileFilter()
+        filter.set_name("All files")
+        filter.add_pattern("*")
+        file_dialog.add_filter(filter)
+
+
+    def preset_load_ask(self):
+        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK)
+        if self.preset_name:
+            title = "Load " + self.preset_name
+        else:
+            title = "Load preset"
+        file_dialog = gtk.FileChooserDialog(title=title, action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=dialog_buttons)
+
+        self.setup_file_dialog_filters(file_dialog)
+
+        # Init the return value
+        filename = ""
+
+        if file_dialog.run() == gtk.RESPONSE_OK:
+            filename = file_dialog.get_filename()
+        file_dialog.destroy()
+
+        if not filename:
+            return
+
+        self.preset_load(filename)
+
+    def preset_get_pre_plugins_xml(self):
+        pass
+
+    def preset_get_post_plugins_xml(self):
+        pass
+
+    def preset_save(self):
+        # TODO: check for overwrite and handle exceptions
+        store = open(self.preset_filename, 'w')
+
+        xml = "<?xml version=\"1.0\"?>\n"
+        if self.preset_name:
+            xml += "<!-- This is a " + self.preset_name + " preset file -->\n"
+        xml += "<!-- saved on " + time.ctime() + " -->\n"
+        xml += self.preset_get_pre_plugins_xml()
+        xml += self.get_plugins_xml("    ")
+        xml += self.preset_get_post_plugins_xml()
+
+        store.write(xml)
+        store.close()
+
+    def preset_save_ask(self):
+        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
+        if self.preset_name:
+            title = "Save " + self.preset_name
+        else:
+            title = "Save preset"
+        file_dialog = gtk.FileChooserDialog(title=title, action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=dialog_buttons)
+
+        # set the filename
+        if self.preset_filename:
+            file_dialog.set_current_name(self.preset_filename)
+
+        self.setup_file_dialog_filters(file_dialog)
+
+        # Init the return value
+        filename = ""
+
+        if file_dialog.run() == gtk.RESPONSE_OK:
+            filename = file_dialog.get_filename()
+        file_dialog.destroy()
+
+        # We have a path, ensure the proper extension
+        filename, extension = os.path.splitext(filename)
+        filename += "." + self.preset_extension
+
+        self.preset_filename = filename
+
+        self.preset_save()
 
     def clear_plugins(self):
         for plugin in self.plugins:
@@ -842,15 +959,15 @@ class host:
         print repr(obj2)
 
 class ZynjackuHost(host):
-    def __init__(self, client_name):
+    def __init__(self, client_name, preset_extension=None, preset_name=None):
         #print "ZynjackuHost constructor called."
 
-        host.__init__(self, zynjacku.Engine(), client_name)
+        host.__init__(self, zynjacku.Engine(), client_name, preset_extension, preset_name)
 
 class ZynjackuHostMulti(ZynjackuHost):
     def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
         #print "ZynjackuHostMulti constructor called."
-        ZynjackuHost.__init__(self, client_name)
+        ZynjackuHost.__init__(self, client_name, "zynjacku", "synth stack")
         
         self.data_dir = data_dir
         self.glade_xml = glade_xml
@@ -898,14 +1015,12 @@ class ZynjackuHostMulti(ZynjackuHost):
         #self.synths_widget.append_column(column_uri)
 
         for uri in uris:
-            self.add_synth(uri)
+            self.load_plugin(uri)
 
         self.synths_widget.set_model(self.store)
 
         self.main_window.show_all()
         self.main_window.connect("destroy", gtk.main_quit)
-
-        self.preset_filename = None
 
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
@@ -918,7 +1033,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.midi_led.set(self.engine.get_midi_activity())
         return True
 
-    def add_synth(self, uri, parameters=[]):
+    def load_plugin(self, uri, parameters=[]):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
@@ -982,93 +1097,20 @@ class ZynjackuHostMulti(ZynjackuHost):
         about.hide()
 
     def on_preset_load(self, widget):
-        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK)
-        file_dialog = gtk.FileChooserDialog(title="Save synth stack", action=gtk.FILE_CHOOSER_ACTION_OPEN, buttons=dialog_buttons)
+        self.preset_load_ask()
 
-        # Create and add the filter
-        filter = gtk.FileFilter()
-        filter.set_name('synth stack (*.zynjacku)')
-        filter.add_pattern("*.zynjacku")
-        file_dialog.add_filter(filter)
+    def preset_get_pre_plugins_xml(self):
+        xml = "<zynjacku>\n"
+        xml += "  <plugins>\n"
+        return xml
 
-        # Create and add the 'all files' filter
-        filter = gtk.FileFilter()
-        filter.set_name("All files")
-        filter.add_pattern("*")
-        file_dialog.add_filter(filter)
-
-        # Init the return value
-        filename = ""
-
-        if file_dialog.run() == gtk.RESPONSE_OK:
-            filename = file_dialog.get_filename()
-        file_dialog.destroy()
-
-        if not filename:
-            return
-
-        # TODO: handle exceptions
-
-        doc = xml.dom.minidom.parse(filename)
-        for plugin in doc.getElementsByTagName("plugin"):
-            uri = plugin.getAttribute("uri")
-            name = None
-            parameters = []
-            for node in plugin.childNodes:
-                if node.nodeType == node.ELEMENT_NODE:
-                    name = node.getAttribute("name")
-                    node.normalize()
-                    value = node.childNodes[0].data
-                    #print "%s='%f'" % (name, value)
-                    parameters.append([name, value])
-
-            self.add_synth(uri, parameters)
+    def preset_get_post_plugins_xml(self):
+        xml = "  </plugins>\n"
+        xml += "</zynjacku>\n"
+        return xml
 
     def on_preset_save_as(self, widget):
-        dialog_buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
-        file_dialog = gtk.FileChooserDialog(title="Save synth stack", action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=dialog_buttons)
-
-        # set the filename
-        if self.preset_filename:
-            file_dialog.set_current_name(self.preset_filename)
-
-        # Create and add the filter
-        filter = gtk.FileFilter()
-        filter.set_name('synth stack (*.zynjacku)')
-        filter.add_pattern("*.zynjacku")
-        file_dialog.add_filter(filter)
-
-        # Create and add the 'all files' filter
-        filter = gtk.FileFilter()
-        filter.set_name("All files")
-        filter.add_pattern("*")
-        file_dialog.add_filter(filter)
-
-        # Init the return value
-        filename = ""
-
-        if file_dialog.run() == gtk.RESPONSE_OK:
-            filename = file_dialog.get_filename()
-        file_dialog.destroy()
-
-        # We have a path, ensure the proper extension
-        filename, extension = os.path.splitext(filename)
-        filename += ".zynjacku"
-
-        # TODO: check for overwrite and handle exceptions
-        store = open(filename, 'w')
-
-        xml = "<?xml version=\"1.0\"?>\n"
-        xml += "<zynjacku>\n"
-        xml += "  <plugins>\n"
-        xml += self.get_plugins_xml("    ")
-        xml += "  </plugins>\n"
-        xml += "</zynjacku>\n"
-
-        store.write(xml)
-        store.close()
-
-        self.preset_filename = filename
+        self.preset_save_ask()
 
     def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
         if progress == 1.0:
@@ -1094,10 +1136,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.engine.disconnect(tick)
 
     def on_synth_load(self, widget):
-        plugin_uris = self.plugins_load("LV2 synth plugins")
-        if plugin_uris:
-            for uri in plugin_uris:
-                self.add_synth(uri)
+        self.plugins_load("LV2 synth plugins")
 
     def on_synth_clear(self, widget):
         self.store.clear();
