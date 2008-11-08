@@ -180,45 +180,10 @@ class lv2rack(zynjacku.host):
         self.engine.disconnect(tick)
 
     def on_effect_load(self, widget):
-        dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
-        plugin_repo_widget = self.glade_xml.get_widget("treeview_available_plugins")
-        progressbar = self.glade_xml.get_widget("progressbar")
-
-        dialog.set_title("LV2 effect plugins")
-
-        plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-
-        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        text_renderer = gtk.CellRendererText()
-
-        column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
-        #column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
-        #column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
-
-        column_name.set_sort_column_id(0)
-        #column_uri.set_sort_column_id(1)
-        #column_license.set_sort_column_id(2)
-
-        plugin_repo_widget.append_column(column_name)
-        #plugin_repo_widget.append_column(column_uri)
-        #plugin_repo_widget.append_column(column_license)
-
-        plugin_repo_widget.set_model(store)
-
-        dialog.show()
-        self.rescan_plugins(store, progressbar, False)
-        while True:
-            ret = dialog.run()
-            if ret == 0:
-                dialog.hide()
-                for path in plugin_repo_widget.get_selection().get_selected_rows()[1]:
-                    self.add_effect(store.get(store.get_iter(path), 1)[0])
-                return
-            elif ret == 1:
-                self.rescan_plugins(store, progressbar, True)
-            else:
-                dialog.hide()
-                return
+        plugin_uris = self.plugins_load("LV2 effect plugins")
+        if plugin_uris:
+            for uri in plugin_uris:
+                self.add_effect(uri)
 
     def on_effect_clear(self, widget):
         self.store.clear();
