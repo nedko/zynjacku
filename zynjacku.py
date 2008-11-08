@@ -719,7 +719,7 @@ class host:
             print "Failed to initialize zynjacku engine"
             sys.exit(1)
 
-    def create_plugin_ui(self, plugin, data):
+    def create_plugin_ui(self, plugin, data=None):
         if not self.plugin_ui_available(plugin):
             return False
 
@@ -1126,33 +1126,15 @@ class ZynjackuHostOne(ZynjackuHost):
                     del(self.synth)
                     self.synth = None
 
+    def on_plugin_ui_window_destroyed(self, window, synth, row):
+        gtk.main_quit()
+
     def run(self):
         if not self.synth:
             return
 
-        if False:                       # test code
-            self.synth.ui_win.show()
-
-            self.synth.ui_win.hide()
-            self.synth.ui_off()
-            del(self.synth.ui_win)
-
-            if not ZynjackuHost.create_plugin_ui(self, self.synth):
-                print"Failed to create synth window"
-                return
-
-            self.synth.ui_win.show()
-
-            return
-        
-        test_connect_id = self.synth.connect("test", self.on_test)
-        if not self.synth.ui_win.show():
-            return
-        self.synth.ui_win.connect("destroy", gtk.main_quit)
-
+        self.synth.ui_win.show()
         ZynjackuHost.run(self)
-
-        self.synth.disconnect(test_connect_id)
 
     def __del__(self):
         #print "ZynjackuHostOne destructor called."
