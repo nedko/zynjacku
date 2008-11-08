@@ -98,7 +98,9 @@ bool
 zynjacku_plugin_repo_load_plugin(
   struct zynjacku_plugin * synth_ptr,
   void * context,
-  zynjacku_plugin_repo_create_port create_port);
+  zynjacku_plugin_repo_create_port create_port,
+  zynjacku_plugin_repo_check_plugin check_plugin,
+  const LV2_Feature * const * supported_features);
 
 void
 zynjacku_plugin_repo_uninit();

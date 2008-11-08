@@ -72,7 +72,8 @@ struct zynjacku_iterate_context g_iterate_context;
 
 static struct list_head g_available_plugins; /* "struct zynjacku_plugin_info's linked by siblings */
 static SLV2World g_world;
-static SLV2Plugins g_plugins;
+static bool g_loaded;
+static bool g_fullscanned;
 static SLV2Value g_slv2uri_port_input;
 static SLV2Value g_slv2uri_port_output;
 static SLV2Value g_slv2uri_port_control;
@@ -194,7 +195,8 @@ zynjacku_plugin_repo_init()
   }
 
   INIT_LIST_HEAD(&g_available_plugins);
-  g_plugins = NULL;
+  g_fullscanned = false;
+  g_loaded = false;
 
   g_slv2uri_port_input = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_INPUT);
   if (g_slv2uri_port_input == NULL)
@@ -300,11 +302,6 @@ zynjacku_plugin_repo_uninit()
     free(plugin_info_ptr->license);
     free(plugin_info_ptr->name);
     free(plugin_info_ptr);
-  }
-
-  if (g_plugins != NULL)
-  {
-    slv2_plugins_free(g_world, g_plugins);
   }
 
   slv2_value_free(g_slv2uri_event_midi);
@@ -548,13 +545,7 @@ zynjacku_plugin_repo_iterate(
 
   LOG_DEBUG("zynjacku_plugin_repo_iterate() called.");
 
-  if (force_scan)
-  {
-    /* scanned in past, clear world to scan again */
-    zynjacku_plugin_repo_uninit();
-    zynjacku_plugin_repo_init();
-  }
-  else if (g_plugins != NULL)
+  if (!force_scan && g_fullscanned)
   {
     if (tack != NULL)
     {
@@ -567,8 +558,17 @@ zynjacku_plugin_repo_iterate(
       }
     }
 
+    if (tick != NULL)
+    {
+      tick(context, 1.0, "");
+    }
+
     return;
   }
+
+  /* scanned in past, clear world to scan again */
+  zynjacku_plugin_repo_uninit();
+  zynjacku_plugin_repo_init();
 
   LOG_DEBUG("Scanning plugins...");
 
@@ -577,7 +577,10 @@ zynjacku_plugin_repo_iterate(
     tick(context, 0.0, "Loading plugins (world) ...");
   }
 
+  assert(!g_loaded);
+
   slv2_world_load_all(g_world);
+  g_loaded = true;
 
   /* get plugins count */
   slv2plugins = slv2_world_get_all_plugins(g_world);
@@ -598,11 +601,14 @@ zynjacku_plugin_repo_iterate(
   {
     tick(context, 1.0, "");
   }
+
+  g_fullscanned = true;
 }
 
 static
 struct zynjacku_plugin_info *
-zynjacku_plugin_repo_lookup_by_uri(const char * uri)
+zynjacku_plugin_repo_lookup_by_uri(
+  const char * uri)
 {
   struct list_head * node_ptr;
   struct zynjacku_plugin_info * plugin_info_ptr;
@@ -851,7 +857,9 @@ bool
 zynjacku_plugin_repo_load_plugin(
   struct zynjacku_plugin * synth_ptr,
   void * context,
-  zynjacku_plugin_repo_create_port create_port)
+  zynjacku_plugin_repo_create_port create_port,
+  zynjacku_plugin_repo_check_plugin check_plugin,
+  const LV2_Feature * const * supported_features)
 {
   struct zynjacku_plugin_info * info_ptr;
   SLV2Values slv2features;
@@ -862,10 +870,51 @@ zynjacku_plugin_repo_load_plugin(
   const char *uri;
   uint32_t ports_count;
   uint32_t i;
+  SLV2Plugins slv2plugins;
+  SLV2Plugin slv2plugin;
+  SLV2Value uri_value;
 
   ret = false;
 
   synth_ptr->dynparams_supported = FALSE;
+
+  if (!g_fullscanned)
+  {
+    if (!g_loaded)
+    {
+      slv2_world_load_all(g_world);
+      g_loaded = true;
+    }
+
+    g_iterate_context.supported_features = supported_features;
+    g_iterate_context.context = context;
+    g_iterate_context.check_plugin = check_plugin;
+    g_iterate_context.progress_step = 0.0;
+    g_iterate_context.progress = 0.0;
+    g_iterate_context.tick = NULL;
+    g_iterate_context.tack = NULL;
+
+    slv2plugins = slv2_world_get_all_plugins(g_world);
+
+    uri_value = slv2_value_new_uri(g_world, synth_ptr->uri);
+
+    slv2plugin = slv2_plugins_get_by_uri(slv2plugins, uri_value);
+
+    ret = zynjacku_plugin_repo_check_and_maybe_init_plugin(slv2plugin);
+
+    slv2_value_free(uri_value);
+
+    slv2_plugins_free(g_world, slv2plugins);
+
+    if (!ret)
+    {
+      LOG_ERROR("plugin '%s' failed to match synth constraints", synth_ptr->uri);
+      goto exit;
+    }
+
+    /* MAYBE: return info_ptr from zynjacku_plugin_repo_check_and_maybe_init_plugin()
+       so we dont lookup it in next line, by calling zynjacku_plugin_repo_lookup_by_uri() */
+  }
 
   info_ptr = zynjacku_plugin_repo_lookup_by_uri(synth_ptr->uri);
   if (info_ptr == NULL)

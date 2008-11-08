@@ -887,7 +887,7 @@ zynjacku_plugin_construct_synth(
   synth_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
   synth_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, plugin_ptr, zynjacku_synth_create_port))
+  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, plugin_ptr, zynjacku_synth_create_port, zynjacku_check_plugin, engine_ptr->host_features))
   {
     LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
     goto fail;
