@@ -196,11 +196,11 @@ zynjacku_engine_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_NONE,              /* return type */
-      3,                        /* n_params */
+      4,                        /* n_params */
       G_TYPE_STRING,            /* plugin name */
       G_TYPE_STRING,            /* plugin uri */
-      G_TYPE_STRING);           /* plugin license */
-
+      G_TYPE_STRING,            /* plugin license */
+      G_TYPE_STRING);           /* plugin author */
 }
 
 static
@@ -742,9 +742,11 @@ zynjacku_engine_tack(
 {
   const char * name;
   const char * license;
+  const char * author;
 
   name = zynjacku_plugin_repo_get_name(uri);
   license = zynjacku_plugin_repo_get_license(uri);
+  author = zynjacku_plugin_repo_get_author(uri);
 
   g_signal_emit(
     engine_obj_ptr,
@@ -752,7 +754,8 @@ zynjacku_engine_tack(
     0,
     name,
     uri,
-    license);
+    license,
+    author);
 }
 
 #undef engine_obj_ptr

@@ -186,18 +186,6 @@ class lv2rack(zynjacku.host):
         while gtk.events_pending():
             gtk.main_iteration()
 
-    def on_plugin_repo_tack(self, repo, name, uri, plugin_license, store):
-        #print "tack: %s %s %s" % (name, uri, plugin_license)
-        store.append([name, uri, plugin_license])
-
-    def rescan_plugins(self, store, progressbar, force):
-        store.clear()
-        tick = self.engine.connect("tick", self.on_plugin_repo_tick, progressbar)
-        tack = self.engine.connect("tack", self.on_plugin_repo_tack, store)
-        self.engine.iterate_plugins(force)
-        self.engine.disconnect(tack)
-        self.engine.disconnect(tick)
-
     def on_effect_load(self, widget):
         self.plugins_load("LV2 effect plugins")
 

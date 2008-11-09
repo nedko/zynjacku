@@ -79,6 +79,10 @@ zynjacku_plugin_repo_get_license(
   const char * uri);
 
 const char *
+zynjacku_plugin_repo_get_author(
+  const char * uri);
+
+const char *
 zynjacku_plugin_repo_get_dlpath(
   const char * uri);
 

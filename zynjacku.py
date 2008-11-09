@@ -808,6 +808,29 @@ class host:
         self.plugins.append(plugin)
         return plugin
 
+    def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
+        if progress == 1.0:
+            progressbar.hide()
+            return
+
+        progressbar.show()
+        progressbar.set_fraction(progress)
+        progressbar.set_text("Checking %s" % uri);
+        while gtk.events_pending():
+            gtk.main_iteration()
+
+    def on_plugin_repo_tack(self, repo, name, uri, plugin_license, author, store):
+        #print "tack: %s %s %s" % (name, uri, plugin_license)
+        store.append([name, uri, plugin_license, author])
+
+    def rescan_plugins(self, store, progressbar, force):
+        store.clear()
+        tick = self.engine.connect("tick", self.on_plugin_repo_tick, progressbar)
+        tack = self.engine.connect("tack", self.on_plugin_repo_tack, store)
+        self.engine.iterate_plugins(force)
+        self.engine.disconnect(tack)
+        self.engine.disconnect(tick)
+
     def plugins_load(self, title="LV2 plugins"):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
         plugin_repo_widget = self.glade_xml.get_widget("treeview_available_plugins")
@@ -817,20 +840,23 @@ class host:
 
         plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
-        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
         text_renderer = gtk.CellRendererText()
 
         column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
-        #column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
-        #column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
+        column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+        column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
 
         column_name.set_sort_column_id(0)
-        #column_uri.set_sort_column_id(1)
-        #column_license.set_sort_column_id(2)
+        column_uri.set_sort_column_id(1)
+        column_license.set_sort_column_id(2)
+        column_author.set_sort_column_id(3)
 
         plugin_repo_widget.append_column(column_name)
-        #plugin_repo_widget.append_column(column_uri)
-        #plugin_repo_widget.append_column(column_license)
+        plugin_repo_widget.append_column(column_uri)
+        plugin_repo_widget.append_column(column_license)
+        plugin_repo_widget.append_column(column_author)
 
         plugin_repo_widget.set_model(store)
         def on_row_activated(widget, path, column):
@@ -1165,29 +1191,6 @@ class ZynjackuHostMulti(ZynjackuHost):
 
     def on_preset_save_as(self, widget):
         self.preset_save_ask()
-
-    def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
-        if progress == 1.0:
-            progressbar.hide()
-            return
-
-        progressbar.show()
-        progressbar.set_fraction(progress)
-        progressbar.set_text("Checking %s" % uri);
-        while gtk.events_pending():
-            gtk.main_iteration()
-
-    def on_plugin_repo_tack(self, repo, name, uri, plugin_license, store):
-        #print "tack: %s %s %s" % (name, uri, plugin_license)
-        store.append([name, uri, plugin_license])
-
-    def rescan_plugins(self, store, progressbar, force):
-        store.clear()
-        tick = self.engine.connect("tick", self.on_plugin_repo_tick, progressbar)
-        tack = self.engine.connect("tack", self.on_plugin_repo_tack, store)
-        self.engine.iterate_plugins(force)
-        self.engine.disconnect(tack)
-        self.engine.disconnect(tick)
 
     def on_synth_load(self, widget):
         self.plugins_load("LV2 synth plugins")

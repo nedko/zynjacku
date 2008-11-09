@@ -52,6 +52,7 @@ struct zynjacku_plugin_info
   SLV2Plugin slv2info;
   char * name;
   char * license;
+  char * author;
   char * uri;
 };
 
@@ -299,6 +300,7 @@ zynjacku_plugin_repo_uninit()
     plugin_info_ptr = list_entry(node_ptr, struct zynjacku_plugin_info, siblings);
 
     //LOG_DEBUG("Removing %s", plugin_info_ptr->name);
+    free(plugin_info_ptr->author);
     free(plugin_info_ptr->license);
     free(plugin_info_ptr->name);
     free(plugin_info_ptr);
@@ -322,6 +324,7 @@ zynjacku_plugin_repo_get_plugin_license(
   SLV2Values slv2_values;
   SLV2Value slv2_value;
   char * license;
+  const char * license_uri;
 
   slv2_values = slv2_plugin_get_value(
     plugin,
@@ -340,11 +343,47 @@ zynjacku_plugin_repo_get_plugin_license(
     return strdup("none");      /* acutally, slv2 should reject those early */
   }
 
-  license = strdup(slv2_value_as_string(slv2_value));
+  license_uri = slv2_value_as_string(slv2_value);
+
+  if (strcmp(license_uri, "http://usefulinc.com/doap/licenses/gpl") == 0)
+  {
+    license = strdup("GNU General Public License");
+  }
+  else if (strcmp(license_uri, "http://usefulinc.com/doap/licenses/lgpl") == 0)
+  {
+    license = strdup("GNU Lesser General Public License");
+  }
+  else
+  {
+    license = strdup(license_uri);
+  }
 
   slv2_values_free(slv2_values);
 
   return license;
+}
+
+char *
+zynjacku_plugin_repo_get_plugin_author(
+  SLV2Plugin plugin)
+{
+  SLV2Value slv2_value;
+  char * author;
+  const char * author_const;
+
+  slv2_value = slv2_plugin_get_author_name(plugin);
+  author_const = slv2_value_as_string_smart(slv2_value);
+
+  if (author_const != NULL)
+  {
+    author = strdup(author_const);
+  }
+  else
+  {
+    author = strdup("unknown");
+  }
+
+  return author;
 }
 
 /* check whether plugin is a synth, if it is, save plugin info */
@@ -497,6 +536,12 @@ zynjacku_plugin_repo_check_and_maybe_init_plugin(
     goto free_info_uri;
   }
 
+  plugin_info_ptr->author = zynjacku_plugin_repo_get_plugin_author(plugin);
+  if (plugin_info_ptr->author == NULL)
+  {
+    goto free_info_license;
+  }
+
   plugin_info_ptr->slv2info = plugin;
 
   list_add_tail(&plugin_info_ptr->siblings, &g_available_plugins);
@@ -509,6 +554,9 @@ zynjacku_plugin_repo_check_and_maybe_init_plugin(
   ret = TRUE;
 
   goto free_features;
+
+free_info_license:
+  free(plugin_info_ptr->license);
 
 free_info_uri:
   free(plugin_info_ptr->uri);
@@ -654,6 +702,21 @@ zynjacku_plugin_repo_get_license(
   }
 
   return plugin_info_ptr->license;
+}
+
+const char *
+zynjacku_plugin_repo_get_author(
+  const char * uri)
+{
+  struct zynjacku_plugin_info * plugin_info_ptr;
+
+  plugin_info_ptr = zynjacku_plugin_repo_lookup_by_uri(uri);
+  if (plugin_info_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return plugin_info_ptr->author;
 }
 
 const char *
