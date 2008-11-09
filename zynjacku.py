@@ -32,6 +32,12 @@ sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
 import zynjacku_c as zynjacku
 sys.path = old_path
 
+try:
+    import lash
+except:
+    print "Cannot load LASH python bindings, you want LASH unless you enjoy manual jack plumbing each time you use this app"
+    lash = None
+
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
               "onesubgroup": "http://home.gna.org/zynjacku/hints#onesubgroup",
@@ -705,7 +711,7 @@ class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
         return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
 class host:
-    def __init__(self, engine, client_name, preset_extension=None, preset_name=None):
+    def __init__(self, engine, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "host constructor called."
 
         self.group_shadow_type = gtk.SHADOW_ETCHED_OUT
@@ -723,6 +729,51 @@ class host:
 
         self.preset_extension = preset_extension
         self.preset_name = preset_name
+
+        if lash_client:
+            # Send our client name to server
+            lash_event = lash.lash_event_new_with_type(lash.LASH_Client_Name)
+            lash.lash_event_set_string(lash_event, client_name)
+            lash.lash_send_event(lash_client, lash_event)
+
+            lash.lash_jack_client_name(lash_client, client_name)
+
+            gobject.timeout_add(1000, self.lash_check_events)
+
+            if not self.preset_extension:
+                self.preset_extension = "xml"
+
+        self.lash_client = lash_client
+
+    def lash_check_events(self):
+        while lash.lash_get_pending_event_count(self.lash_client):
+            event = lash.lash_get_event(self.lash_client)
+
+            #print repr(event)
+
+            event_type = lash.lash_event_get_type(event)
+            if event_type == lash.LASH_Quit:
+                print "LASH ordered quit."
+                gtk.main_quit()
+                return False
+            elif event_type == lash.LASH_Save_File:
+                directory = lash.lash_event_get_string(event)
+                print "LASH ordered to save data in directory %s" % directory
+                self.preset_filename = directory + os.sep + "preset." + self.preset_extension
+                self.preset_save()
+                lash.lash_send_event(self.lash_client, event)
+            elif event_type == lash.LASH_Restore_File:
+                directory = lash.lash_event_get_string(event)
+                print "LASH ordered to restore data from directory %s" % directory
+                self.preset_load(directory + os.sep + "preset." + self.preset_extension)
+                lash.lash_send_event(self.lash_client, event)
+            else:
+                print "Got unhandled LASH event, type " + str(event_type)
+                return True
+
+            #lash.lash_event_destroy(event)
+
+        return True
 
     def create_plugin_ui(self, plugin, data=None):
         if not self.plugin_ui_available(plugin):
@@ -959,15 +1010,15 @@ class host:
         print repr(obj2)
 
 class ZynjackuHost(host):
-    def __init__(self, client_name, preset_extension=None, preset_name=None):
+    def __init__(self, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "ZynjackuHost constructor called."
 
-        host.__init__(self, zynjacku.Engine(), client_name, preset_extension, preset_name)
+        host.__init__(self, zynjacku.Engine(), client_name, preset_extension, preset_name, lash_client)
 
 class ZynjackuHostMulti(ZynjackuHost):
-    def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
+    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
         #print "ZynjackuHostMulti constructor called."
-        ZynjackuHost.__init__(self, client_name, "zynjacku", "synth stack")
+        ZynjackuHost.__init__(self, client_name, "zynjacku", "synth stack", lash_client)
         
         self.data_dir = data_dir
         self.glade_xml = glade_xml
@@ -1225,10 +1276,23 @@ def main():
 
     client_name = "zynjacku"
 
+    if lash:                        # If LASH python bindings are available
+        # sys.argv is modified by this call
+        lash_client = lash.init(sys.argv, "zynjacku", lash.LASH_Config_File)
+    else:
+        lash_client = None
+
+    # TODO: generic argument processing goes here
+
+    # Yeah , this sounds stupid, we connected earlier, but we dont want to show this if we got --help option
+    # This issue should be fixed in pylash, there is a reason for having two functions for initialization after all
+    if lash_client:
+        print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
+
     if len(sys.argv) == 2 and sys.argv[1][-9:] != ".zynjacku":
         host = ZynjackuHostOne(glade_xml, client_name, sys.argv[1])
     else:
-        host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:])
+        host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:], lash_client)
 
     host.run()
 
