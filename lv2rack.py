@@ -33,10 +33,16 @@ sys.path = old_path
 
 import zynjacku as zynjacku
 
+try:
+    import lash
+except:
+    print "Cannot load LASH python bindings, you want LASH unless you enjoy manual jack plumbing each time you use this app"
+    lash = None
+
 class lv2rack(zynjacku.host):
-    def __init__(self, data_dir, glade_xml, client_name, the_license, uris):
+    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
         #print "lv2rack constructor called."
-        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, "lv2rack", "effect stack")
+        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, "lv2rack", "effect stack", lash_client)
         
         self.data_dir = data_dir
         self.glade_xml = glade_xml
@@ -204,7 +210,20 @@ def main():
 
     zynjacku.register_types()
 
-    lv2rack(data_dir, glade_xml, "lv2rack", the_license, sys.argv[1:]).run()
+    if lash:                        # If LASH python bindings are available
+        # sys.argv is modified by this call
+        lash_client = lash.init(sys.argv, "lv2rack", lash.LASH_Config_File)
+    else:
+        lash_client = None
+
+    # TODO: generic argument processing goes here
+
+    # Yeah , this sounds stupid, we connected earlier, but we dont want to show this if we got --help option
+    # This issue should be fixed in pylash, there is a reason for having two functions for initialization after all
+    if lash_client:
+        print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
+
+    lv2rack(data_dir, glade_xml, "lv2rack", the_license, sys.argv[1:], lash_client).run()
 
 if __name__ == '__main__':
     main()
