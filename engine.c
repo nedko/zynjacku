@@ -36,6 +36,7 @@
 
 #include "config.h"
 
+#include "lv2_contexts.h"
 #include "lv2-miditype.h"
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
@@ -64,7 +65,7 @@
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
 
-#define ZYNJACKU_ENGINE_FEATURES 4
+#define ZYNJACKU_ENGINE_FEATURES 6
 
 struct zynjacku_engine
 {
@@ -93,6 +94,8 @@ struct zynjacku_engine
   LV2_Feature host_feature_uri_map;
   LV2_Feature host_feature_event_ref;
   LV2_Feature host_feature_dynparams;
+  LV2_Feature host_feature_contexts;
+  LV2_Feature host_feature_msgcontext;
   const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
 };
 
@@ -269,12 +272,20 @@ zynjacku_engine_init(
   engine_ptr->host_feature_dynparams.URI = LV2DYNPARAM_URI;
   engine_ptr->host_feature_dynparams.data = NULL;
 
+  engine_ptr->host_feature_contexts.URI = LV2_CONTEXTS_URI;
+  engine_ptr->host_feature_contexts.data = NULL;
+
+  engine_ptr->host_feature_msgcontext.URI = LV2_CONTEXT_MESSAGE;
+  engine_ptr->host_feature_msgcontext.data = NULL;
+
   /* initialize host features array */
   count = 0;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_rtmempool;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_uri_map;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_event_ref;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_dynparams;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_contexts;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_msgcontext;
   assert(ZYNJACKU_ENGINE_FEATURES == count);
   engine_ptr->host_features[count] = NULL;
   /* keep in mind to update the constant when adding things here */
@@ -578,7 +589,7 @@ jack_process_cb(
     {
       zynjacku_lv2_connect_port(
         synth_ptr->lv2plugin,
-        synth_ptr->subtype.synth.audio_out_left_port.index,
+        &synth_ptr->subtype.synth.audio_out_left_port,
         jack_port_get_buffer(synth_ptr->subtype.synth.audio_out_left_port.data.audio, nframes));
     }
 
@@ -587,7 +598,7 @@ jack_process_cb(
     {
       zynjacku_lv2_connect_port(
         synth_ptr->lv2plugin,
-        synth_ptr->subtype.synth.audio_out_right_port.index,
+        &synth_ptr->subtype.synth.audio_out_right_port,
         jack_port_get_buffer(synth_ptr->subtype.synth.audio_out_right_port.data.audio, nframes));
     }
 
@@ -846,6 +857,7 @@ zynjacku_synth_create_port(
       }
 
       port_ptr->type = PORT_TYPE_AUDIO;
+      port_ptr->flags = 0;
       port_ptr->index = port_index;
 
       return true;
@@ -930,10 +942,10 @@ zynjacku_plugin_construct_synth(
   switch (synth_ptr->midi_in_port.type)
   {
   case PORT_TYPE_MIDI:
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_buffer);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, &synth_ptr->midi_in_port, &engine_ptr->lv2_midi_buffer);
     break;
   case PORT_TYPE_EVENT_MIDI:
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, synth_ptr->midi_in_port.index, &engine_ptr->lv2_midi_event_buffer);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, &synth_ptr->midi_in_port, &engine_ptr->lv2_midi_event_buffer);
     break;
   default:
     LOG_ERROR("don't know how to connect midi port of type %u", synth_ptr->midi_in_port.type);
@@ -946,7 +958,7 @@ zynjacku_plugin_construct_synth(
   list_for_each(node_ptr, &plugin_ptr->parameter_ports)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
   }
 
@@ -954,7 +966,7 @@ zynjacku_plugin_construct_synth(
   list_for_each(node_ptr, &plugin_ptr->measure_ports)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
   }
 
   size_name = strlen(plugin_ptr->name);

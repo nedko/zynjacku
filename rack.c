@@ -35,6 +35,7 @@
 
 #include "config.h"
 
+#include "lv2_contexts.h"
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
 
@@ -54,6 +55,8 @@
 #include "rtmempool.h"
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
+
+#define ZYNJACKU_RACK_ENGINE_FEATURES 4
 
 struct lv2rack_engine
 {
@@ -76,7 +79,9 @@ struct lv2rack_engine
 
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_dynparams;
-  const LV2_Feature * host_features[3];
+  LV2_Feature host_feature_contexts;
+  LV2_Feature host_feature_msgcontext;
+  const LV2_Feature * host_features[ZYNJACKU_RACK_ENGINE_FEATURES + 1];
 };
 
 #define ZYNJACKU_RACK_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_RACK_TYPE, struct lv2rack_engine))
@@ -87,8 +92,6 @@ struct lv2rack_engine
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
-
-#define ZYNJACKU_RACK_ENGINE_FEATURES 2
 
 static guint g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNALS_COUNT];
 
@@ -220,10 +223,18 @@ zynjacku_rack_init(
   rack_ptr->host_feature_dynparams.URI = LV2DYNPARAM_URI;
   rack_ptr->host_feature_dynparams.data = NULL;
 
+  rack_ptr->host_feature_contexts.URI = LV2_CONTEXTS_URI;
+  rack_ptr->host_feature_contexts.data = NULL;
+
+  rack_ptr->host_feature_msgcontext.URI = LV2_CONTEXT_MESSAGE;
+  rack_ptr->host_feature_msgcontext.data = NULL;
+
   /* initialize host features array */
   count = 0;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_rtmempool;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_dynparams;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_contexts;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_msgcontext;
   assert(ZYNJACKU_RACK_ENGINE_FEATURES == count);
   rack_ptr->host_features[count] = NULL;
 
@@ -399,14 +410,14 @@ jack_process_cb(
     /* Connect plugin LV2 input audio ports */
     zynjacku_lv2_connect_port(
       effect_ptr->lv2plugin,
-      effect_ptr->subtype.effect.audio_in_left_port.index,
+      &effect_ptr->subtype.effect.audio_in_left_port,
       left);
 
     if (effect_ptr->subtype.effect.audio_in_right_port.type == PORT_TYPE_AUDIO)
     {
       zynjacku_lv2_connect_port(
         effect_ptr->lv2plugin,
-        effect_ptr->subtype.effect.audio_in_right_port.index,
+        &effect_ptr->subtype.effect.audio_in_right_port,
         mono ? left : right);
     }
 
@@ -414,7 +425,7 @@ jack_process_cb(
     left = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_left_port.data.audio, nframes);
     zynjacku_lv2_connect_port(
       effect_ptr->lv2plugin,
-      effect_ptr->subtype.effect.audio_out_left_port.index,
+      &effect_ptr->subtype.effect.audio_out_left_port,
       left);
 
     mono = effect_ptr->subtype.effect.audio_out_right_port.type != PORT_TYPE_AUDIO;
@@ -423,7 +434,7 @@ jack_process_cb(
       right = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_right_port.data.audio, nframes);
       zynjacku_lv2_connect_port(
         effect_ptr->lv2plugin,
-        effect_ptr->subtype.effect.audio_out_right_port.index,
+        &effect_ptr->subtype.effect.audio_out_right_port,
         right);
     }
 
@@ -748,7 +759,7 @@ zynjacku_plugin_construct_effect(
   list_for_each(node_ptr, &plugin_ptr->parameter_ports)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
     LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
   }
 
@@ -756,7 +767,7 @@ zynjacku_plugin_construct_effect(
   list_for_each(node_ptr, &plugin_ptr->measure_ports)
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr->index, &port_ptr->data.parameter);
+    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
   }
 
   size_name = strlen(plugin_ptr->name);

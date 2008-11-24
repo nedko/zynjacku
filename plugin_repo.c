@@ -45,6 +45,9 @@
 #define LV2_RDF_LICENSE_URI "http://usefulinc.com/ns/doap#license"
 #define LV2_MIDI_PORT_URI "http://ll-plugins.nongnu.org/lv2/ext/MidiPort"
 #define LV2_EVENT_PORT_URI LV2_EVENT_URI "#EventPort"
+#define LV2_CONTEXT_URI "http://lv2plug.in/ns/dev/contexts"
+#define LV2_PORT_CONTEXT_URI LV2_CONTEXT_URI "#context"
+#define LV2_MESSAGE_CONTEXT_URI LV2_CONTEXT_URI "#MessageContext"
 
 struct zynjacku_plugin_info
 {
@@ -81,6 +84,8 @@ static SLV2Value g_slv2uri_port_control;
 static SLV2Value g_slv2uri_port_audio;
 static SLV2Value g_slv2uri_port_midi;
 static SLV2Value g_slv2uri_port_event;
+static SLV2Value g_slv2uri_port_context;
+static SLV2Value g_slv2uri_message_context;
 static SLV2Value g_slv2uri_license;
 static SLV2Value g_slv2uri_event_midi;
 
@@ -185,9 +190,29 @@ slv2_port_is_midi_event(
   return slv2_port_supports_event(plugin, port, g_slv2uri_event_midi);
 }
 
+struct uri_registration
+{
+  const char *name;
+  SLV2Value *value;
+};
+
+static struct uri_registration uri_regs[] = {
+  {SLV2_PORT_CLASS_INPUT, &g_slv2uri_port_input},
+  {SLV2_PORT_CLASS_OUTPUT, &g_slv2uri_port_output},
+  {SLV2_PORT_CLASS_CONTROL, &g_slv2uri_port_control},
+  {SLV2_PORT_CLASS_AUDIO, &g_slv2uri_port_audio},
+  {LV2_MIDI_PORT_URI, &g_slv2uri_port_midi},
+  {LV2_RDF_LICENSE_URI, &g_slv2uri_license},
+  {LV2_PORT_CONTEXT_URI, &g_slv2uri_port_context},
+  {LV2_MESSAGE_CONTEXT_URI, &g_slv2uri_message_context},
+  {LV2_EVENT_PORT_URI, &g_slv2uri_port_event},
+  {LV2_EVENT_URI_TYPE_MIDI, &g_slv2uri_event_midi},
+};
+
 bool
 zynjacku_plugin_repo_init()
 {
+  int i;
   g_world = slv2_world_new();
   if (g_world == NULL)
   {
@@ -199,84 +224,19 @@ zynjacku_plugin_repo_init()
   g_fullscanned = false;
   g_loaded = false;
 
-  g_slv2uri_port_input = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_INPUT);
-  if (g_slv2uri_port_input == NULL)
+  for (i = 0; i < sizeof(uri_regs) / sizeof(struct uri_registration); i++)
   {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_world;
+    *uri_regs[i].value = slv2_value_new_uri(g_world, uri_regs[i].name);
+    if (!*uri_regs[i].value)
+    {
+      LOG_ERROR("slv2_value_new_uri() failed.");
+      for (i--; i >= 0; i--)
+        slv2_value_free(*uri_regs[i].value);
+      goto fail_free_world;
+    }
   }
-
-  g_slv2uri_port_output = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_OUTPUT);
-  if (g_slv2uri_port_output == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_input;
-  }
-
-  g_slv2uri_port_control = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_CONTROL);
-  if (g_slv2uri_port_control == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_output;
-  }
-
-  g_slv2uri_port_audio = slv2_value_new_uri(g_world, SLV2_PORT_CLASS_AUDIO);
-  if (g_slv2uri_port_audio == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_control;
-  }
-
-  g_slv2uri_port_midi = slv2_value_new_uri(g_world, LV2_MIDI_PORT_URI);
-  if (g_slv2uri_port_midi == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_audio;
-  }
-
-  g_slv2uri_license = slv2_value_new_uri(g_world, LV2_RDF_LICENSE_URI);
-  if (g_slv2uri_license == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_midi;
-  }
-
-  g_slv2uri_port_event = slv2_value_new_uri(g_world, LV2_EVENT_PORT_URI);
-  if (g_slv2uri_port_event == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_license;
-  }
-
-  g_slv2uri_event_midi = slv2_value_new_uri(g_world, LV2_EVENT_URI_TYPE_MIDI);
-  if (g_slv2uri_event_midi == NULL)
-  {
-    LOG_ERROR("slv2_value_new_uri() failed.");
-    goto fail_free_port_event;
-  }
-
+  
   return true;
-
-fail_free_port_event:
-  slv2_value_free(g_slv2uri_port_event);
-
-fail_free_license:
-  slv2_value_free(g_slv2uri_license);
-
-fail_free_port_midi:
-  slv2_value_free(g_slv2uri_port_midi);
-
-fail_free_port_audio:
-  slv2_value_free(g_slv2uri_port_audio);
-
-fail_free_port_control:
-  slv2_value_free(g_slv2uri_port_control);
-
-fail_free_port_output:
-  slv2_value_free(g_slv2uri_port_output);
-
-fail_free_port_input:
-  slv2_value_free(g_slv2uri_port_input);
 
 fail_free_world:
   slv2_world_free(g_world);
@@ -765,6 +725,7 @@ zynjacku_plugin_repo_create_port_internal(
   SLV2Value default_value;
   SLV2Value min_value;
   SLV2Value max_value;
+  SLV2Values contexts;
   const char * symbol_str;
   const char * name_str;
   unsigned int port_type;
@@ -799,6 +760,7 @@ zynjacku_plugin_repo_create_port_internal(
     }
 
     port_ptr->index = port_index;
+    port_ptr->flags = 0;
 
     if (output_port)
     {
@@ -808,6 +770,8 @@ zynjacku_plugin_repo_create_port_internal(
     }
     else
     {
+      int i;
+      
       port_ptr->type = PORT_TYPE_PARAMETER;
 
       /* port symbol */
@@ -869,6 +833,16 @@ zynjacku_plugin_repo_create_port_internal(
         slv2_value_free(max_value);
       }
 
+      contexts = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_port_context);
+      for (i = 0; i < slv2_values_size(contexts); i++)
+      {
+        if (slv2_value_equals(slv2_values_get_at(contexts, i), g_slv2uri_message_context))
+        {
+          port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
+          fprintf(stderr, "Port %d has message context\n", port_index);
+        }
+      }
+      
       list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
     }
 

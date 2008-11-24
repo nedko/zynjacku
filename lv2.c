@@ -36,6 +36,7 @@
 #include "lv2-miditype.h"
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
+#include "lv2_contexts.h"
 
 #include "list.h"
 #include "lv2.h"
@@ -49,6 +50,7 @@ struct zynjacku_lv2_plugin
 {
   void *dlhandle;
   const LV2_Descriptor *lv2;
+  const LV2MessageContext *lv2msg;
   LV2_Handle lv2handle;
 };
 
@@ -130,6 +132,7 @@ zynjacku_lv2_load(
     LOG_ERROR("Instantiation of %s failed.", uri);
     goto fail_dlclose;
   }
+  plugin_ptr->lv2msg = plugin_ptr->lv2->extension_data("http://lv2plug.in/ns/dev/contexts#MessageContext");
 
   return (zynjacku_lv2_handle)plugin_ptr;
 
@@ -157,11 +160,23 @@ zynjacku_lv2_unload(
 void
 zynjacku_lv2_connect_port(
   zynjacku_lv2_handle lv2handle,
-  uint32_t port,
+  struct zynjacku_port *port,
   void *data_location)
 {
   LOG_DEBUG("Connecting port %d", port);
-  plugin_ptr->lv2->connect_port(plugin_ptr->lv2handle, port, data_location);
+  if (port->flags & PORT_FLAGS_MSGCONTEXT)
+    (*plugin_ptr->lv2msg->message_connect_port)(plugin_ptr->lv2handle, port->index, data_location);
+  else
+    plugin_ptr->lv2->connect_port(plugin_ptr->lv2handle, port->index, data_location);
+}
+
+void
+zynjacku_lv2_message(
+  zynjacku_lv2_handle lv2handle)
+{
+  static uint32_t output_data[1024];
+  // TODO: handle output data properly
+  plugin_ptr->lv2msg->message_run(plugin_ptr->lv2handle, output_data);
 }
 
 void

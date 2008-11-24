@@ -269,6 +269,10 @@ zynjacku_gtk2gui_callback_write(
   LOG_DEBUG("setting port %u to %f", (unsigned int)port_index, *(float *)buffer);
 
   ui_ptr->ports[port_index]->data.parameter.value = *(float *)buffer;
+  if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
+  {
+    zynjacku_lv2_message(ui_ptr->lv2plugin);
+  }
 }
 
 bool

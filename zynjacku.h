@@ -34,11 +34,14 @@
 #define PORT_TYPE_PARAMETER        4 /* LV2 control rate input port used for synth/effect parameters */
 #define PORT_TYPE_MEASURE          5 /* LV2 control rate output port used for plugin output (leds, meters, etc.) */
 
+#define PORT_FLAGS_MSGCONTEXT      1 /* uses LV2 message context */
+
 struct zynjacku_port
 {
   struct list_head plugin_siblings;
   struct list_head port_type_siblings;
   unsigned int type;            /* one of PORT_TYPE_XXX */
+  unsigned int flags;
   uint32_t index;               /* LV2 port index within owning plugin */
   char * symbol;                /* valid only when type is PORT_TYPE_PARAMETER */
   char * name;                  /* valid only when type is PORT_TYPE_PARAMETER */

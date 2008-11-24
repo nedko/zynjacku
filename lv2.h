@@ -25,6 +25,8 @@
 
 typedef struct { int _unused; } * zynjacku_lv2_handle;
 
+struct zynjacku_port;
+
 zynjacku_lv2_handle
 zynjacku_lv2_load(
   const char * uri,
@@ -38,7 +40,7 @@ zynjacku_lv2_unload(
 void
 zynjacku_lv2_connect_port(
   zynjacku_lv2_handle lv2handle,
-  uint32_t port,
+  struct zynjacku_port *port,
   void *data_location);
 
 void
@@ -60,6 +62,10 @@ zynjacku_lv2_get_descriptor(
 
 LV2_Handle
 zynjacku_lv2_get_handle(
+  zynjacku_lv2_handle lv2handle);
+
+void
+zynjacku_lv2_message(
   zynjacku_lv2_handle lv2handle);
 
 #endif /* #ifndef LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED */
