@@ -20,13 +20,13 @@
 #
 
 AC_PREREQ(2.61)
-AC_INIT(zynjacku, dev)
+AC_INIT(zynjacku, 2)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADER([config.h])
 
-# not real check but hack (because version is not parameter to configure script) to detect development version
-AM_CONDITIONAL(DEV_VERSION, test $VERSION = dev)
+if test -d $srcdir/.git ; then dev_version="yes" ; else dev_version="no"; fi
+AM_CONDITIONAL(DEV_VERSION, test "$dev_version" = "yes")
 
 #AS_AC_EXPAND(DATADIR, $datadir)
 AC_SUBST(DATADIR)
@@ -91,11 +91,8 @@ AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
 AC_MSG_RESULT([])
-AC_MSG_RESULT([**********************************************************************])
-AC_MSG_RESULT([])
-AC_MSG_RESULT([Prefix:            $prefix])
-AC_MSG_RESULT([])
-AC_MSG_RESULT([Python dir:      $PYTHON_INCLUDES])
-AC_MSG_RESULT([])
-AC_MSG_RESULT([**********************************************************************])
+AC_MSG_RESULT([========================])
+AC_MSG_RESULT([Prefix:      $prefix])
+AC_MSG_RESULT([Python dir:  $PYTHON_INCLUDES])
+AC_MSG_RESULT([Dev version: $dev_version])
 AC_MSG_RESULT([])
