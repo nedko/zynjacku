@@ -87,16 +87,6 @@ else
   AC_MSG_WARN([Checks for python modules required runtime have been force disabled])
 fi
 
-# LASH
-have_lash="unknown"
-AC_ARG_ENABLE(lash, [AS_HELP_STRING(--disable-lash, [Force disable LASH support [default=no]])], [ have_lash="no" ])
-if test "$have_lash" = "unknown"
-then
-  PKG_CHECK_MODULES(LASH, lash-1.0, AC_DEFINE([HAVE_LASH], [], [Defined if we have LASH support.]) have_lash="yes")
-fi
-
-have_lash="no (force disabled, not ready yet)"
-
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
@@ -106,8 +96,6 @@ AC_MSG_RESULT([])
 AC_MSG_RESULT([Prefix:            $prefix])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([Python dir:      $PYTHON_INCLUDES])
-AC_MSG_RESULT([])
-AC_MSG_RESULT([LASH support:      $have_lash])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([**********************************************************************])
 AC_MSG_RESULT([])
