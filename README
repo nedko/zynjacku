@@ -7,4 +7,6 @@ zynjacku is a nunchaku weapon for JACK audio synthesis. You have solid
 parts for synthesis itself and you have flexible part that allows
 synthesis to suit your needs.
 
+lv2rack is a host for LV2 effect plugins.
+
 http://home.gna.org/zynjacku/
