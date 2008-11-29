@@ -72,6 +72,11 @@ zynjacku_c_la_SOURCES += hints.c
 zynjacku_c_la_SOURCES += hints.h
 zynjacku_c_la_SOURCES += list.h
 zynjacku_c_la_SOURCES += lv2-miditype.h
+zynjacku_c_la_SOURCES += lv2_contexts.h
+zynjacku_c_la_SOURCES += lv2_data_access.h
+zynjacku_c_la_SOURCES += lv2_event.h
+zynjacku_c_la_SOURCES += lv2_event_helpers.h
+zynjacku_c_la_SOURCES += lv2_uri_map.h
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
 
