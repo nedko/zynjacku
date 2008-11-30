@@ -1042,7 +1042,7 @@ zynjacku_plugin_bool_set(
 
   LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", context);
 
-  dynparam_parameter_boolean_change(
+  lv2dynparam_parameter_boolean_change(
     plugin_ptr->dynparams,
     (lv2dynparam_host_parameter)context,
     value);
@@ -1116,7 +1116,7 @@ zynjacku_plugin_float_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    dynparam_parameter_float_change(
+    lv2dynparam_parameter_float_change(
       plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
@@ -1205,7 +1205,7 @@ zynjacku_plugin_enum_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    dynparam_parameter_enum_change(
+    lv2dynparam_parameter_enum_change(
       plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
@@ -1280,12 +1280,30 @@ zynjacku_plugin_int_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    dynparam_parameter_int_change(
+    lv2dynparam_parameter_int_change(
       plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
       value);
   }
 }
+
+#define plugin_obj_ptr ((ZynjackuPlugin *)context)
+
+void
+zynjacku_plugin_dynparameter_get_callback(
+  void * context,
+  const char * parameter_name,
+  const char * parameter_value)
+{
+  g_signal_emit(
+    plugin_obj_ptr,
+    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
+    0,
+    parameter_name,
+    parameter_value);
+}
+
+#undef plugin_obj_ptr
 
 void
 zynjacku_plugin_get_parameters(
@@ -1301,25 +1319,32 @@ zynjacku_plugin_get_parameters(
 
   LOG_DEBUG("zynjacku_plugin_get_parameters() called.");
 
-  locale = strdup(setlocale(LC_NUMERIC, NULL));
-
-  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  if (plugin_ptr->dynparams != NULL)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    setlocale(LC_NUMERIC, "POSIX");
-    sprintf(value, "%f", port_ptr->data.parameter.value);
-    setlocale(LC_NUMERIC, locale);
-
-    g_signal_emit(
-      plugin_obj_ptr,
-      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
-      0,
-      port_ptr->symbol,
-      value);
+    lv2dynparam_get_parameters(plugin_ptr->dynparams, zynjacku_plugin_dynparameter_get_callback, plugin_obj_ptr);
   }
+  else
+  {
+    locale = strdup(setlocale(LC_NUMERIC, NULL));
 
-  free(locale);
+    list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+    {
+      port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+      setlocale(LC_NUMERIC, "POSIX");
+      sprintf(value, "%f", port_ptr->data.parameter.value);
+      setlocale(LC_NUMERIC, locale);
+
+      g_signal_emit(
+        plugin_obj_ptr,
+        g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
+        0,
+        port_ptr->symbol,
+        value);
+    }
+
+    free(locale);
+  }
 }
 
 gboolean
@@ -1337,25 +1362,32 @@ zynjacku_plugin_set_parameter(
 
   LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s') called.", parameter, value);
 
-  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  if (plugin_ptr->dynparams != NULL)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    if (strcmp(port_ptr->symbol, parameter) == 0)
+    lv2dynparam_set_parameter(plugin_ptr->dynparams, parameter, value);
+  }
+  else
+  {
+    list_for_each(node_ptr, &plugin_ptr->parameter_ports)
     {
-      locale = strdup(setlocale(LC_NUMERIC, NULL));
-      setlocale(LC_NUMERIC, "POSIX");
+      port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-      if (sscanf(value, "%f", &port_ptr->data.parameter.value) != 1)
+      if (strcmp(port_ptr->symbol, parameter) == 0)
       {
-        LOG_ERROR("failed to convert value '%s' of parameter '%s' to float", value, parameter);
+        locale = strdup(setlocale(LC_NUMERIC, NULL));
+        setlocale(LC_NUMERIC, "POSIX");
+
+        if (sscanf(value, "%f", &port_ptr->data.parameter.value) != 1)
+        {
+          LOG_ERROR("failed to convert value '%s' of parameter '%s' to float", value, parameter);
+        }
+
+        setlocale(LC_NUMERIC, locale);
+
+        free(locale);
+
+        return TRUE;
       }
-
-      setlocale(LC_NUMERIC, locale);
-
-      free(locale);
-
-      return TRUE;
     }
   }
 
