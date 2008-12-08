@@ -32,6 +32,7 @@
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"
+#include "lv2_string_port.h"
 #include "lv2_uri_map.h"
 
 #include "list.h"
@@ -48,6 +49,9 @@
 #define LV2_CONTEXT_URI "http://lv2plug.in/ns/dev/contexts"
 #define LV2_PORT_CONTEXT_URI LV2_CONTEXT_URI "#context"
 #define LV2_MESSAGE_CONTEXT_URI LV2_CONTEXT_URI "#MessageContext"
+#define LV2_STRING_PORT_ROOT_URI "http://lv2plug.in/ns/dev/string-port#"
+#define LV2_STRING_PORT_TYPE_URI LV2_STRING_PORT_ROOT_URI "StringPort"
+#define LV2_STRING_PORT_DEFAULT_URI LV2_STRING_PORT_ROOT_URI "default"
 
 struct zynjacku_plugin_info
 {
@@ -88,6 +92,8 @@ static SLV2Value g_slv2uri_port_context;
 static SLV2Value g_slv2uri_message_context;
 static SLV2Value g_slv2uri_license;
 static SLV2Value g_slv2uri_event_midi;
+static SLV2Value g_slv2uri_port_string;
+static SLV2Value g_slv2uri_string_port_default;
 
 /* as slv2_value_as_string() but returns NULL if value is NULL or value type is not string
    such conditions are assumed to be error, thus this function should be
@@ -140,6 +146,14 @@ slv2_port_is_control(
   SLV2Port port)
 {
   return slv2_port_is_a(plugin, port, g_slv2uri_port_control);
+}
+
+bool
+slv2_port_is_string(
+  SLV2Plugin plugin,
+  SLV2Port port)
+{
+  return slv2_port_is_a(plugin, port, g_slv2uri_port_string);
 }
 
 bool
@@ -207,6 +221,8 @@ static struct uri_registration uri_regs[] = {
   {LV2_MESSAGE_CONTEXT_URI, &g_slv2uri_message_context},
   {LV2_EVENT_PORT_URI, &g_slv2uri_port_event},
   {LV2_EVENT_URI_TYPE_MIDI, &g_slv2uri_event_midi},
+  {LV2_STRING_PORT_TYPE_URI, &g_slv2uri_port_string},
+  {LV2_STRING_PORT_DEFAULT_URI, &g_slv2uri_string_port_default},
 };
 
 bool
@@ -357,6 +373,7 @@ zynjacku_plugin_repo_check_and_maybe_init_plugin(
   uint32_t audio_out_ports_count;
   uint32_t midi_in_ports_count;
   uint32_t control_ports_count;
+  uint32_t string_ports_count;
   uint32_t event_ports_count;
   uint32_t midi_event_in_ports_count;
   uint32_t ports_count;
@@ -440,6 +457,7 @@ zynjacku_plugin_repo_check_and_maybe_init_plugin(
   audio_out_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_audio, g_slv2uri_port_output, NULL);
   midi_in_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_midi, g_slv2uri_port_input, NULL);
   control_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_control, NULL);
+  string_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_string, NULL);
   event_ports_count = slv2_plugin_get_num_ports_of_class(plugin, g_slv2uri_port_event, NULL);
 
   midi_event_in_ports_count = 0;
@@ -464,6 +482,7 @@ zynjacku_plugin_repo_check_and_maybe_init_plugin(
         audio_out_ports_count,
         midi_in_ports_count,
         control_ports_count,
+        string_ports_count,
         event_ports_count,
         midi_event_in_ports_count,
         ports_count))
@@ -729,7 +748,7 @@ zynjacku_plugin_repo_create_port_internal(
   const char * symbol_str;
   const char * name_str;
   unsigned int port_type;
-  bool output_port;
+  bool output_port, is_control;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
@@ -750,7 +769,8 @@ zynjacku_plugin_repo_create_port_internal(
 
   output_port = slv2_port_is_output(info_ptr->slv2info, port);
 
-  if (slv2_port_is_control(info_ptr->slv2info, port))
+  is_control = slv2_port_is_control(info_ptr->slv2info, port);
+  if (is_control || slv2_port_is_string(info_ptr->slv2info, port))
   {
     port_ptr = malloc(sizeof(struct zynjacku_port));
     if (port_ptr == NULL)
@@ -765,6 +785,8 @@ zynjacku_plugin_repo_create_port_internal(
     if (output_port)
     {
       port_ptr->type = PORT_TYPE_MEASURE;
+      
+      /* TODO measure string ports are broken for now */
 
       list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->measure_ports);
     }
@@ -807,31 +829,66 @@ zynjacku_plugin_repo_create_port_internal(
         goto fail_free_symbol;
       }
 
-      /* port range */
-      slv2_port_get_range(
-        info_ptr->slv2info,
-        port,
-        &default_value,
-        &min_value,
-        &max_value);
-
-      if (default_value != NULL)
+      if (is_control)
       {
-        port_ptr->data.parameter.value = slv2_value_as_float(default_value);
-        slv2_value_free(default_value);
-      }
+        /* port range */
+        slv2_port_get_range(
+          info_ptr->slv2info,
+          port,
+          &default_value,
+          &min_value,
+          &max_value);
 
-      if (min_value != NULL)
-      {
-        port_ptr->data.parameter.min = slv2_value_as_float(min_value);
-        slv2_value_free(min_value);
-      }
+        if (default_value != NULL)
+        {
+          port_ptr->data.parameter.value = slv2_value_as_float(default_value);
+          slv2_value_free(default_value);
+        }
 
-      if (max_value != NULL)
-      {
-        port_ptr->data.parameter.max = slv2_value_as_float(max_value);
-        slv2_value_free(max_value);
+        if (min_value != NULL)
+        {
+          port_ptr->data.parameter.min = slv2_value_as_float(min_value);
+          slv2_value_free(min_value);
+        }
+
+        if (max_value != NULL)
+        {
+          port_ptr->data.parameter.max = slv2_value_as_float(max_value);
+          slv2_value_free(max_value);
+        }
       }
+      else
+      {
+        SLV2Values defs = NULL;
+        SLV2Value defval = NULL;
+        const char *defval_str = NULL;
+        int len = 0;
+        /* string port - get default */
+        port_ptr->data.string = malloc(sizeof(LV2_String_Data));
+        defs = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_string_port_default);
+        if (defs && slv2_values_size(defs) == 1)
+        {
+          defval = slv2_values_get_at(defs, 0);
+          if (slv2_value_is_string(defval)) {
+            defval_str = slv2_value_as_string(defval);
+            len = strlen(defval_str);
+          }
+        }
+
+        port_ptr->data.string->storage = 256; /* TODO: get from slv2 (requiredSpace) */
+        if (len + 1 > 256)
+          port_ptr->data.string->storage = len + 1;
+        port_ptr->data.string->data = malloc(port_ptr->data.string->storage);
+        if (defval_str)
+          strcpy(port_ptr->data.string->data, defval_str);
+        else
+          *port_ptr->data.string->data = '\0';
+        port_ptr->data.string->len = len;
+        port_ptr->data.string->flags = LV2_STRING_DATA_CHANGED_FLAG;
+        port_ptr->data.string->pad = 0;
+        port_ptr->flags |= PORT_FLAGS_IS_STRING;
+      }
+      
 
       contexts = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_port_context);
       for (i = 0; i < slv2_values_size(contexts); i++)

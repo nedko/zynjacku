@@ -88,6 +88,8 @@ zynjacku_lv2_load(
     LOG_ERROR("Failed to allocate memory for zynjacku_lv2_plugin structure");
     goto fail;
   }
+  /* zero everything to initialize pointers and ensure predictability */
+  memset(plugin_ptr, 0, sizeof(struct zynjacku_lv2_plugin));
 
   plugin_ptr->dlhandle = dlopen(dlpath, RTLD_NOW);
   if (plugin_ptr->dlhandle == NULL)

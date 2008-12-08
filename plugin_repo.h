@@ -46,6 +46,7 @@ bool
   uint32_t audio_out_ports_count,
   uint32_t midi_in_ports_count,
   uint32_t control_ports_count,
+  uint32_t string_ports_count,
   uint32_t event_ports_count,
   uint32_t midi_event_in_ports_count,
   uint32_t ports_count);

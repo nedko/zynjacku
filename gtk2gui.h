@@ -26,11 +26,14 @@
 typedef void * zynjacku_gtk2gui_handle;
 #define ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE NULL
 
+struct zynjacku_plugin;
+
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_create(
   const LV2_Feature * const * host_features,
   unsigned int host_feature_count,
   zynjacku_lv2_handle plugin_handle,
+  struct zynjacku_plugin * plugin,
   void * context_ptr,
   const char * uri,
   const char * synth_id,

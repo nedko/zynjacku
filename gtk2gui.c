@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <assert.h>
+#include <unistd.h>
 #include <lv2.h>
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
@@ -38,6 +39,7 @@
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
 #include "lv2_data_access.h"
+#include "lv2_string_port.h"
 
 #include "list.h"
 #include "lv2.h"
@@ -58,6 +60,7 @@ struct zynjacku_gtk2gui
   char *bundle_path;
   unsigned int ports_count;
   struct zynjacku_port ** ports;
+  struct zynjacku_plugin * plugin;
   void * context_ptr;
   const char * synth_id;
   bool resizable;
@@ -77,6 +80,7 @@ zynjacku_gtk2gui_create(
   const LV2_Feature * const * host_features,
   unsigned int host_feature_count,
   zynjacku_lv2_handle plugin_handle,
+  struct zynjacku_plugin *plugin,
   void *context_ptr,
   const char *uri,
   const char *synth_id,
@@ -106,17 +110,17 @@ zynjacku_gtk2gui_create(
   }
 
   ui_ptr->plugin_uri = uri;
+  ui_ptr->plugin = plugin;
   ui_ptr->context_ptr = context_ptr;
   ui_ptr->synth_id = synth_id;
   ui_ptr->resizable = true;
   ui_ptr->lv2plugin = plugin_handle;
   ui_ptr->data_access.data_access = zynjacku_lv2_get_descriptor(plugin_handle)->extension_data;
-  
+
   ui_ptr->gui_feature_instance_access.URI = "http://lv2plug.in/ns/ext/instance-access";
   ui_ptr->gui_feature_instance_access.data = zynjacku_lv2_get_handle(ui_ptr->lv2plugin);
   ui_ptr->gui_feature_data_access.URI = LV2_DATA_ACCESS_URI;
   ui_ptr->gui_feature_data_access.data = &ui_ptr->data_access;
-  
 
   ports_count = 0;
 
@@ -263,16 +267,64 @@ zynjacku_gtk2gui_callback_write(
     return;
   }
 
-  /* se support only lv2:ControlPort ATM */
-  assert(buffer_size == sizeof(float));
-
   LOG_DEBUG("setting port %u to %f", (unsigned int)port_index, *(float *)buffer);
 
-  ui_ptr->ports[port_index]->data.parameter.value = *(float *)buffer;
-  if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
+  if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_IS_STRING)
   {
-    zynjacku_lv2_message(ui_ptr->lv2plugin);
+    LV2_String_Data *old_dest = ui_ptr->ports[port_index]->data.string;
+    LV2_String_Data *dest = malloc(sizeof(LV2_String_Data));
+    const LV2_String_Data *src = (const LV2_String_Data *)buffer;
+    struct zynjacku_rt_command cmd;
+    int t = 1;
+    
+    memcpy(dest, old_dest, sizeof(LV2_String_Data));
+    if (src->len + 1 > dest->storage)
+      dest->storage = src->len + 65; /* alloc 64 bytes more, just in case */
+    dest->data = malloc(dest->storage);
+    strcpy(dest->data, src->data);
+    dest->len = src->len;
+    dest->flags |= LV2_STRING_DATA_CHANGED_FLAG;
+    
+    if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
+    {
+      /* send it via message context */
+      zynjacku_lv2_connect_port(ui_ptr->lv2plugin, ui_ptr->ports[port_index], dest);
+      zynjacku_lv2_message(ui_ptr->lv2plugin);
+      dest->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
+    }
+    else
+    {
+      /* send it via RT thread */
+      cmd.port = ui_ptr->ports[port_index];
+      cmd.data = dest;
+      assert(!ui_ptr->plugin->command_result);
+      ui_ptr->plugin->command = &cmd;
+      
+      while(!ui_ptr->plugin->command_result) {
+        usleep(10000 * t);
+        t *= 2;
+      }
+      /* TODO: any memory barriers needed here? */
+      assert(!ui_ptr->plugin->command);
+      assert(ui_ptr->plugin->command_result == &cmd);
+      ui_ptr->plugin->command_result = NULL;
+    }
+    
+    ui_ptr->ports[port_index]->data.string = dest;
+    
+    free(old_dest->data);
+    free(old_dest);
   }
+  else {
+    ui_ptr->ports[port_index]->data.parameter.value = *(float *)buffer;
+    /* se support only lv2:ControlPort ATM */
+    assert(buffer_size == sizeof(float));
+    if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
+    {
+      zynjacku_lv2_message(ui_ptr->lv2plugin);
+    }
+  }
+
 }
 
 bool
@@ -320,6 +372,9 @@ zynjacku_gtk2gui_ui_on(
     {
       for (port_index = 0 ; port_index < ui_ptr->ports_count ; port_index++)
       {
+        int size = sizeof(float);
+        int format = 0;
+        const void *data = NULL;
         port_ptr = ui_ptr->ports[port_index];
 
         if (port_ptr == NULL)     /* handle gaps */
@@ -334,12 +389,20 @@ zynjacku_gtk2gui_ui_on(
           port_ptr->data.parameter.min,
           port_ptr->data.parameter.max);
 
+        data = (const void *)&port_ptr->data.parameter.value;
+        if (port_ptr->flags & PORT_FLAGS_IS_STRING)
+        {
+          size = sizeof(LV2_String_Data);
+          format = ZYNJACKU_STRING_XFER_ID;
+          data = port_ptr->data.string;
+        }
+        
         ui_ptr->lv2ui->port_event(
           ui_ptr->ui_handle,
           port_ptr->index,
-          sizeof(float),
-          0,
-          (const void *)&port_ptr->data.parameter.value);
+          size,
+          format,
+          data);
       }
     }
   }
@@ -382,14 +445,24 @@ zynjacku_gtk2gui_push_measure_ports(
 
   list_for_each(node_ptr, measure_ports_ptr)
   {
+    int size = sizeof(float);
+    int format = 0;
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    const void *data = (const void *)&port_ptr->data.parameter.value;
+    
+    if (port_ptr->flags & PORT_FLAGS_IS_STRING)
+    {
+      size = sizeof(LV2_String_Data);
+      format = ZYNJACKU_STRING_XFER_ID;
+      data = (const void *)port_ptr->data.string;
+    }
 
     ui_ptr->lv2ui->port_event(
       ui_ptr->ui_handle,
       port_ptr->index,
-      sizeof(float),
-      0,
-      (const void *)&port_ptr->data.parameter.value);
+      size,
+      format,
+      data);
   }
 }
 

@@ -27,6 +27,8 @@
 
 #define LV2_EVENT_URI_TYPE_MIDI "http://lv2plug.in/ns/ext/midi#MidiEvent"
 
+#define ZYNJACKU_STRING_XFER_ID 2
+
 #define PORT_TYPE_INVALID          0
 #define PORT_TYPE_AUDIO            1 /* LV2 audio out port */
 #define PORT_TYPE_MIDI             2 /* LV2 midi in port */
@@ -35,6 +37,7 @@
 #define PORT_TYPE_MEASURE          5 /* LV2 control rate output port used for plugin output (leds, meters, etc.) */
 
 #define PORT_FLAGS_MSGCONTEXT      1 /* uses LV2 message context */
+#define PORT_FLAGS_IS_STRING       2 /* is a string port*/
 
 struct zynjacku_port
 {
@@ -53,6 +56,7 @@ struct zynjacku_port
       float min;
       float max;
     } parameter;                /* for PORT_TYPE_PARAMETER */
+    struct _LV2_String_Data * string;
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
   } data;
 
@@ -62,6 +66,12 @@ struct zynjacku_port
 #define PLUGIN_TYPE_UNKNOWN  0
 #define PLUGIN_TYPE_SYNTH    1
 #define PLUGIN_TYPE_EFFECT   2
+
+struct zynjacku_rt_command
+{
+  struct zynjacku_port * port; /* port to set data for */
+  void *data;     /* new data */
+};
 
 struct zynjacku_plugin
 {
@@ -102,6 +112,9 @@ struct zynjacku_plugin
       struct zynjacku_port audio_out_right_port;
     } effect;
   } subtype;
+  
+  struct zynjacku_rt_command * volatile command; /* command to execute */
+  struct zynjacku_rt_command * volatile command_result; /* command that has been executed */
 
   void (* deactivate)(GObject * synth_obj_ptr);
   void (* free_ports)(GObject * synth_obj_ptr);

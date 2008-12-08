@@ -38,6 +38,7 @@
 #include "lv2_contexts.h"
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
+#include "lv2_string_port.h"
 
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
@@ -56,7 +57,7 @@
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 
-#define ZYNJACKU_RACK_ENGINE_FEATURES 4
+#define ZYNJACKU_RACK_ENGINE_FEATURES 5
 
 struct lv2rack_engine
 {
@@ -81,6 +82,7 @@ struct lv2rack_engine
   LV2_Feature host_feature_dynparams;
   LV2_Feature host_feature_contexts;
   LV2_Feature host_feature_msgcontext;
+  LV2_Feature host_feature_stringport;
   const LV2_Feature * host_features[ZYNJACKU_RACK_ENGINE_FEATURES + 1];
 };
 
@@ -229,12 +231,16 @@ zynjacku_rack_init(
   rack_ptr->host_feature_msgcontext.URI = LV2_CONTEXT_MESSAGE;
   rack_ptr->host_feature_msgcontext.data = NULL;
 
+  rack_ptr->host_feature_stringport.URI = LV2_STRING_PORT_URI;
+  rack_ptr->host_feature_stringport.data = NULL;
+
   /* initialize host features array */
   count = 0;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_rtmempool;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_dynparams;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_contexts;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_msgcontext;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_stringport;
   assert(ZYNJACKU_RACK_ENGINE_FEATURES == count);
   rack_ptr->host_features[count] = NULL;
 
@@ -395,6 +401,15 @@ jack_process_cb(
   {
     effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_active);
 
+    if (effect_ptr->command)
+    {
+      struct zynjacku_rt_command * cmd = effect_ptr->command;
+      assert(!effect_ptr->command_result);
+      effect_ptr->command = NULL;
+      zynjacku_lv2_connect_port(effect_ptr->lv2plugin, cmd->port, cmd->data);
+      effect_ptr->command_result = cmd;
+    }
+
     if (effect_ptr->recycle)
     {
       list_del(effect_node_ptr);
@@ -522,6 +537,7 @@ zynjacku_rack_check_plugin(
   uint32_t audio_out_ports_count,
   uint32_t midi_in_ports_count,
   uint32_t control_ports_count,
+  uint32_t string_ports_count,
   uint32_t event_ports_count,
   uint32_t midi_event_in_ports_count,
   uint32_t ports_count)
@@ -531,6 +547,7 @@ zynjacku_rack_check_plugin(
     LOG_DEBUG("Skipping 's' %s, [effect] plugin with unsupported port configuration", name, plugin_uri);
     LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
     LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+    LOG_DEBUG("  string ports: %d", (unsigned int)string_ports_count);
     LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
     LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
     LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
@@ -542,6 +559,7 @@ zynjacku_rack_check_plugin(
   LOG_DEBUG("Found effect plugin '%s' %s", name, plugin_uri);
   LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
   LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
+  LOG_DEBUG("  string ports: %d", (unsigned int)string_ports_count);
   LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
   LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
   LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
@@ -818,7 +836,7 @@ zynjacku_plugin_construct_effect(
 
   /* no plugins to test gtk2gui */
   plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(rack_ptr->host_features, ZYNJACKU_RACK_ENGINE_FEATURES, plugin_ptr->lv2plugin, 
-    plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
+    plugin_ptr, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
 
   plugin_ptr->deactivate = zynjacku_rack_deactivate_effect;
   plugin_ptr->free_ports = zynjacku_free_effect_ports;
