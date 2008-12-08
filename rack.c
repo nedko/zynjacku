@@ -399,22 +399,25 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each_safe(effect_node_ptr, temp_node_ptr, &rack_ptr->plugins_active)
   {
-    effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_active);
+    struct zynjacku_rt_command * cmd;
 
-    if (effect_ptr->command)
-    {
-      struct zynjacku_rt_command * cmd = effect_ptr->command;
-      assert(!effect_ptr->command_result);
-      effect_ptr->command = NULL;
-      zynjacku_lv2_connect_port(effect_ptr->lv2plugin, cmd->port, cmd->data);
-      effect_ptr->command_result = cmd;
-    }
+    effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_active);
 
     if (effect_ptr->recycle)
     {
       list_del(effect_node_ptr);
       effect_ptr->recycle = false;
       continue;
+    }
+
+    cmd = effect_ptr->command;
+
+    /* Execute the command */
+    if (cmd)
+    {
+      assert(!effect_ptr->command_result);
+      assert(!(cmd->port->flags & PORT_FLAGS_MSGCONTEXT));
+      zynjacku_lv2_connect_port(effect_ptr->lv2plugin, cmd->port, cmd->data);
     }
 
     if (effect_ptr->dynparams)
@@ -455,6 +458,15 @@ jack_process_cb(
 
     /* Run plugin for this cycle */
     zynjacku_lv2_run(effect_ptr->lv2plugin, nframes);
+    
+    /* Acknowledge the command */
+    if (cmd)
+    {
+      if (cmd->port->flags & PORT_FLAGS_IS_STRING)
+        ((LV2_String_Data *)(cmd->data))->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
+      effect_ptr->command = NULL;
+      effect_ptr->command_result = cmd;
+    }
   }
 
   return 0;
