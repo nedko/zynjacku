@@ -46,10 +46,11 @@ class midiccmap:
         vbox.pack_start(align)
 
         vbox_top_left = gtk.VBox()
+        vbox_top_left.set_spacing(5)
         hbox_middle.pack_start(vbox_top_left, False, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
-        curve.set_size_request(300,300)
+        curve.set_size_request(250,250)
         hbox_middle.pack_start(curve, True, True)
 
         start_value_text = "Start value"
@@ -67,7 +68,7 @@ class midiccmap:
 
         r = gtk.CellRendererText()
         c1 = gtk.TreeViewColumn("From", r, text=0)
-        c2 = gtk.TreeViewColumn("", r, text=5)
+        c2 = gtk.TreeViewColumn("->", r, text=5)
         c3 = gtk.TreeViewColumn("To", r, text=1)
 
         self.tv = gtk.TreeView(self.ls)
@@ -76,11 +77,14 @@ class midiccmap:
         self.tv.append_column(c2)
         self.tv.append_column(c3)
         tv_box = gtk.VBox()
+
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(10, 3, 10, 10)
+        align.set_padding(3, 3, 10, 10)
         align.add(gtk.Label("Control points"))
         tv_box.pack_start(align, False, False)
-        tv_box.add(self.tv)
+
+        tv_box.pack_start(self.tv)
+
         vbox_top_left.pack_start(tv_box, True, True)
 
         adj_max = gtk.Adjustment(max_value, 0, 1, 0.01, 0.2)
@@ -94,7 +98,7 @@ class midiccmap:
         hbox_bottom = gtk.HBox()
         hbox_bottom.set_spacing(10)
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(0, 0, 10, 10)
+        align.set_padding(0, 2, 10, 10)
         align.add(hbox_bottom)
         vbox.pack_start(align, False, False)
 
@@ -109,9 +113,9 @@ class midiccmap:
         hbox_top.pack_start(cc_no_box)
 
         hbox_top.pack_start(gtk.Label("Show parameter range:"))
-        button = gtk.RadioButton(None, "full")
+        button = gtk.RadioButton(None, "mapped")
         hbox_top.pack_start(button)
-        button = gtk.RadioButton(button, "mapped")
+        button = gtk.RadioButton(button, "full")
         hbox_top.pack_start(button)
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
