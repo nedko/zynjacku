@@ -22,7 +22,7 @@ import gobject
 import calfwidgets
 
 class midiccmap:
-    def __init__(self, min_value=0.1, max_value=1.0):
+    def __init__(self, min_value=0.1, max_value=1.0, points=[]):
         w = gtk.Window(gtk.WINDOW_TOPLEVEL)
         #w.set_size_request(300,300)
         w.set_title("Parameter MIDI CC map")
@@ -90,32 +90,45 @@ class midiccmap:
         value_frame.add(value_box)
         hbox_bottom.pack_start(value_frame)
 
-        adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
-        self.cc_value = gtk.SpinButton(adj_cc_value, 0.0, 0)
+        self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
+        self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
         cc_value_box = gtk.HBox()
         cc_value_box.pack_start(gtk.Label("MIDI CC value"))
         cc_value_box.pack_start(self.cc_value)
-        cc_value_change_button = gtk.Button("Change")
-        cc_value_box.pack_start(cc_value_change_button)
-        cc_value_new_button = gtk.Button("New")
-        cc_value_box.pack_start(cc_value_new_button)
-        cc_value_delete_button = gtk.Button("Remove")
-        cc_value_box.pack_start(cc_value_delete_button)
+
+        self.cc_value_change_button = gtk.Button("Change")
+        cc_value_box.pack_start(self.cc_value_change_button)
+        self.cc_value_change_button.connect("clicked", self.on_button_clicked)
+
+        self.cc_value_new_button = gtk.Button("New")
+        cc_value_box.pack_start(self.cc_value_new_button)
+        self.cc_value_new_button.connect("clicked", self.on_button_clicked)
+
+        self.cc_value_delete_button = gtk.Button("Remove")
+        cc_value_box.pack_start(self.cc_value_delete_button)
+        self.cc_value_delete_button.connect("clicked", self.on_button_clicked)
+
         cc_value_frame = gtk.Frame()
         cc_value_frame.add(cc_value_box)
         hbox_bottom.pack_start(cc_value_frame)
+        self.adj_cc_value.connect("value-changed", self.on_cc_value_changed)
 
-        iter = self.ls.append(["0", "", adj_min, start_value_text, True])
+        iter = self.ls.append(["0", "", adj_min, "MIDI CC value 0", True])
         adj_min.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
 
-        iter = self.ls.append(["127", "", adj_max, end_value_text, True])
+        for point in points:
+            self.new_point(point[0], point[1])
+
+        iter = self.ls.append(["127", "", adj_max, "MIDI CC value 127", True])
         adj_max.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
 
-        self.tv.connect("cursor-changed", self.on_cursor_changed)
+        self.tv.get_selection().connect("changed", self.on_selection_changed)
 
-        self.tv.set_cursor((0,))
+        self.current_row = (0,)
+        self.current_immutable = True
+        self.tv.get_selection().select_path(self.current_row)
 
         w.connect("destroy", gtk.main_quit)
         w.show_all()
@@ -123,13 +136,65 @@ class midiccmap:
     def on_value_changed(self, adj, iter):
         self.ls[iter][1] = str(self.ls[iter][2].value)
 
-    def on_cursor_changed(self, tree):
-        cur = self.tv.get_cursor()
-        row = self.ls[cur[0]]
+    def on_selection_changed(self, obj):
+        iter = self.tv.get_selection().get_selected()[1]
+        self.current_row = iter
+        if not iter:
+            #print "selection gone"
+            return
+        row = self.ls[iter]
+        #print "selected %s" % row[0]
         self.value_label.set_text(row[3])
         self.value.set_adjustment(row[2])
         self.cc_value.set_value(int(row[0]))
 
+        # is immutable?
+        immutable = row[4]
+        self.cc_value_delete_button.set_sensitive(not immutable)
 
-m = midiccmap(0.23, 0.78)
+        self.current_immutable = immutable
+
+        self.on_cc_value_changed(row[2])
+
+    def on_cc_value_changed(self, adj):
+        for row in self.ls:
+            #print "%s ?= %s" % (row[0], int(adj.value))
+            if int(row[0]) == int(adj.value):
+                self.cc_value_new_button.set_sensitive(False)
+                self.cc_value_change_button.set_sensitive(False)
+                return
+        self.cc_value_new_button.set_sensitive(True)
+        self.cc_value_change_button.set_sensitive(not self.current_immutable)
+
+    def new_point(self, cc_value, value):
+        #print "new point %u" % cc_value
+        prev_iter = None
+
+        for row in self.ls:
+            if int(row[0]) > cc_value:
+                break
+            prev_iter = row.iter
+        
+        adj = gtk.Adjustment(value, 0, 1, 0.01, 0.2)
+        iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, "MIDI CC value %u" % cc_value, False])
+        adj.connect("value-changed", self.on_value_changed, iter)
+        self.on_value_changed(None, iter)
+        return iter
+
+    def on_button_clicked(self, button):
+        if button == self.cc_value_change_button:
+            #print "change cc value"
+            adj = self.ls[self.current_row][2]
+            self.ls.remove(self.tv.get_selection().get_selected()[1])
+            iter = self.new_point(int(self.adj_cc_value.value), adj.value)
+            self.tv.get_selection().select_iter(iter)
+        elif button == self.cc_value_new_button:
+            #print "new cc value"
+            iter = self.new_point(int(self.adj_cc_value.value), self.ls[self.current_row][2].value)
+            #self.tv.set_cursor(iter)
+        elif button == self.cc_value_delete_button:
+            #print "delete cc value"
+            self.ls.remove(self.tv.get_selection().get_selected()[1])
+
+m = midiccmap(0.23, 0.78, [[56, 0.91], [89, 0.1]])
 gtk.main()
