@@ -22,7 +22,6 @@ import sys
 import gtk
 import gtk.glade
 import gobject
-import phat
 import re
 import time
 import xml.dom.minidom
@@ -31,6 +30,20 @@ old_path = sys.path
 sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
 import zynjacku_c as zynjacku
 sys.path = old_path
+
+try:
+    import phat
+except:
+    phat = None
+try:
+    import calfwidgets
+except:
+    calfwidgets = None
+
+if not phat and not calfwidgets:
+    dlg = gtk.MessageDialog(message_format="No PHAT, no Calf, no joy.", type=gtk.MESSAGE_ERROR)
+    dlg.run()
+    sys.exit(1)
 
 try:
     import lash
@@ -548,7 +561,10 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
         adjustment = gtk.Adjustment(value, min, max, 1, 19)
 
         hbox = gtk.HBox()
-        self.knob = phat.HFanSlider()
+        if calfwidgets:
+            self.knob = calfwidgets.Knob()
+        elif phat:
+            self.knob = phat.HFanSlider()
         self.knob.set_adjustment(adjustment)
         #self.knob.set_size_request(200,-1)
         #align = gtk.Alignment(0.5, 0.5)
