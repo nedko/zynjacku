@@ -191,7 +191,7 @@ class midiccmap:
         elif button == self.cc_value_new_button:
             #print "new cc value"
             iter = self.new_point(int(self.adj_cc_value.value), self.ls[self.current_row][2].value)
-            #self.tv.set_cursor(iter)
+            self.tv.get_selection().select_iter(iter)
         elif button == self.cc_value_delete_button:
             #print "delete cc value"
             self.ls.remove(self.tv.get_selection().get_selected()[1])
