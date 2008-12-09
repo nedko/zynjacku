@@ -80,9 +80,23 @@ AC_ARG_ENABLE(pymod-checks, [AS_HELP_STRING(--disable-pymod-checks, [Force disab
 
 if test "$disable_pymod_checks" != "yes"
 then
-  AM_CHECK_PYMOD(phat,,,[AC_MSG_ERROR(Could not find PyPHAT)])
+  have_calfwidgets="no"
+  have_phat="no"
+
+  AM_CHECK_PYMOD(calfwidgets,,have_calfwidgets="yes")
+
+  AM_CHECK_PYMOD(phat,,have_phat="yes")
   # We cannot check for pyphat version, check phat version instead
-  PKG_CHECK_MODULES(PHAT, phat >= 0.4.1)
+  if test have_calfwidgets = "yes"
+  then
+    PKG_CHECK_MODULES(PHAT, phat >= 0.4.1)
+  fi
+
+  if test $have_calfwidgets = "no" -a $have_phat = "no"
+  then
+    AC_MSG_ERROR([Could not find PyPHAT nor Calf widgets])
+  fi
+
 else
   AC_MSG_WARN([Checks for python modules required runtime have been force disabled])
 fi
@@ -92,7 +106,12 @@ AC_OUTPUT
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([========================])
-AC_MSG_RESULT([Prefix:      $prefix])
-AC_MSG_RESULT([Python dir:  $PYTHON_INCLUDES])
-AC_MSG_RESULT([Dev version: $dev_version])
+AC_MSG_RESULT([Prefix                 : $prefix])
+AC_MSG_RESULT([Python dir             : $PYTHON_INCLUDES])
+AC_MSG_RESULT([Dev version            : $dev_version])
+if test "$disable_pymod_checks" != "yes"
+then
+  AC_MSG_RESULT([Calf widgets available : $have_calfwidgets])
+  AC_MSG_RESULT([PHAT avalable          : $have_phat])
+fi
 AC_MSG_RESULT([])
