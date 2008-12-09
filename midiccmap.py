@@ -33,12 +33,15 @@ class midiccmap:
         hbox_top = gtk.HBox()
         vbox.pack_start(hbox_top)
 
+        hbox_middle = gtk.HBox()
+        vbox.pack_start(hbox_middle)
+
         vbox_top_left = gtk.VBox()
-        hbox_top.pack_start(vbox_top_left, False, False)
+        hbox_middle.pack_start(vbox_top_left, False, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
         curve.set_size_request(400,400)
-        hbox_top.pack_start(curve, True, True)
+        hbox_middle.pack_start(curve, True, True)
 
         start_value_text = "Start value"
         end_value_text = "End value"
@@ -81,12 +84,18 @@ class midiccmap:
         cc_no_box.pack_start(cc_no)
         #cc_frame = gtk.Frame()
         #cc_frame.add(cc_box)
-        hbox_bottom.pack_start(cc_no_box)
+        hbox_top.pack_start(cc_no_box)
+
+        hbox_top.pack_start(gtk.Label("Show parameter range:"))
+        button = gtk.RadioButton(None, "full")
+        hbox_top.pack_start(button)
+        button = gtk.RadioButton(button, "mapped")
+        hbox_top.pack_start(button)
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
         cc_value_box = gtk.HBox()
-        cc_value_box.pack_start(gtk.Label("value"))
+        cc_value_box.pack_start(gtk.Label("MIDI CC value"))
         cc_value_box.pack_start(self.cc_value)
 
         self.cc_value_change_button = gtk.Button("Change")
