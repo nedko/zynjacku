@@ -28,19 +28,28 @@ class midiccmap:
         #self.window.set_size_request(650,650)
 
         vbox = gtk.VBox()
+        vbox.set_spacing(5)
         self.window.add(vbox)
 
         hbox_top = gtk.HBox()
-        vbox.pack_start(hbox_top)
+        hbox_top.set_spacing(10)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 0, 10, 10)
+        align.add(hbox_top)
+        vbox.pack_start(align)
 
         hbox_middle = gtk.HBox()
-        vbox.pack_start(hbox_middle)
+        hbox_middle.set_spacing(10)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(0, 0, 10, 10)
+        align.add(hbox_middle)
+        vbox.pack_start(align)
 
         vbox_top_left = gtk.VBox()
         hbox_middle.pack_start(vbox_top_left, False, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
-        curve.set_size_request(400,400)
+        curve.set_size_request(300,300)
         hbox_middle.pack_start(curve, True, True)
 
         start_value_text = "Start value"
@@ -71,10 +80,7 @@ class midiccmap:
         align.set_padding(10, 3, 10, 10)
         align.add(gtk.Label("Control points"))
         tv_box.pack_start(align, False, False)
-        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
-        align.set_padding(0, 5, 5, 5)
-        align.add(self.tv)
-        tv_box.add(align)
+        tv_box.add(self.tv)
         vbox_top_left.pack_start(tv_box, True, True)
 
         adj_max = gtk.Adjustment(max_value, 0, 1, 0.01, 0.2)
@@ -86,7 +92,11 @@ class midiccmap:
         #vbox_top_left.pack_start(max_box, False, False)
 
         hbox_bottom = gtk.HBox()
-        vbox.pack_start(hbox_bottom, False, False)
+        hbox_bottom.set_spacing(10)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(0, 0, 10, 10)
+        align.add(hbox_bottom)
+        vbox.pack_start(align, False, False)
 
         self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
         self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
@@ -106,9 +116,9 @@ class midiccmap:
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
-        cc_value_box = gtk.HBox()
-        cc_value_box.pack_start(gtk.Label("CC value"))
-        cc_value_box.pack_start(self.cc_value)
+        label = gtk.Label("CC value")
+        hbox_bottom.pack_start(label, False, False)
+        hbox_bottom.pack_start(self.cc_value, False, False)
 
         self.cc_value_delete_button = gtk.Button("Remove")
         vbox_top_left.pack_start(self.cc_value_delete_button, False, False)
@@ -122,21 +132,14 @@ class midiccmap:
         vbox_top_left.pack_start(self.cc_value_change_button, False, False)
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
 
-        #cc_value_frame = gtk.Frame()
-        #cc_value_frame.add(cc_value_box)
-        hbox_bottom.pack_start(cc_value_box)
         self.adj_cc_value.connect("value-changed", self.on_cc_value_changed)
 
         self.value = calfwidgets.Knob()
-        value_box = gtk.HBox()
         self.value_label = gtk.Label()
-        value_box.pack_start(self.value_label)
-        value_box.pack_start(self.value)
+        hbox_bottom.pack_start(self.value_label, False)
+        hbox_bottom.pack_start(self.value, False)
         self.value_spin = gtk.SpinButton(digits=2)
-        value_box.pack_start(self.value_spin)
-        #value_frame = gtk.Frame()
-        #value_frame.add(value_box)
-        hbox_bottom.pack_start(value_box)
+        hbox_bottom.pack_start(self.value_spin, False)
 
         iter = self.ls.append(["0", "", adj_min, "MIDI CC value 0", True, "->"])
         adj_min.connect("value-changed", self.on_value_changed, iter)
@@ -178,7 +181,7 @@ class midiccmap:
         row = self.ls[iter]
         #print "selected %s" % row[0]
         #self.value_label.set_text(row[3])
-        self.value_label.set_text("->")
+        self.value_label.set_text("-> %s" % self.parameter_name)
         self.value.set_adjustment(row[2])
         self.value_spin.set_adjustment(row[2])
         self.value_spin.set_value(row[2].value)
@@ -232,5 +235,5 @@ class midiccmap:
             #print "delete cc value"
             self.ls.remove(self.tv.get_selection().get_selected()[1])
 
-m = midiccmap("Test", 23, 0.23, 0.78, [[56, 0.91], [89, 0.1]])
+m = midiccmap("Modulation", 23, 0.23, 0.78, [[56, 0.91], [89, 0.1]])
 gtk.main()
