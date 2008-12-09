@@ -75,25 +75,16 @@ class midiccmap:
         adj_cc = gtk.Adjustment(70, 0, 127, 1, 19)
         cc = gtk.SpinButton(adj_cc, 0.0, 0)
         cc_box = gtk.HBox()
-        cc_box.pack_start(gtk.Label("MIDI CC"))
+        cc_box.pack_start(gtk.Label("MIDI CC # "))
         cc_box.pack_start(cc)
-        cc_frame = gtk.Frame()
-        cc_frame.add(cc_box)
-        hbox_bottom.pack_start(cc_frame)
-
-        self.value = calfwidgets.Knob()
-        value_box = gtk.HBox()
-        self.value_label = gtk.Label()
-        value_box.pack_start(self.value_label)
-        value_box.pack_start(self.value)
-        value_frame = gtk.Frame()
-        value_frame.add(value_box)
-        hbox_bottom.pack_start(value_frame)
+        #cc_frame = gtk.Frame()
+        #cc_frame.add(cc_box)
+        hbox_bottom.pack_start(cc_box)
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
         cc_value_box = gtk.HBox()
-        cc_value_box.pack_start(gtk.Label("MIDI CC value"))
+        cc_value_box.pack_start(gtk.Label("value"))
         cc_value_box.pack_start(self.cc_value)
 
         self.cc_value_change_button = gtk.Button("Change")
@@ -108,10 +99,19 @@ class midiccmap:
         cc_value_box.pack_start(self.cc_value_delete_button)
         self.cc_value_delete_button.connect("clicked", self.on_button_clicked)
 
-        cc_value_frame = gtk.Frame()
-        cc_value_frame.add(cc_value_box)
-        hbox_bottom.pack_start(cc_value_frame)
+        #cc_value_frame = gtk.Frame()
+        #cc_value_frame.add(cc_value_box)
+        hbox_bottom.pack_start(cc_value_box)
         self.adj_cc_value.connect("value-changed", self.on_cc_value_changed)
+
+        self.value = calfwidgets.Knob()
+        value_box = gtk.HBox()
+        self.value_label = gtk.Label()
+        value_box.pack_start(self.value_label)
+        value_box.pack_start(self.value)
+        #value_frame = gtk.Frame()
+        #value_frame.add(value_box)
+        hbox_bottom.pack_start(value_box)
 
         iter = self.ls.append(["0", "", adj_min, "MIDI CC value 0", True])
         adj_min.connect("value-changed", self.on_value_changed, iter)
@@ -144,7 +144,8 @@ class midiccmap:
             return
         row = self.ls[iter]
         #print "selected %s" % row[0]
-        self.value_label.set_text(row[3])
+        #self.value_label.set_text(row[3])
+        self.value_label.set_text("is mapped to parameter value")
         self.value.set_adjustment(row[2])
         self.cc_value.set_value(int(row[0]))
 
