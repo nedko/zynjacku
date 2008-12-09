@@ -22,13 +22,13 @@ import gobject
 import calfwidgets
 
 class midiccmap:
-    def __init__(self, min_value=0.1, max_value=1.0, points=[]):
-        w = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[]):
+        self.parameter_name = parameter_name
+        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         #w.set_size_request(300,300)
-        w.set_title("Parameter MIDI CC map")
 
         vbox = gtk.VBox()
-        w.add(vbox)
+        self.window.add(vbox)
 
         hbox_top = gtk.HBox()
         vbox.pack_start(hbox_top)
@@ -72,14 +72,15 @@ class midiccmap:
         hbox_bottom = gtk.HBox()
         vbox.pack_start(hbox_bottom)
 
-        adj_cc = gtk.Adjustment(70, 0, 127, 1, 19)
-        cc = gtk.SpinButton(adj_cc, 0.0, 0)
-        cc_box = gtk.HBox()
-        cc_box.pack_start(gtk.Label("MIDI CC # "))
-        cc_box.pack_start(cc)
+        self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
+        self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
+        cc_no = gtk.SpinButton(self.adj_cc_no, 0.0, 0)
+        cc_no_box = gtk.HBox()
+        cc_no_box.pack_start(gtk.Label("MIDI CC #"))
+        cc_no_box.pack_start(cc_no)
         #cc_frame = gtk.Frame()
         #cc_frame.add(cc_box)
-        hbox_bottom.pack_start(cc_box)
+        hbox_bottom.pack_start(cc_no_box)
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
@@ -130,8 +131,16 @@ class midiccmap:
         self.current_immutable = True
         self.tv.get_selection().select_path(self.current_row)
 
-        w.connect("destroy", gtk.main_quit)
-        w.show_all()
+        self.set_title()
+
+        self.window.connect("destroy", gtk.main_quit)
+        self.window.show_all()
+
+    def set_title(self):
+        self.window.set_title('Parameter "%s" MIDI CC #%u map' % (self.parameter_name, int(self.adj_cc_no.value)))
+
+    def on_cc_no_changed(self, adj):
+        self.set_title()
 
     def on_value_changed(self, adj, iter):
         self.ls[iter][1] = str(self.ls[iter][2].value)
@@ -197,5 +206,5 @@ class midiccmap:
             #print "delete cc value"
             self.ls.remove(self.tv.get_selection().get_selected()[1])
 
-m = midiccmap(0.23, 0.78, [[56, 0.91], [89, 0.1]])
+m = midiccmap("Test", 23, 0.23, 0.78, [[56, 0.91], [89, 0.1]])
 gtk.main()
