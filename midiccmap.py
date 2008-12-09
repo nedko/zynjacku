@@ -56,14 +56,6 @@ class midiccmap:
         start_value_text = "Start value"
         end_value_text = "End value"
 
-        value_min = calfwidgets.Knob()
-        adj_min = gtk.Adjustment(min_value, 0, 1, 0.01, 0.2)
-        value_min.set_adjustment(adj_min)
-        min_box = gtk.HBox()
-        min_box.pack_start(gtk.Label(start_value_text))
-        min_box.pack_start(value_min)
-        #vbox_top_left.pack_start(min_box, False)
-
         self.ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gtk.Adjustment, str, bool, str)
 
         r = gtk.CellRendererText()
@@ -89,14 +81,6 @@ class midiccmap:
         tv_box.pack_start(sw)
 
         vbox_top_left.pack_start(tv_box, True, True)
-
-        adj_max = gtk.Adjustment(max_value, 0, 1, 0.01, 0.2)
-        value_max = calfwidgets.Knob()
-        value_max.set_adjustment(adj_max)
-        max_box = gtk.HBox()
-        max_box.pack_start(gtk.Label(end_value_text))
-        max_box.pack_start(value_max)
-        #vbox_top_left.pack_start(max_box, False)
 
         hbox_bottom = gtk.HBox()
         hbox_bottom.set_spacing(10)
