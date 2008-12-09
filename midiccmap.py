@@ -25,7 +25,7 @@ class midiccmap:
     def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[]):
         self.parameter_name = parameter_name
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        #self.window.set_size_request(800,800)
+        #self.window.set_size_request(650,650)
 
         vbox = gtk.VBox()
         self.window.add(vbox)
@@ -37,6 +37,7 @@ class midiccmap:
         hbox_top.pack_start(vbox_top_left, False, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
+        curve.set_size_request(400,400)
         hbox_top.pack_start(curve, True, True)
 
         start_value_text = "Start value"
