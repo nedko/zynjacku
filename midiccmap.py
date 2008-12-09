@@ -83,7 +83,10 @@ class midiccmap:
         align.add(gtk.Label("Control points"))
         tv_box.pack_start(align, False)
 
-        tv_box.pack_start(self.tv)
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.add(self.tv)
+        tv_box.pack_start(sw)
 
         vbox_top_left.pack_start(tv_box, True, True)
 
@@ -242,5 +245,14 @@ class midiccmap:
             self.ls.remove(selection.get_selected()[1])
             selection.select_path(path)
 
-m = midiccmap("Modulation", 23, 0.23, 0.78, [[56, 0.91], [89, 0.1]])
+values = [
+    [1, 0.12],
+    [2, 0.13],
+    [3, 0.14],
+    [4, 0.18],
+    [5, 0.2],
+    [56, 0.71],
+    [89, 0.80]
+    ]
+m = midiccmap("Modulation", 23, 0.1, 0.9, values)
 gtk.main()
