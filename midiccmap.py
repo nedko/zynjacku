@@ -237,7 +237,10 @@ class midiccmap:
             self.tv.get_selection().select_iter(iter)
         elif button == self.cc_value_delete_button:
             #print "delete cc value"
-            self.ls.remove(self.tv.get_selection().get_selected()[1])
+            selection = self.tv.get_selection()
+            path = self.ls.get_path(self.current_row)
+            self.ls.remove(selection.get_selected()[1])
+            selection.select_path(path)
 
 m = midiccmap("Modulation", 23, 0.23, 0.78, [[56, 0.91], [89, 0.1]])
 gtk.main()
