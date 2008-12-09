@@ -25,7 +25,7 @@ class midiccmap:
     def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[]):
         self.parameter_name = parameter_name
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        #w.set_size_request(300,300)
+        #self.window.set_size_request(800,800)
 
         vbox = gtk.VBox()
         self.window.add(vbox)
@@ -34,10 +34,10 @@ class midiccmap:
         vbox.pack_start(hbox_top)
 
         vbox_top_left = gtk.VBox()
-        hbox_top.pack_start(vbox_top_left)
+        hbox_top.pack_start(vbox_top_left, False, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
-        hbox_top.pack_start(curve)
+        hbox_top.pack_start(curve, True, True)
 
         start_value_text = "Start value"
         end_value_text = "End value"
@@ -48,7 +48,7 @@ class midiccmap:
         min_box = gtk.HBox()
         min_box.pack_start(gtk.Label(start_value_text))
         min_box.pack_start(value_min)
-        vbox_top_left.pack_start(min_box)
+        vbox_top_left.pack_start(min_box, False, False)
 
         self.ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gtk.Adjustment, str, bool)
 
@@ -59,7 +59,7 @@ class midiccmap:
         self.tv = gtk.TreeView(self.ls)
         self.tv.append_column(c1)
         self.tv.append_column(c2)
-        vbox_top_left.pack_start(self.tv)
+        vbox_top_left.pack_start(self.tv, True, True)
 
         adj_max = gtk.Adjustment(max_value, 0, 1, 0.01, 0.2)
         value_max = calfwidgets.Knob()
@@ -67,10 +67,10 @@ class midiccmap:
         max_box = gtk.HBox()
         max_box.pack_start(gtk.Label(end_value_text))
         max_box.pack_start(value_max)
-        vbox_top_left.pack_start(max_box)
+        vbox_top_left.pack_start(max_box, False, False)
 
         hbox_bottom = gtk.HBox()
-        vbox.pack_start(hbox_bottom)
+        vbox.pack_start(hbox_bottom, False, False)
 
         self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
         self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
