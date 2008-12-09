@@ -52,18 +52,30 @@ class midiccmap:
         min_box = gtk.HBox()
         min_box.pack_start(gtk.Label(start_value_text))
         min_box.pack_start(value_min)
-        vbox_top_left.pack_start(min_box, False, False)
+        #vbox_top_left.pack_start(min_box, False, False)
 
-        self.ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gtk.Adjustment, str, bool)
+        self.ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gtk.Adjustment, str, bool, str)
 
         r = gtk.CellRendererText()
-        c1 = gtk.TreeViewColumn("MIDI", r, text=0)
-        c2 = gtk.TreeViewColumn("Parameter", r, text=1)
+        c1 = gtk.TreeViewColumn("From", r, text=0)
+        c2 = gtk.TreeViewColumn("", r, text=5)
+        c3 = gtk.TreeViewColumn("To", r, text=1)
 
         self.tv = gtk.TreeView(self.ls)
+        self.tv.set_headers_visible(False)
         self.tv.append_column(c1)
         self.tv.append_column(c2)
-        vbox_top_left.pack_start(self.tv, True, True)
+        self.tv.append_column(c3)
+        tv_box = gtk.VBox()
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 3, 10, 10)
+        align.add(gtk.Label("Control points"))
+        tv_box.pack_start(align, False, False)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(0, 5, 5, 5)
+        align.add(self.tv)
+        tv_box.add(align)
+        vbox_top_left.pack_start(tv_box, True, True)
 
         adj_max = gtk.Adjustment(max_value, 0, 1, 0.01, 0.2)
         value_max = calfwidgets.Knob()
@@ -71,7 +83,7 @@ class midiccmap:
         max_box = gtk.HBox()
         max_box.pack_start(gtk.Label(end_value_text))
         max_box.pack_start(value_max)
-        vbox_top_left.pack_start(max_box, False, False)
+        #vbox_top_left.pack_start(max_box, False, False)
 
         hbox_bottom = gtk.HBox()
         vbox.pack_start(hbox_bottom, False, False)
@@ -95,20 +107,20 @@ class midiccmap:
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
         cc_value_box = gtk.HBox()
-        cc_value_box.pack_start(gtk.Label("MIDI CC value"))
+        cc_value_box.pack_start(gtk.Label("CC value"))
         cc_value_box.pack_start(self.cc_value)
 
-        self.cc_value_change_button = gtk.Button("Change")
-        cc_value_box.pack_start(self.cc_value_change_button)
-        self.cc_value_change_button.connect("clicked", self.on_button_clicked)
+        self.cc_value_delete_button = gtk.Button("Remove")
+        vbox_top_left.pack_start(self.cc_value_delete_button, False, False)
+        self.cc_value_delete_button.connect("clicked", self.on_button_clicked)
 
         self.cc_value_new_button = gtk.Button("New")
-        cc_value_box.pack_start(self.cc_value_new_button)
+        vbox_top_left.pack_start(self.cc_value_new_button, False, False)
         self.cc_value_new_button.connect("clicked", self.on_button_clicked)
 
-        self.cc_value_delete_button = gtk.Button("Remove")
-        cc_value_box.pack_start(self.cc_value_delete_button)
-        self.cc_value_delete_button.connect("clicked", self.on_button_clicked)
+        self.cc_value_change_button = gtk.Button("Change CC value")
+        vbox_top_left.pack_start(self.cc_value_change_button, False, False)
+        self.cc_value_change_button.connect("clicked", self.on_button_clicked)
 
         #cc_value_frame = gtk.Frame()
         #cc_value_frame.add(cc_value_box)
@@ -120,18 +132,20 @@ class midiccmap:
         self.value_label = gtk.Label()
         value_box.pack_start(self.value_label)
         value_box.pack_start(self.value)
+        self.value_spin = gtk.SpinButton(digits=2)
+        value_box.pack_start(self.value_spin)
         #value_frame = gtk.Frame()
         #value_frame.add(value_box)
         hbox_bottom.pack_start(value_box)
 
-        iter = self.ls.append(["0", "", adj_min, "MIDI CC value 0", True])
+        iter = self.ls.append(["0", "", adj_min, "MIDI CC value 0", True, "->"])
         adj_min.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
 
         for point in points:
             self.new_point(point[0], point[1])
 
-        iter = self.ls.append(["127", "", adj_max, "MIDI CC value 127", True])
+        iter = self.ls.append(["127", "", adj_max, "MIDI CC value 127", True, "->"])
         adj_max.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
 
@@ -153,7 +167,7 @@ class midiccmap:
         self.set_title()
 
     def on_value_changed(self, adj, iter):
-        self.ls[iter][1] = str(self.ls[iter][2].value)
+        self.ls[iter][1] = "%.2f" % self.ls[iter][2].value
 
     def on_selection_changed(self, obj):
         iter = self.tv.get_selection().get_selected()[1]
@@ -164,8 +178,10 @@ class midiccmap:
         row = self.ls[iter]
         #print "selected %s" % row[0]
         #self.value_label.set_text(row[3])
-        self.value_label.set_text("is mapped to parameter value")
+        self.value_label.set_text("->")
         self.value.set_adjustment(row[2])
+        self.value_spin.set_adjustment(row[2])
+        self.value_spin.set_value(row[2].value)
         self.cc_value.set_value(int(row[0]))
 
         # is immutable?
@@ -196,7 +212,7 @@ class midiccmap:
             prev_iter = row.iter
         
         adj = gtk.Adjustment(value, 0, 1, 0.01, 0.2)
-        iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, "MIDI CC value %u" % cc_value, False])
+        iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, "MIDI CC value %u" % cc_value, False, "->"])
         adj.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
         return iter
