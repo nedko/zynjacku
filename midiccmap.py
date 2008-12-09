@@ -36,7 +36,7 @@ class midiccmap:
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         align.set_padding(10, 0, 10, 10)
         align.add(hbox_top)
-        vbox.pack_start(align)
+        vbox.pack_start(align, False)
 
         hbox_middle = gtk.HBox()
         hbox_middle.set_spacing(10)
@@ -47,7 +47,7 @@ class midiccmap:
 
         vbox_top_left = gtk.VBox()
         vbox_top_left.set_spacing(5)
-        hbox_middle.pack_start(vbox_top_left, False, False)
+        hbox_middle.pack_start(vbox_top_left, False)
 
         curve = gtk.Frame("Here will be the curve widget..................................")
         curve.set_size_request(250,250)
@@ -62,7 +62,7 @@ class midiccmap:
         min_box = gtk.HBox()
         min_box.pack_start(gtk.Label(start_value_text))
         min_box.pack_start(value_min)
-        #vbox_top_left.pack_start(min_box, False, False)
+        #vbox_top_left.pack_start(min_box, False)
 
         self.ls = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gtk.Adjustment, str, bool, str)
 
@@ -81,7 +81,7 @@ class midiccmap:
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         align.set_padding(3, 3, 10, 10)
         align.add(gtk.Label("Control points"))
-        tv_box.pack_start(align, False, False)
+        tv_box.pack_start(align, False)
 
         tv_box.pack_start(self.tv)
 
@@ -93,14 +93,14 @@ class midiccmap:
         max_box = gtk.HBox()
         max_box.pack_start(gtk.Label(end_value_text))
         max_box.pack_start(value_max)
-        #vbox_top_left.pack_start(max_box, False, False)
+        #vbox_top_left.pack_start(max_box, False)
 
         hbox_bottom = gtk.HBox()
         hbox_bottom.set_spacing(10)
         align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
         align.set_padding(0, 2, 10, 10)
         align.add(hbox_bottom)
-        vbox.pack_start(align, False, False)
+        vbox.pack_start(align, False)
 
         self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
         self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
@@ -110,30 +110,30 @@ class midiccmap:
         cc_no_box.pack_start(cc_no)
         #cc_frame = gtk.Frame()
         #cc_frame.add(cc_box)
-        hbox_top.pack_start(cc_no_box)
+        hbox_top.pack_start(cc_no_box, False)
 
-        hbox_top.pack_start(gtk.Label("Show parameter range:"))
+        hbox_top.pack_start(gtk.Label("Show parameter range:"), False)
         button = gtk.RadioButton(None, "mapped")
-        hbox_top.pack_start(button)
+        hbox_top.pack_start(button, False)
         button = gtk.RadioButton(button, "full")
-        hbox_top.pack_start(button)
+        hbox_top.pack_start(button, False)
 
         self.adj_cc_value = gtk.Adjustment(17, 0, 127, 1, 19)
         self.cc_value = gtk.SpinButton(self.adj_cc_value, 0.0, 0)
         label = gtk.Label("CC value")
-        hbox_bottom.pack_start(label, False, False)
-        hbox_bottom.pack_start(self.cc_value, False, False)
+        hbox_bottom.pack_start(label, False)
+        hbox_bottom.pack_start(self.cc_value, False)
 
         self.cc_value_delete_button = gtk.Button("Remove")
-        vbox_top_left.pack_start(self.cc_value_delete_button, False, False)
+        vbox_top_left.pack_start(self.cc_value_delete_button, False)
         self.cc_value_delete_button.connect("clicked", self.on_button_clicked)
 
         self.cc_value_new_button = gtk.Button("New")
-        vbox_top_left.pack_start(self.cc_value_new_button, False, False)
+        vbox_top_left.pack_start(self.cc_value_new_button, False)
         self.cc_value_new_button.connect("clicked", self.on_button_clicked)
 
         self.cc_value_change_button = gtk.Button("Change CC value")
-        vbox_top_left.pack_start(self.cc_value_change_button, False, False)
+        vbox_top_left.pack_start(self.cc_value_change_button, False)
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
 
         self.adj_cc_value.connect("value-changed", self.on_cc_value_changed)
