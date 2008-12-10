@@ -22,16 +22,19 @@ import gobject
 import calfwidgets
 
 class midiccmap:
-    def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[]):
+    def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[[0, 0], [127, 1]]):
         self.parameter_name = parameter_name
         self.min_value = min_value
         self.max_value = max_value
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.points = points
+        self.window = gtk.Dialog(
+            flags=gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+            buttons=(gtk.STOCK_UNDO, gtk.RESPONSE_NONE, gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT, gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
 
         # the grand vbox
-        vbox = gtk.VBox()
-        vbox.set_spacing(5)
-        self.window.add(vbox)
+        vbox = self.window.vbox
+        #vbox.set_spacing(5)
+        #self.window.add(vbox)
 
         # top hbox
         hbox_top = gtk.HBox()
@@ -134,11 +137,7 @@ class midiccmap:
         self.value_spin = gtk.SpinButton(digits=2)
         hbox_bottom.pack_start(self.value_spin, False)
 
-        # add points
-        self.new_point(points[0][0], points[0][1], True)
-        for point in points[1:-1]:
-            self.new_point(point[0], point[1])
-        self.new_point(points[-1][0], points[-1][1], True)
+        self.add_points()
 
         self.tv.get_selection().connect("changed", self.on_selection_changed)
 
@@ -146,8 +145,27 @@ class midiccmap:
 
         self.set_title()
 
-        self.window.connect("destroy", gtk.main_quit)
+    def add_points(self):
+        self.new_point(self.points[0][0], self.points[0][1], True)
+        for point in self.points[1:-1]:
+            self.new_point(point[0], point[1])
+        self.new_point(self.points[-1][0], self.points[-1][1], True)
+
+    def run(self):
         self.window.show_all()
+        while True:
+            ret = self.window.run()
+            if ret == gtk.RESPONSE_NONE: # revert/undo button pressed?
+                path = self.ls.get_path(self.current_row)
+                self.ls.clear()
+                self.add_points()
+                if path[0] >= len(self.ls):
+                    path = (len(self.ls) - 1,)
+                self.tv.get_selection().select_path(path)
+                continue
+
+            self.window.hide_all()
+            return ret
 
     def set_title(self):
         self.window.set_title('Parameter "%s" MIDI CC #%u map' % (self.parameter_name, int(self.adj_cc_no.value)))
@@ -233,5 +251,4 @@ values = [
     [89, 0.80],
     [127, 0.95]
     ]
-m = midiccmap("Modulation", 23, 0, 1, values)
-gtk.main()
+midiccmap("Modulation", 23, 0, 1, values).run()
