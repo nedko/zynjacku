@@ -21,6 +21,67 @@ import gtk
 import gobject
 import calfwidgets
 
+class curve_widget(gtk.DrawingArea):
+    def __init__(self, points):
+        gtk.DrawingArea.__init__(self)
+
+        self.connect("expose-event", self.on_expose)
+        self.connect("size-request", self.on_size_request)
+        self.connect("size_allocate", self.on_size_allocate)
+
+        self.color_bg = gtk.gdk.Color(0,0,0)
+        self.color_value = gtk.gdk.Color(int(65535 * 0.8), int(65535 * 0.7), 0)
+        self.color_mark = gtk.gdk.Color(int(65535 * 0.2), int(65535 * 0.2), int(65535 * 0.2))
+        self.width = 0
+        self.height = 0
+
+        self.points = points
+
+    def on_expose(self, widget, event):
+        cairo_ctx = widget.window.cairo_create()
+
+        # set a clip region for the expose event
+        cairo_ctx.rectangle(event.area.x, event.area.y, event.area.width, event.area.height)
+        cairo_ctx.clip()
+
+        self.draw(cairo_ctx)
+
+        return False
+
+    def on_size_allocate(self, widget, allocation):
+        #print allocation.x, allocation.y, allocation.width, allocation.height
+        self.width = float(allocation.width)
+        self.height = float(allocation.height)
+        self.font_size = 10
+
+    def on_size_request(self, widget, requisition):
+        #print "size-request, %u x %u" % (requisition.width, requisition.height)
+        requisition.width = 20
+        return
+
+    def invalidate_all(self):
+        self.queue_draw_area(0, 0, int(self.width), int(self.height))
+
+    def draw(self, cairo_ctx):
+        cairo_ctx.set_source_color(self.color_bg)
+        cairo_ctx.rectangle(0, 0, self.width, self.height)
+        cairo_ctx.fill()
+
+        cairo_ctx.set_source_color(self.color_value)
+
+        prev_point = False
+        for point in self.points:
+            x = int((1.0 - float(point[0]) / 127) * self.width)
+            y = int(float(point[1]) * self.height)
+            #print x, y
+            if not prev_point:
+                cairo_ctx.move_to(x, y)
+            else:
+                cairo_ctx.line_to(x, y)
+            prev_point = True
+
+        cairo_ctx.stroke()
+
 class midiccmap:
     def __init__(self, parameter_name, cc_no, min_value=0.0, max_value=1.0, points=[[0, 0], [127, 1]]):
         self.parameter_name = parameter_name
@@ -108,7 +169,7 @@ class midiccmap:
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
         vbox_left.pack_start(self.cc_value_change_button, False)
 
-        curve = gtk.Frame("Here will be the curve widget..................................")
+        curve = curve_widget(points)
         curve.set_size_request(250,250)
         hbox_middle.pack_start(curve, True, True)
 
