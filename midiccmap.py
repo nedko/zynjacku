@@ -22,7 +22,7 @@ import gobject
 import calfwidgets
 
 class curve_widget(gtk.DrawingArea):
-    def __init__(self, points):
+    def __init__(self):
         gtk.DrawingArea.__init__(self)
 
         self.connect("expose-event", self.on_expose)
@@ -34,8 +34,30 @@ class curve_widget(gtk.DrawingArea):
         self.color_mark = gtk.gdk.Color(int(65535 * 0.2), int(65535 * 0.2), int(65535 * 0.2))
         self.width = 0
         self.height = 0
+        self.margin = 5
 
-        self.points = points
+        self.points = []
+
+    def add_point(self, cc, adj):
+        i = 0
+        for point in self.points:
+            if point[0] > cc:
+                break
+            i += 1
+        self.points.insert(i, [cc, adj])
+
+    def remove_point(self, cc):
+        #print "removing point with cc value %u" % cc
+        i = 0
+        for point in self.points:
+            #print "%u ?= %u" % (cc, point[0])
+            if point[0] == cc:
+                #print "removed point %u -> %f (index %u)" % (cc, point[1].value, i)
+                del(self.points[i])
+                return
+            i += 1
+
+        print "point with cc value %u not found" % cc
 
     def on_expose(self, widget, event):
         cairo_ctx = widget.window.cairo_create()
@@ -56,7 +78,8 @@ class curve_widget(gtk.DrawingArea):
 
     def on_size_request(self, widget, requisition):
         #print "size-request, %u x %u" % (requisition.width, requisition.height)
-        requisition.width = 20
+        requisition.width = 150
+        requisition.height = 150
         return
 
     def invalidate_all(self):
@@ -67,12 +90,16 @@ class curve_widget(gtk.DrawingArea):
         cairo_ctx.rectangle(0, 0, self.width, self.height)
         cairo_ctx.fill()
 
+        #cairo_ctx.set_source_color(self.color_mark)
+        #cairo_ctx.rectangle(self.margin, self.margin, self.width - 2 * self.margin, self.height - 2 * self.margin)
+        #cairo_ctx.stroke()
+
         cairo_ctx.set_source_color(self.color_value)
 
         prev_point = False
         for point in self.points:
-            x = int((1.0 - float(point[0]) / 127) * self.width)
-            y = int(float(point[1]) * self.height)
+            x = int(self.margin + float(point[0]) / 127 * (self.width - 2 * self.margin))
+            y = int(self.margin + (1.0 - float(point[1].value)) * (self.height - 2 * self.margin))
             #print x, y
             if not prev_point:
                 cairo_ctx.move_to(x, y)
@@ -169,9 +196,9 @@ class midiccmap:
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
         vbox_left.pack_start(self.cc_value_change_button, False)
 
-        curve = curve_widget(points)
-        curve.set_size_request(250,250)
-        hbox_middle.pack_start(curve, True, True)
+        self.curve = curve_widget()
+        self.curve.set_size_request(250,250)
+        hbox_middle.pack_start(self.curve, True, True)
 
         # bottom hbox
         hbox_bottom = gtk.HBox()
@@ -236,6 +263,7 @@ class midiccmap:
 
     def on_value_changed(self, adj, iter):
         self.ls[iter][1] = "%.2f" % self.ls[iter][2].value
+        self.curve.invalidate_all()
 
     def on_selection_changed(self, obj):
         iter = self.tv.get_selection().get_selected()[1]
@@ -278,6 +306,7 @@ class midiccmap:
             prev_iter = row.iter
         
         adj = gtk.Adjustment(value, self.min_value, self.max_value, 0.01, 0.2)
+        self.curve.add_point(cc_value, adj)
         iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, immutable, "->"])
         adj.connect("value-changed", self.on_value_changed, iter)
         self.on_value_changed(None, iter)
@@ -287,19 +316,26 @@ class midiccmap:
         if button == self.cc_value_change_button:
             #print "change cc value"
             adj = self.ls[self.current_row][2]
+            cc = int(self.ls[self.current_row][0])
             self.ls.remove(self.tv.get_selection().get_selected()[1])
             iter = self.new_point(int(self.adj_cc_value.value), adj.value)
             self.tv.get_selection().select_iter(iter)
+            self.curve.remove_point(cc)
+            self.curve.invalidate_all()
         elif button == self.cc_value_new_button:
             #print "new cc value"
             iter = self.new_point(int(self.adj_cc_value.value), self.ls[self.current_row][2].value)
             self.tv.get_selection().select_iter(iter)
+            self.curve.invalidate_all()
         elif button == self.cc_value_delete_button:
             #print "delete cc value"
             selection = self.tv.get_selection()
+            cc = int(self.ls[self.current_row][0])
             path = self.ls.get_path(self.current_row)
             self.ls.remove(selection.get_selected()[1])
             selection.select_path(path)
+            self.curve.remove_point(cc)
+            self.curve.invalidate_all()
 
 values = [
     [0, 0.1],
