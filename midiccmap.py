@@ -19,7 +19,11 @@
 
 import gtk
 import gobject
-import calfwidgets
+try:
+    import calfwidgets
+    calfwidgets.Knob()
+except:
+    calfwidgets = None
 
 class curve_widget(gtk.DrawingArea):
     def __init__(self):
@@ -246,8 +250,11 @@ class midiccmap:
 
         hbox_bottom.pack_start(gtk.Label("-> %s" % self.parameter_name), False)
 
-        self.value = calfwidgets.Knob()
-        hbox_bottom.pack_start(self.value, False)
+        if calfwidgets:
+            self.value_knob = calfwidgets.Knob()
+            hbox_bottom.pack_start(self.value_knob, False)
+        else:
+            self.value_knob = None
 
         self.value_spin = gtk.SpinButton(digits=2)
         hbox_bottom.pack_start(self.value_spin, False)
@@ -310,7 +317,8 @@ class midiccmap:
         self.cc_value_delete_button.set_sensitive(not immutable)
         self.current_immutable = immutable
 
-        self.value.set_adjustment(row[2])
+        if self.value_knob:
+            self.value_knob.set_adjustment(row[2])
         self.value_spin.set_adjustment(row[2])
         self.value_spin.set_value(row[2].value)
         self.cc_value.set_value(int(row[0]))
