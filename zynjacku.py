@@ -37,6 +37,7 @@ except:
     phat = None
 try:
     import calfwidgets
+    calfwidgets.Knob()
 except:
     calfwidgets = None
 
