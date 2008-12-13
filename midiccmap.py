@@ -37,6 +37,7 @@ class curve_widget(gtk.DrawingArea):
         self.margin = 5
 
         self.points = []
+        self.full_range = False
 
     def add_point(self, cc, adj):
         i = 0
@@ -45,6 +46,10 @@ class curve_widget(gtk.DrawingArea):
                 break
             i += 1
         self.points.insert(i, [cc, adj])
+
+    def set_full_range(self, full_range = True):
+        self.full_range = full_range
+        self.invalidate_all()
 
     def remove_point(self, cc):
         #print "removing point with cc value %u" % cc
@@ -94,12 +99,29 @@ class curve_widget(gtk.DrawingArea):
         #cairo_ctx.rectangle(self.margin, self.margin, self.width - 2 * self.margin, self.height - 2 * self.margin)
         #cairo_ctx.stroke()
 
+        if not self.points:
+            return
+
         cairo_ctx.set_source_color(self.color_value)
+
+        if self.full_range:
+            min_value = 0.0
+            max_value = 1.0
+        else:
+            max_value = min_value = self.points[0][1].value
+            for point in self.points[1:]:
+                if point[1].value > max_value:
+                    max_value = point[1].value
+                elif point[1].value < min_value:
+                    min_value = point[1].value
 
         prev_point = False
         for point in self.points:
             x = int(self.margin + float(point[0]) / 127 * (self.width - 2 * self.margin))
-            y = int(self.margin + (1.0 - float(point[1].value)) * (self.height - 2 * self.margin))
+            value = float(point[1].value)
+            value -= min_value
+            value = value / (max_value - min_value)
+            y = int(self.margin + (1.0 - value) * (self.height - 2 * self.margin))
             #print x, y
             if not prev_point:
                 cairo_ctx.move_to(x, y)
@@ -142,8 +164,10 @@ class midiccmap:
 
         hbox_top.pack_start(gtk.Label("Show parameter range:"), False)
         button = gtk.RadioButton(None, "mapped")
+        button.connect("toggled", self.on_set_full_range, False)
         hbox_top.pack_start(button, False)
         button = gtk.RadioButton(button, "full")
+        button.connect("toggled", self.on_set_full_range, True)
         hbox_top.pack_start(button, False)
 
         # middle hbox
@@ -258,6 +282,10 @@ class midiccmap:
     def set_title(self):
         self.window.set_title('Parameter "%s" MIDI CC #%u map' % (self.parameter_name, int(self.adj_cc_no.value)))
 
+    def on_set_full_range(self, button, full_range):
+        self.curve.set_full_range(full_range)
+        self.curve.invalidate_all()
+
     def on_cc_no_changed(self, adj):
         self.set_title()
 
@@ -337,7 +365,7 @@ class midiccmap:
             self.curve.remove_point(cc)
             self.curve.invalidate_all()
 
-values = [
+values_big = [
     [0, 0.1],
     [1, 0.12],
     [2, 0.13],
@@ -348,4 +376,13 @@ values = [
     [89, 0.80],
     [127, 0.95]
     ]
-midiccmap("Modulation", 23, 0, 1, values).run()
+
+values_flat = [
+    [0, 0.40],
+    [5, 0.42],
+    [56, 0.37],
+    [89, 0.60],
+    [127, 0.65]
+    ]
+
+midiccmap("Modulation", 23, 0, 1, values_flat).run()
