@@ -222,7 +222,10 @@ class midiccmap:
 
         self.curve = curve_widget()
         self.curve.set_size_request(250,250)
-        hbox_middle.pack_start(self.curve, True, True)
+        frame = gtk.Frame()
+        frame.set_shadow_type(gtk.SHADOW_ETCHED_OUT)
+        frame.add(self.curve)
+        hbox_middle.pack_start(frame, True, True)
 
         # bottom hbox
         hbox_bottom = gtk.HBox()
