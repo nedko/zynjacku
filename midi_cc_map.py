@@ -366,6 +366,9 @@ class midiccmap:
                 self.revert_points()
                 continue
 
+            if ret == gtk.RESPONSE_REJECT: # cancel button pressed?
+                self.revert_points()
+
             self.window.hide_all()
             return ret
 
