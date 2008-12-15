@@ -788,7 +788,7 @@ zynjacku_free_plugin_control_ports(
 
   while (!list_empty(&plugin_ptr->dynparam_ports))
   {
-    node_ptr = plugin_ptr->measure_ports.next;
+    node_ptr = plugin_ptr->dynparam_ports.next;
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     assert(port_ptr->type == PORT_TYPE_DYNPARAM);
