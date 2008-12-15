@@ -3,7 +3,7 @@
  *
  *   This file is part of zynjacku
  *
- *   Copyright (C) 2006,2007,2008 Nedko Arnaudov <nedko@arnaudov.name>
+ *   Copyright (C) 2008 Nedko Arnaudov <nedko@arnaudov.name>
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include "midi_cc_map.h"
 
 #include "list.h"
+#include "midi_cc_map_internal.h"
 
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -34,7 +35,9 @@
 #define ZYNJACKU_MIDI_CC_MAP_SIGNAL_POINT_REMOVED         1
 #define ZYNJACKU_MIDI_CC_MAP_SIGNAL_POINT_CC_CHANGED      2
 #define ZYNJACKU_MIDI_CC_MAP_SIGNAL_POINT_VALUE_CHANGED   3
-#define ZYNJACKU_MIDI_CC_MAP_SIGNALS_COUNT                4
+#define ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED        4
+#define ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_VALUE_CHANGED      5
+#define ZYNJACKU_MIDI_CC_MAP_SIGNALS_COUNT                6
 
 struct point
 {
@@ -48,6 +51,7 @@ struct zynjacku_midi_cc_map
 {
   gboolean dispose_has_run;
 
+  guint cc_no;
   struct list_head points;
 };
 
@@ -173,6 +177,34 @@ zynjacku_midi_cc_map_class_init(
       2,                        /* n_params */
       G_TYPE_UINT,              /* MIDI CC value 0..127 */
       G_TYPE_FLOAT);            /* uri of plugin being scanned */
+
+  g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED] =
+    g_signal_new(
+      "cc-no-assigned",         /* signal_name */
+      ZYNJACKU_MIDI_CC_MAP_TYPE, /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_UINT);             /* MIDI CC No, 0..127 */
+
+  g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_VALUE_CHANGED] =
+    g_signal_new(
+      "cc-value-changed",       /* signal_name */
+      ZYNJACKU_MIDI_CC_MAP_TYPE, /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      1,                        /* n_params */
+      G_TYPE_UINT);             /* MIDI CC value 0..127 */
 }
 
 static
@@ -188,6 +220,7 @@ zynjacku_midi_cc_map_init(
   map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(instance);
 
   INIT_LIST_HEAD(&map_ptr->points);
+  map_ptr->cc_no = G_MAXUINT;
 }
 
 GType zynjacku_midiccmap_get_type()
@@ -413,4 +446,37 @@ zynjacku_midiccmap_point_parameter_value_change(
   point_ptr->parameter_value = parameter_value;
 
   zynjacku_midiccmap_point_value_changed(map_obj_ptr, cc_value, parameter_value);
+}
+
+void
+zynjacku_midiccmap_point_midi_cc(
+  ZynjackuMidiCcMap * map_obj_ptr,
+  guint cc_no,
+  guint cc_value)
+{
+  struct zynjacku_midi_cc_map * map_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_point_midi_cc(%u, %u) called.", cc_no, cc_value);
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  if (map_ptr->cc_no == G_MAXUINT)
+  {
+    map_ptr->cc_no = cc_no;
+
+    g_signal_emit(
+      map_obj_ptr,
+      g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED],
+      0,
+      cc_no);
+  }
+
+  if (map_ptr->cc_no == cc_no)
+  {
+    g_signal_emit(
+      map_obj_ptr,
+      g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_VALUE_CHANGED],
+      0,
+      cc_value);
+  }
 }

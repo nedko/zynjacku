@@ -135,4 +135,10 @@ void
 zynjacku_plugin_ui_run(
   struct zynjacku_plugin * plugin_ptr);
 
+void
+zynjacku_plugin_midi_cc(
+  struct zynjacku_plugin * plugin_ptr,
+  unsigned int cc_no,
+  unsigned int cc_value);
+
 #endif /* #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED */

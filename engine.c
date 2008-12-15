@@ -58,6 +58,7 @@
 #include "rtmempool.h"
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
+#include "midi_cc_map.h"
 
 #define ZYNJACKU_ENGINE_SIGNAL_TICK    0 /* plugin iterated */
 #define ZYNJACKU_ENGINE_SIGNAL_TACK    1 /* "good" plugin found */
@@ -99,6 +100,15 @@ struct zynjacku_engine
   LV2_Feature host_feature_msgcontext;
   LV2_Feature host_feature_stringport;
   const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
+
+  pthread_mutex_t cc_lock;
+  struct
+  {
+    signed char value_rt;      /* accessed by rt-thread only */
+    signed char value;         /* protected by cc_lock */
+    signed char value_changed; /* accessed by ui-thread only */
+    signed char value_ui;      /* accessed by ui-thread only */
+  } cc[127];
 };
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
@@ -141,6 +151,9 @@ zynjacku_engine_dispose(GObject * obj)
     zynjacku_engine_stop_jack(ZYNJACKU_ENGINE(obj));
     zynjacku_plugin_repo_uninit();
   }
+
+  pthread_mutex_destroy(&engine_ptr->active_plugins_lock);
+  pthread_mutex_destroy(&engine_ptr->cc_lock);
 
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
@@ -245,6 +258,7 @@ zynjacku_engine_init(
 {
   struct zynjacku_engine * engine_ptr;
   int count;
+  int i;
 
   LOG_DEBUG("zynjacku_engine_init() called.");
 
@@ -253,6 +267,17 @@ zynjacku_engine_init(
   engine_ptr->dispose_has_run = FALSE;
 
   engine_ptr->jack_client = NULL;
+
+  pthread_mutex_init(&engine_ptr->active_plugins_lock, NULL);
+  pthread_mutex_init(&engine_ptr->cc_lock, NULL);
+
+  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
+  {
+    engine_ptr->cc[i].value_rt = 255;
+    engine_ptr->cc[i].value = 255;
+    engine_ptr->cc[i].value_changed = false;
+    engine_ptr->cc[i].value_ui = 255;
+  }
 
   /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&engine_ptr->mempool_allocator);
@@ -542,6 +567,54 @@ zynjacku_jackmidi_to_lv2midi(
   return input_event_count != 0;
 }
 
+static
+void
+zynjacku_jackmidi_cc(
+  struct zynjacku_engine * engine_ptr,
+  jack_port_t * jack_port,
+  jack_nframes_t nframes)
+{
+  void * input_buf;
+  jack_midi_event_t input_event;
+  jack_nframes_t input_event_count;
+  jack_nframes_t i;
+  int cc_no;
+  bool changes;
+
+  input_buf = jack_port_get_buffer(jack_port, nframes);
+  input_event_count = jack_midi_get_event_count(input_buf);
+
+  changes = false;
+
+  /* iterate over all incoming JACK MIDI events */
+  for (i = 0; i < input_event_count; i++)
+  {
+    /* retrieve JACK MIDI event */
+    jack_midi_event_get(&input_event, input_buf, i);
+
+    if ((input_event.size == 3) && ((input_event.buffer[0] & 0xF0) == 0xB0))
+    {
+      //LOG_DEBUG("CC %u, value %u, channel %u", input_event.buffer[1], input_event.buffer[2], (input_event.buffer[0] & 0x0F));
+      cc_no = input_event.buffer[1] & 0x7F;
+      engine_ptr->cc[cc_no].value_rt = input_event.buffer[2] & 0x7F;
+      changes = true;
+    }
+  }
+
+  if (changes)
+  {
+    if (pthread_mutex_trylock(&engine_ptr->active_plugins_lock) == 0)
+    {
+      for (i = 0; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]); i++)
+      {
+        engine_ptr->cc[i].value = engine_ptr->cc[i].value_rt;
+      }
+
+      pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
+    }
+  }
+}
+
 #define engine_ptr ((struct zynjacku_engine *)context_ptr)
 
 /* Jack process callback. */
@@ -564,6 +637,8 @@ jack_process_cb(
   {
     engine_ptr->midi_activity = TRUE;
   }
+
+  zynjacku_jackmidi_cc(engine_ptr, engine_ptr->jack_midi_in, nframes);
 
   if (pthread_mutex_trylock(&engine_ptr->active_plugins_lock) == 0)
   {
@@ -667,20 +742,48 @@ void
 zynjacku_engine_ui_run(
   ZynjackuEngine * engine_obj_ptr)
 {
-  struct list_head * synth_node_ptr;
-  struct zynjacku_plugin * synth_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_engine * engine_ptr;
+  unsigned int i;
 
 //  LOG_DEBUG("zynjacku_engine_ui_run() called.");
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
-  /* Iterate over plugins */
-  list_for_each(synth_node_ptr, &engine_ptr->plugins_all)
+  pthread_mutex_lock(&engine_ptr->cc_lock);
+  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
   {
-    synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings_all);
+    if (engine_ptr->cc[i].value != engine_ptr->cc[i].value_ui)
+    {
+      engine_ptr->cc[i].value_changed = true;
+      engine_ptr->cc[i].value_ui = engine_ptr->cc[i].value;
+    }
+  }
+  pthread_mutex_unlock(&engine_ptr->cc_lock);
 
-    zynjacku_plugin_ui_run(synth_ptr);
+  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
+  {
+    if (engine_ptr->cc[i].value_changed)
+    {
+      /* Iterate over plugins */
+      list_for_each(node_ptr, &engine_ptr->plugins_all)
+      {
+        plugin_ptr = list_entry(node_ptr, struct zynjacku_plugin, siblings_all);
+
+        zynjacku_plugin_midi_cc(plugin_ptr, i, (unsigned int)engine_ptr->cc[i].value_ui);
+      }
+
+      engine_ptr->cc[i].value_changed = false;
+    }
+  }
+
+  /* Iterate over plugins */
+  list_for_each(node_ptr, &engine_ptr->plugins_all)
+  {
+    plugin_ptr = list_entry(node_ptr, struct zynjacku_plugin, siblings_all);
+
+    zynjacku_plugin_ui_run(plugin_ptr);
   }
 }
 

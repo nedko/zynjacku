@@ -84,6 +84,7 @@ class curve_widget(gtk.DrawingArea):
 
     def set_moving_point_cc(self, cc_value):
         self.moving_point_cc = cc_value
+        self.invalidate_all()
 
     def get_moving_point(self, min_value, max_value):
         if self.moving_point_cc >= 0:
@@ -239,6 +240,8 @@ class midiccmap:
         self.map.connect("point-removed", self.on_point_removed)
         self.map.connect("point-cc-changed", self.on_point_cc_changed)
         self.map.connect("point-value-changed", self.on_point_value_changed)
+        self.map.connect("cc-no-assigned", self.on_cc_no_assigned)
+        self.map.connect("cc-value-changed", self.on_cc_map_value_changed)
 
         self.window = gtk.Dialog(
             flags=gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
@@ -432,6 +435,15 @@ class midiccmap:
         for row in self.ls:
             if int(row[0]) == cc_value:
                 self.on_value_changed(row.iter, parameter_value)
+
+    def on_cc_no_assigned(self, map, cc_no):
+        #print "on_cc_no_assigned(%u)" % cc_no
+        self.adj_cc_no.value = cc_no
+
+    def on_cc_map_value_changed(self, map, cc_value):
+        #print "on_cc_map_value_changed(%u)" % cc_value
+        self.adj_cc_value.value = cc_value
+        self.curve.set_moving_point_cc(cc_value)
 
     def revert_points(self):
         path = self.ls.get_path(self.current_row)

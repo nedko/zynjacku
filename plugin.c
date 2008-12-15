@@ -54,6 +54,7 @@
 #include "synth.h"
 #include "effect.h"
 #include "midi_cc_map.h"
+#include "midi_cc_map_internal.h"
 
 /* signals */
 #define ZYNJACKU_PLUGIN_SIGNAL_TEST                0
@@ -1495,4 +1496,24 @@ zynjacku_plugin_remove_midi_cc_map(
   }
 
   port_ptr->midi_cc_map_obj_ptr = NULL;
+}
+
+void
+zynjacku_plugin_midi_cc(
+  struct zynjacku_plugin * plugin_ptr,
+  unsigned int cc_no,
+  unsigned int cc_value)
+{
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+
+  list_for_each(node_ptr, &plugin_ptr->dynparam_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    if (port_ptr->midi_cc_map_obj_ptr != NULL)
+    {
+      zynjacku_midiccmap_point_midi_cc(ZYNJACKU_MIDI_CC_MAP(port_ptr->midi_cc_map_obj_ptr), cc_no, cc_value);
+    }
+  }
 }
