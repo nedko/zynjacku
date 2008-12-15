@@ -380,7 +380,14 @@ class PluginUIUniversalGroupGeneric(PluginUIUniversalGroup):
             self.scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
             self.scrolled_window.add_with_viewport(self.box_top)
-            self.window.window.add(self.scrolled_window)
+
+            self.window.statusbar = gtk.Statusbar()
+
+            box = gtk.VBox()
+            box.pack_start(self.scrolled_window, True, True)
+            box.pack_start(self.window.statusbar, False)
+
+            self.window.window.add(box)
 
         if window.ui_enabled:
             window.window.show_all()
