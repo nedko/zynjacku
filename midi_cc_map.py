@@ -17,6 +17,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from math import pi
 import gtk
 import gobject
 try:
@@ -26,7 +27,7 @@ except:
     calfwidgets = None
 
 class curve_widget(gtk.DrawingArea):
-    def __init__(self, min_value, max_value):
+    def __init__(self, min_value, max_value, value):
         gtk.DrawingArea.__init__(self)
 
         self.connect("expose-event", self.on_expose)
@@ -45,6 +46,9 @@ class curve_widget(gtk.DrawingArea):
 
         self.min_value = min_value
         self.max_value = max_value
+
+        self.moving_point_cc = -1
+        self.moving_point_value = value
 
     def add_point(self, cc, adj):
         i = 0
@@ -77,6 +81,55 @@ class curve_widget(gtk.DrawingArea):
         adj = self.remove_point(cc_value_old)
         self.add_point(cc_value_new, adj)
         self.invalidate_all()
+
+    def set_moving_point_cc(self, cc_value):
+        self.moving_point_cc = cc_value
+
+    def get_moving_point(self, min_value, max_value):
+        if self.moving_point_cc >= 0:
+            x = self.get_x(self.moving_point_cc)
+
+            prev_point = self.points[0]
+            for point in self.points:
+                if point[0] == self.moving_point_cc:
+                    y3 = point[1].value
+                    break
+                elif point[0] > self.moving_point_cc:
+                    x1 = float(prev_point[0])
+                    y1 = prev_point[1].value
+                    x2 = float(point[0])
+                    y2 = point[1].value
+                    x3 = float(self.moving_point_cc)
+                    y3 = y1 + ((x3 - x1) * (y2 - y1) / (x2 - x1))
+                    break
+                prev_point = point
+
+            y = self.get_y(min_value, max_value, y3)
+
+            return x, y
+
+        y = self.get_y(min_value, max_value, self.moving_point_value)
+
+        #print "searching for value %f" % self.moving_point_value
+        prev_point = self.points[0]
+        for point in self.points:
+            #print "%f ? %f ? %f" % (prev_point[1].value, self.moving_point_value, point[1].value)
+            if point[1].value == self.moving_point_value:
+                x = self.get_x(float(point[0]))
+                return x, y
+            elif ((prev_point[1].value < self.moving_point_value and self.moving_point_value < point[1].value) or
+                  (prev_point[1].value > self.moving_point_value and self.moving_point_value > point[1].value)):
+                x1 = float(prev_point[0])
+                y1 = prev_point[1].value
+                x2 = float(point[0])
+                y2 = point[1].value
+                y3 = self.moving_point_value
+                x3 = x1 + ((y3 - y1) * (x2 - x1) / (y2 - y1))
+                #print "x = %f" % x3
+                x = self.get_x(x3)
+                return x, y
+            prev_point = point
+        return None
 
     def on_expose(self, widget, event):
         cairo_ctx = widget.window.cairo_create()
@@ -170,8 +223,13 @@ class curve_widget(gtk.DrawingArea):
 
         cairo_ctx.stroke()
 
+        pt = self.get_moving_point(min_value, max_value)
+        if pt:
+            cairo_ctx.arc(pt[0], pt[1], 5, 0, 2 * pi)
+            cairo_ctx.fill()
+
 class midiccmap:
-    def __init__(self, map, parameter_name, cc_no, min_value=0.0, max_value=1.0):
+    def __init__(self, map, parameter_name, cc_no, min_value=0.0, max_value=1.0, value=0.5):
         self.parameter_name = parameter_name
         self.min_value = min_value
         self.max_value = max_value
@@ -265,7 +323,7 @@ class midiccmap:
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
         vbox_left.pack_start(self.cc_value_change_button, False)
 
-        self.curve = curve_widget(min_value, max_value)
+        self.curve = curve_widget(min_value, max_value, value)
         self.curve.set_size_request(250,250)
         frame = gtk.Frame()
         frame.set_shadow_type(gtk.SHADOW_ETCHED_OUT)
@@ -498,4 +556,4 @@ if __name__ == '__main__':
     for point in values_flat:
         map.point_create(point[0], point[1])
 
-    midiccmap(map, "Modulation", 23, 0, 1).run()
+    midiccmap(map, "Modulation", 23, 0, 1, 0.5).run()

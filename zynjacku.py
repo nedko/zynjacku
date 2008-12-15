@@ -604,7 +604,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
     def on_clicked(self, widget, event):
         if event.type != gtk.gdk._2BUTTON_PRESS:
-            return
+            return False
 
         #print "double click on %s" % self.parameter_name
 
@@ -621,8 +621,10 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
             #print "existing map"
             new_map = False
 
-        if not midi_cc_map.midiccmap(map, self.parameter_name, 23, self.adjustment.lower, self.adjustment.upper).run() and new_map:
-            self.window.plugin.clear_midi_cc_map(self.context)
+        if not midi_cc_map.midiccmap(map, self.parameter_name, 23, self.adjustment.lower, self.adjustment.upper, self.adjustment.value).run() and new_map:
+            self.window.plugin.remove_midi_cc_map(self.context)
+
+        return True
 
     def get_top_widget(self):
         return self.top
