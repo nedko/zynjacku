@@ -25,6 +25,7 @@ import gobject
 import re
 import time
 import xml.dom.minidom
+import midi_cc_map
 
 old_path = sys.path
 sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
@@ -597,7 +598,31 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         self.cid = adjustment.connect("value-changed", self.on_value_changed)
 
+        self.knob.connect("button-press-event", self.on_clicked)
+
         #print "Float \"%s\" created: %s" % (name, repr(self))
+
+    def on_clicked(self, widget, event):
+        if event.type != gtk.gdk._2BUTTON_PRESS:
+            return
+
+        #print "double click on %s" % self.parameter_name
+
+        map = self.window.synth.get_midi_cc_map(self.context)
+
+        if not map:
+            #print "new map"
+            new_map = True
+            map = zynjacku.MidiCcMap()
+            map.point_create(0, self.adjustment.lower)
+            map.point_create(127, self.adjustment.upper)
+            self.window.synth.set_midi_cc_map(self.context, map)
+        else:
+            #print "existing map"
+            new_map = False
+
+        if not midi_cc_map.midiccmap(map, self.parameter_name, 23, self.adjustment.lower, self.adjustment.upper).run() and new_map:
+            self.window.synth.clear_midi_cc_map(self.context)
 
     def get_top_widget(self):
         return self.top

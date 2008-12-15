@@ -53,6 +53,7 @@
 #include "plugin_repo.h"
 #include "synth.h"
 #include "effect.h"
+#include "midi_cc_map.h"
 
 /* signals */
 #define ZYNJACKU_PLUGIN_SIGNAL_TEST                0
@@ -480,6 +481,7 @@ zynjacku_plugin_init(
   plugin_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
   INIT_LIST_HEAD(&plugin_ptr->measure_ports);
+  INIT_LIST_HEAD(&plugin_ptr->dynparam_ports);
 
   plugin_ptr->type = PLUGIN_TYPE_UNKNOWN;
 
@@ -591,7 +593,7 @@ zynjacku_plugin_generic_lv2_ui_on(
       port_ptr->data.parameter.value,
       port_ptr->data.parameter.min,
       port_ptr->data.parameter.max,
-      zynjacku_plugin_context_to_string(&port_ptr->data.parameter.value),
+      zynjacku_plugin_context_to_string(port_ptr),
       &port_ptr->ui_context);
   }
 
@@ -783,6 +785,18 @@ zynjacku_free_plugin_control_ports(
 
     free(port_ptr);
   }
+
+  while (!list_empty(&plugin_ptr->dynparam_ports))
+  {
+    node_ptr = plugin_ptr->measure_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+
+    list_del(node_ptr);
+
+    free(port_ptr);
+  }
 }
 
 gboolean
@@ -937,15 +951,19 @@ dynparam_parameter_float_disappeared(
   void * parent_group_ui_context,
   void * parameter_ui_context)
 {
+  struct zynjacku_port * port_ptr;
+
   LOG_DEBUG("dynparam_parameter_float_disappeared() called.");
+
+  port_ptr = (struct zynjacku_port *)parameter_ui_context;
 
   g_signal_emit(
     (ZynjackuPlugin *)instance_ui_context,
     g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED],
     0,
-    parameter_ui_context);
+    port_ptr->ui_context);
 
-  g_object_unref(parameter_ui_context);
+  g_object_unref(port_ptr->ui_context);
 }
 
 void
@@ -1060,8 +1078,9 @@ dynparam_parameter_float_appeared(
   float max,
   void ** parameter_ui_context)
 {
-  GObject * ret_obj_ptr;
   ZynjackuHints * hints_obj_ptr;
+  struct zynjacku_port * port_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
   LOG_DEBUG(
     "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
@@ -1070,6 +1089,23 @@ dynparam_parameter_float_appeared(
     min,
     max,
     parameter_handle);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_ui_context);
+
+  port_ptr = malloc(sizeof(struct zynjacku_port));
+  if (port_ptr == NULL)
+  {
+    LOG_ERROR("malloc() failed.");
+    return;
+  }
+
+  port_ptr->index = 0;
+  port_ptr->flags = 0;
+  port_ptr->ui_context = NULL;
+  port_ptr->midi_cc_map_obj_ptr = NULL;
+  port_ptr->type = PORT_TYPE_DYNPARAM;
+  port_ptr->data.dynparam = parameter_handle;
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->dynparam_ports);
 
   hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
 
@@ -1089,14 +1125,14 @@ dynparam_parameter_float_appeared(
     (gfloat)value,
     (gfloat)min,
     (gfloat)max,
-    zynjacku_plugin_context_to_string(parameter_handle),
-    &ret_obj_ptr);
+    zynjacku_plugin_context_to_string(port_ptr),
+    &port_ptr->ui_context);
 
   LOG_DEBUG("float-appeared signal returned object ptr is %p", ret_obj_ptr);
 
   g_object_unref(hints_obj_ptr);
 
-  *parameter_ui_context = ret_obj_ptr;
+  *parameter_ui_context = port_ptr;
 }
 
 void
@@ -1105,12 +1141,12 @@ zynjacku_plugin_float_set(
   gchar * string_context,
   gfloat value)
 {
-  void * context;
   struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_plugin_context_from_string(string_context);
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
   LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", context);
 
@@ -1118,12 +1154,12 @@ zynjacku_plugin_float_set(
   {
     lv2dynparam_parameter_float_change(
       plugin_ptr->dynparams,
-      (lv2dynparam_host_parameter)context,
+      port_ptr->data.dynparam,
       value);
   }
   else
   {
-    *(float *)context = value;
+    port_ptr->data.parameter.value = value;
   }
 }
 
@@ -1392,4 +1428,71 @@ zynjacku_plugin_set_parameter(
   }
 
   return FALSE;
+}
+
+GObject *
+zynjacku_plugin_get_midi_cc_map(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_plugin_get_midi_cc_map() called, context %p", context);
+
+  if (port_ptr->midi_cc_map_obj_ptr == NULL)
+  {
+    return NULL;
+  }
+
+  return g_object_ref(port_ptr->midi_cc_map_obj_ptr);
+}
+
+void
+zynjacku_plugin_set_midi_cc_map(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context,
+  GObject * midi_cc_map_obj_ptr)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_plugin_set_midi_cc_map() called, context %p", context);
+
+  if (port_ptr->midi_cc_map_obj_ptr != NULL)
+  {
+    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+  }
+
+  port_ptr->midi_cc_map_obj_ptr = g_object_ref(midi_cc_map_obj_ptr);
+}
+
+void
+zynjacku_plugin_remove_midi_cc_map(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_plugin_remove_midi_cc_map() called, context %p", context);
+
+  if (port_ptr->midi_cc_map_obj_ptr != NULL)
+  {
+    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+  }
+
+  port_ptr->midi_cc_map_obj_ptr = NULL;
 }

@@ -35,6 +35,7 @@
 #define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
 #define PORT_TYPE_PARAMETER        4 /* LV2 control rate input port used for synth/effect parameters */
 #define PORT_TYPE_MEASURE          5 /* LV2 control rate output port used for plugin output (leds, meters, etc.) */
+#define PORT_TYPE_DYNPARAM         6
 
 #define PORT_FLAGS_MSGCONTEXT      1 /* uses LV2 message context */
 #define PORT_FLAGS_IS_STRING       2 /* is a string port*/
@@ -58,9 +59,12 @@ struct zynjacku_port
     } parameter;                /* for PORT_TYPE_PARAMETER */
     struct _LV2_String_Data * string;
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
+    lv2dynparam_host_parameter dynparam; /* for PORT_TYPE_DYNPARAM */
   } data;
 
   GObject * ui_context;
+
+  GObject * midi_cc_map_obj_ptr;
 };
 
 #define PLUGIN_TYPE_UNKNOWN  0
@@ -87,6 +91,7 @@ struct zynjacku_plugin
   bool dynparams_supported;
   struct list_head parameter_ports;
   struct list_head measure_ports;
+  struct list_head dynparam_ports;
   lv2dynparam_host_instance dynparams;
   zynjacku_gtk2gui_handle gtk2gui;
   char * id;

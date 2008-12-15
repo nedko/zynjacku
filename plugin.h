@@ -121,6 +121,22 @@ zynjacku_plugin_set_parameter(
   gchar * parameter,
   gchar * value);
 
+GObject *
+zynjacku_plugin_get_midi_cc_map(
+  ZynjackuPlugin * obj_ptr,
+  gchar * parameter_context);
+
+void
+zynjacku_plugin_set_midi_cc_map(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context,
+  GObject * midi_cc_map_obj_ptr);
+
+void
+zynjacku_plugin_remove_midi_cc_map(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context);
+
 G_END_DECLS
 
 #endif /* #ifndef PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */
