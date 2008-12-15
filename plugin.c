@@ -754,7 +754,7 @@ zynjacku_gtk2gui_on_ui_destroyed(
 }
 
 void
-zynjacku_free_plugin_control_ports(
+zynjacku_free_plugin_ports(
   struct zynjacku_plugin * plugin_ptr)
 {
   struct list_head * node_ptr;

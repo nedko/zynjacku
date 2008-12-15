@@ -128,7 +128,7 @@ struct zynjacku_plugin
 #define ZYNJACKU_PLUGIN_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_TYPE, struct zynjacku_plugin))
 
 void
-zynjacku_free_plugin_control_ports(
+zynjacku_free_plugin_ports(
   struct zynjacku_plugin * plugin_ptr);
 
 void

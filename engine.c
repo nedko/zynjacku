@@ -832,7 +832,7 @@ zynjacku_free_synth_ports(
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(plugin_ptr->engine_object_ptr);
 
-  zynjacku_free_plugin_control_ports(plugin_ptr);
+  zynjacku_free_plugin_ports(plugin_ptr);
 
   if (plugin_ptr->type == PLUGIN_TYPE_SYNTH)
   {

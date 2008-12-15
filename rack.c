@@ -649,7 +649,7 @@ zynjacku_free_effect_ports(
 
   LOG_DEBUG("zynjacku_free_effect_ports() called");
 
-  zynjacku_free_plugin_control_ports(plugin_ptr);
+  zynjacku_free_plugin_ports(plugin_ptr);
 
   if (plugin_ptr->type == PLUGIN_TYPE_EFFECT)
   {
