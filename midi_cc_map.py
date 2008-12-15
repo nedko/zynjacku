@@ -26,7 +26,7 @@ except:
     calfwidgets = None
 
 class curve_widget(gtk.DrawingArea):
-    def __init__(self):
+    def __init__(self, min_value, max_value):
         gtk.DrawingArea.__init__(self)
 
         self.connect("expose-event", self.on_expose)
@@ -42,6 +42,9 @@ class curve_widget(gtk.DrawingArea):
 
         self.points = []
         self.full_range = False
+
+        self.min_value = min_value
+        self.max_value = max_value
 
     def add_point(self, cc, adj):
         i = 0
@@ -101,6 +104,21 @@ class curve_widget(gtk.DrawingArea):
     def invalidate_all(self):
         self.queue_draw_area(0, 0, int(self.width), int(self.height))
 
+    def get_x(self, cc_value):
+        x = int(self.margin + cc_value / 127.0 * (self.width - 2 * self.margin))
+        #print "x(%f) -> %u" % (cc_value, x)
+        return x
+
+    def get_y(self, min_value, max_value, value):
+        if max_value == min_value:
+            y = int(self.height / 2)
+        else:
+            v = 1.0 - (value - min_value) / (max_value - min_value)
+            y = int(self.margin + v * (self.height - 2 * self.margin))
+
+        #print "y(%f, [%f, %f]) -> %u" % (value, min_value, max_value, y)
+        return y
+
     def draw(self, cairo_ctx):
         cairo_ctx.set_source_color(self.color_bg)
         cairo_ctx.rectangle(0, 0, self.width, self.height)
@@ -113,11 +131,9 @@ class curve_widget(gtk.DrawingArea):
         if not self.points:
             return
 
-        cairo_ctx.set_source_color(self.color_value)
-
         if self.full_range:
-            min_value = 0.0
-            max_value = 1.0
+            min_value = self.min_value
+            max_value = self.max_value
         else:
             max_value = min_value = self.points[0][1].value
             for point in self.points[1:]:
@@ -126,13 +142,25 @@ class curve_widget(gtk.DrawingArea):
                 elif point[1].value < min_value:
                     min_value = point[1].value
 
+        if min_value <= 0 and max_value >= 0:
+            cairo_ctx.set_source_color(self.color_mark)
+            cairo_ctx.set_line_width(1);
+
+            y = self.get_y(min_value, max_value, 0)
+            x = self.get_x(0)
+            cairo_ctx.move_to(x, y)
+            x = self.get_x(127)
+            cairo_ctx.line_to(x, y)
+
+            cairo_ctx.stroke()
+
+        cairo_ctx.set_source_color(self.color_value)
+        cairo_ctx.set_line_width(2);
+
         prev_point = False
         for point in self.points:
-            x = int(self.margin + float(point[0]) / 127 * (self.width - 2 * self.margin))
-            value = float(point[1].value)
-            value -= min_value
-            value = value / (max_value - min_value)
-            y = int(self.margin + (1.0 - value) * (self.height - 2 * self.margin))
+            x = self.get_x(point[0])
+            y = self.get_y(min_value, max_value, point[1].value)
             #print x, y
             if not prev_point:
                 cairo_ctx.move_to(x, y)
@@ -237,7 +265,7 @@ class midiccmap:
         self.cc_value_change_button.connect("clicked", self.on_button_clicked)
         vbox_left.pack_start(self.cc_value_change_button, False)
 
-        self.curve = curve_widget()
+        self.curve = curve_widget(min_value, max_value)
         self.curve.set_size_request(250,250)
         frame = gtk.Frame()
         frame.set_shadow_type(gtk.SHADOW_ETCHED_OUT)
