@@ -623,7 +623,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         ret = midi_cc_map.midiccmap(map, self.parameter_name, self.adjustment.lower, self.adjustment.upper, self.adjustment.value).run()
         if (not ret and new_map) or ret == "delete":
-            print "removing map"
+            #print "removing map"
             self.window.plugin.remove_midi_cc_map(self.context)
 
         return True
