@@ -87,9 +87,9 @@ class PluginUI(gobject.GObject):
             ()                          # parameter types
         )}
 
-    def __init__(self, synth):
+    def __init__(self, plugin):
         gobject.GObject.__init__(self)
-        self.synth = synth
+        self.plugin = plugin
 
     def show(self):
         '''Show synth window'''
@@ -98,10 +98,10 @@ class PluginUI(gobject.GObject):
         '''Hide synth window'''
 
 class PluginUICustom(PluginUI):
-    def __init__(self, synth):
-        PluginUI.__init__(self, synth)
+    def __init__(self, plugin):
+        PluginUI.__init__(self, plugin)
 
-        self.synth.connect("custom-gui-off", self.on_window_destroy)
+        self.plugin.connect("custom-gui-off", self.on_window_destroy)
 
     def on_window_destroy(self, synth):
         #print "Custom GUI window destroy detected"
@@ -109,12 +109,12 @@ class PluginUICustom(PluginUI):
 
     def show(self):
         '''Show synth window'''
-        return self.synth.ui_on()
+        return self.plugin.ui_on()
 
     def hide(self):
         '''Hide synth window'''
 
-        self.synth.ui_off()
+        self.plugin.ui_off()
 
 class PluginUIUniversalGroup(gobject.GObject):
     def __init__(self, window, parent_group, name, hints, context):
@@ -173,15 +173,15 @@ class PluginUIUniversal(PluginUI):
     layout_type_vertical = 0
     layout_type_horizontal = 1
 
-    def __init__(self, synth, group_shadow_type, layout_type):
-        PluginUI.__init__(self, synth)
+    def __init__(self, plugin, group_shadow_type, layout_type):
+        PluginUI.__init__(self, plugin)
 
         self.group_shadow_type = group_shadow_type
         self.layout_type = layout_type
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_size_request(600,300)
-        self.window.set_title(synth.get_instance_name())
+        self.window.set_title(plugin.get_instance_name())
         self.window.set_role("zynjacku_synth_ui")
 
         self.window.connect("destroy", self.on_window_destroy)
@@ -192,19 +192,19 @@ class PluginUIUniversal(PluginUI):
     def on_window_destroy(self, window):
         if self.ui_enabled:
             self.hide()
-            self.synth.ui_off()
-            self.synth.disconnect(self.enum_disappeared_connect_id)
-            self.synth.disconnect(self.enum_appeared_connect_id)
-            self.synth.disconnect(self.float_disappeared_connect_id)
-            self.synth.disconnect(self.float_appeared_connect_id)
-            self.synth.disconnect(self.bool_disappeared_connect_id)
-            self.synth.disconnect(self.bool_appeared_connect_id)
-            self.synth.disconnect(self.group_disappeared_connect_id)
-            self.synth.disconnect(self.group_appeared_connect_id)
-            self.synth.disconnect(self.int_disappeared_connect_id)
-            self.synth.disconnect(self.int_appeared_connect_id)
+            self.plugin.ui_off()
+            self.plugin.disconnect(self.enum_disappeared_connect_id)
+            self.plugin.disconnect(self.enum_appeared_connect_id)
+            self.plugin.disconnect(self.float_disappeared_connect_id)
+            self.plugin.disconnect(self.float_appeared_connect_id)
+            self.plugin.disconnect(self.bool_disappeared_connect_id)
+            self.plugin.disconnect(self.bool_appeared_connect_id)
+            self.plugin.disconnect(self.group_disappeared_connect_id)
+            self.plugin.disconnect(self.group_appeared_connect_id)
+            self.plugin.disconnect(self.int_disappeared_connect_id)
+            self.plugin.disconnect(self.int_appeared_connect_id)
         else:
-            self.synth.ui_off()
+            self.plugin.ui_off()
 
         self.emit('destroy')
 
@@ -212,18 +212,18 @@ class PluginUIUniversal(PluginUI):
         '''Show synth window'''
 
         if not self.ui_enabled:
-            self.group_appeared_connect_id = self.synth.connect("group-appeared", self.on_group_appeared)
-            self.group_disappeared_connect_id = self.synth.connect("group-disappeared", self.on_group_disappeared)
-            self.bool_appeared_connect_id = self.synth.connect("bool-appeared", self.on_bool_appeared)
-            self.bool_disappeared_connect_id = self.synth.connect("bool-disappeared", self.on_bool_disappeared)
-            self.float_appeared_connect_id = self.synth.connect("float-appeared", self.on_float_appeared)
-            self.float_disappeared_connect_id = self.synth.connect("float-disappeared", self.on_float_disappeared)
-            self.enum_appeared_connect_id = self.synth.connect("enum-appeared", self.on_enum_appeared)
-            self.enum_disappeared_connect_id = self.synth.connect("enum-disappeared", self.on_enum_disappeared)
-            self.int_appeared_connect_id = self.synth.connect("int-appeared", self.on_int_appeared)
-            self.int_disappeared_connect_id = self.synth.connect("int-disappeared", self.on_int_disappeared)
+            self.group_appeared_connect_id = self.plugin.connect("group-appeared", self.on_group_appeared)
+            self.group_disappeared_connect_id = self.plugin.connect("group-disappeared", self.on_group_disappeared)
+            self.bool_appeared_connect_id = self.plugin.connect("bool-appeared", self.on_bool_appeared)
+            self.bool_disappeared_connect_id = self.plugin.connect("bool-disappeared", self.on_bool_disappeared)
+            self.float_appeared_connect_id = self.plugin.connect("float-appeared", self.on_float_appeared)
+            self.float_disappeared_connect_id = self.plugin.connect("float-disappeared", self.on_float_disappeared)
+            self.enum_appeared_connect_id = self.plugin.connect("enum-appeared", self.on_enum_appeared)
+            self.enum_disappeared_connect_id = self.plugin.connect("enum-disappeared", self.on_enum_disappeared)
+            self.int_appeared_connect_id = self.plugin.connect("int-appeared", self.on_int_appeared)
+            self.int_disappeared_connect_id = self.plugin.connect("int-disappeared", self.on_int_disappeared)
 
-            self.synth.ui_on()
+            self.plugin.ui_on()
 
             self.ui_enabled = True
 
@@ -608,7 +608,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         #print "double click on %s" % self.parameter_name
 
-        map = self.window.synth.get_midi_cc_map(self.context)
+        map = self.window.plugin.get_midi_cc_map(self.context)
 
         if not map:
             #print "new map"
@@ -616,20 +616,20 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
             map = zynjacku.MidiCcMap()
             map.point_create(0, self.adjustment.lower)
             map.point_create(127, self.adjustment.upper)
-            self.window.synth.set_midi_cc_map(self.context, map)
+            self.window.plugin.set_midi_cc_map(self.context, map)
         else:
             #print "existing map"
             new_map = False
 
         if not midi_cc_map.midiccmap(map, self.parameter_name, 23, self.adjustment.lower, self.adjustment.upper).run() and new_map:
-            self.window.synth.clear_midi_cc_map(self.context)
+            self.window.plugin.clear_midi_cc_map(self.context)
 
     def get_top_widget(self):
         return self.top
 
     def on_value_changed(self, adjustment):
         #print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
-        self.window.synth.float_set(self.context, adjustment.get_value())
+        self.window.plugin.float_set(self.context, adjustment.get_value())
 
     def set_sensitive(self, sensitive):
         self.knob.set_sensitive(sensitive)
@@ -678,7 +678,7 @@ class PluginUIUniversalParameterInt(PluginUIUniversalParameter):
 
     def on_value_changed(self, adjustment):
         #print "Int changed. \"%s\" set to %d" % (self.parameter_name, int(adjustment.get_value()))
-        self.window.synth.int_set(self.context, int(adjustment.get_value()))
+        self.window.plugin.int_set(self.context, int(adjustment.get_value()))
 
     def set_sensitive(self, sensitive):
         self.knob.set_sensitive(sensitive)
@@ -710,7 +710,7 @@ class PluginUIUniversalParameterBool(PluginUIUniversalParameter):
 
     def on_toggled(self, widget):
         #print "Boolean toggled. \"%s\" set to \"%s\"" % (widget.get_label(), widget.get_active())
-        self.window.synth.bool_set(self.context, widget.get_active())
+        self.window.plugin.bool_set(self.context, widget.get_active())
 
 class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
     def __init__(self, window, parent_group, name, selected_value_index, valid_values, context):
@@ -753,7 +753,7 @@ class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
     def on_changed(self, adjustment):
         #print "Enum changed. \"%s\" set to %u" % (self.parameter_name, adjustment.get_active())
         self.selected_value_index = adjustment.get_active()
-        self.window.synth.enum_set(self.context, self.selected_value_index)
+        self.window.plugin.enum_set(self.context, self.selected_value_index)
         self.emit("zynjacku-parameter-changed")
 
     def get_selection(self):
@@ -1253,39 +1253,39 @@ class ZynjackuHostOne(ZynjackuHost):
         #print "ZynjackuHostOne constructor called."
         ZynjackuHost.__init__(self, client_name)
 
-        self.synth = zynjacku.Plugin(uri=uri)
-        if not self.synth.construct(self.engine):
+        self.plugin = zynjacku.Plugin(uri=uri)
+        if not self.plugin.construct(self.engine):
             print"Failed to construct %s" % uri
-            del(self.synth)
-            self.synth = None
+            del(self.plugin)
+            self.plugin = None
         else:
-            if not ZynjackuHost.plugin_ui_available(self, self.synth):
+            if not ZynjackuHost.plugin_ui_available(self, self.plugin):
                 print"Synth window not available"
-                self.synth.destruct()
-                del(self.synth)
-                self.synth = None
+                self.plugin.destruct()
+                del(self.plugin)
+                self.plugin = None
             else:
-                if not ZynjackuHost.create_plugin_ui(self, self.synth):
+                if not ZynjackuHost.create_plugin_ui(self, self.plugin):
                     print"Failed to create synth window"
-                    self.synth.destruct()
-                    del(self.synth)
-                    self.synth = None
+                    self.plugin.destruct()
+                    del(self.plugin)
+                    self.plugin = None
 
     def on_plugin_ui_window_destroyed(self, window, synth, row):
         gtk.main_quit()
 
     def run(self):
-        if not self.synth:
+        if not self.plugin:
             return
 
-        self.synth.ui_win.show()
+        self.plugin.ui_win.show()
         ZynjackuHost.run(self)
 
     def __del__(self):
         #print "ZynjackuHostOne destructor called."
 
-        if self.synth:
-            self.synth.destruct()
+        if self.plugin:
+            self.plugin.destruct()
 
         ZynjackuHost.__del__(self)
 
