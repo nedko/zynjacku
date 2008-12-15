@@ -159,16 +159,16 @@ class curve_widget(gtk.DrawingArea):
         self.queue_draw_area(0, 0, int(self.width), int(self.height))
 
     def get_x(self, cc_value):
-        x = int(self.margin + cc_value / 127.0 * (self.width - 2 * self.margin))
+        x = self.margin + cc_value / 127.0 * (self.width - 2 * self.margin)
         #print "x(%f) -> %u" % (cc_value, x)
         return x
 
     def get_y(self, min_value, max_value, value):
         if max_value == min_value:
-            y = int(self.height / 2)
+            y = self.height / 2.0
         else:
             v = 1.0 - (value - min_value) / (max_value - min_value)
-            y = int(self.margin + v * (self.height - 2 * self.margin))
+            y = self.margin + v * (self.height - 2 * self.margin)
 
         #print "y(%f, [%f, %f]) -> %u" % (value, min_value, max_value, y)
         return y
@@ -209,7 +209,7 @@ class curve_widget(gtk.DrawingArea):
             cairo_ctx.stroke()
 
         cairo_ctx.set_source_color(self.color_value)
-        cairo_ctx.set_line_width(2);
+        cairo_ctx.set_line_width(1);
 
         prev_point = False
         for point in self.points:
@@ -226,7 +226,7 @@ class curve_widget(gtk.DrawingArea):
 
         pt = self.get_moving_point(min_value, max_value)
         if pt:
-            cairo_ctx.arc(pt[0], pt[1], 5, 0, 2 * pi)
+            cairo_ctx.arc(pt[0], pt[1], 3, 0, 2 * pi)
             cairo_ctx.fill()
 
 class midiccmap:
