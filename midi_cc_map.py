@@ -245,7 +245,7 @@ class midiccmap:
 
         self.window = gtk.Dialog(
             flags=gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
-            buttons=(gtk.STOCK_UNDO, gtk.RESPONSE_NONE, gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT, gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+            buttons=(gtk.STOCK_UNDO, gtk.RESPONSE_NONE, gtk.STOCK_DELETE, gtk.RESPONSE_NO, gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT, gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
 
         # the grand vbox
         vbox = self.window.vbox
@@ -461,12 +461,18 @@ class midiccmap:
         while True:
             ret = self.window.run()
             if ret == gtk.RESPONSE_NONE: # revert/undo button pressed?
+                #print "revert"
                 self.revert_points()
                 continue
-            elif ret == gtk.RESPONSE_REJECT: # cancel button pressed?
+            elif ret == gtk.RESPONSE_REJECT or ret == gtk.RESPONSE_DELETE_EVENT: # cancel button pressed? dialog window closed
+                #print "cancel"
                 self.revert_points()
                 ret = False
+            elif ret == gtk.RESPONSE_NO: # delete button pressed?
+                #print "delete"
+                ret = "delete"
             else:
+                #print "ok"
                 ret = True
 
             self.window.hide_all()
