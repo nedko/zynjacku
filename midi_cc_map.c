@@ -321,18 +321,14 @@ zynjacku_midiccmap_point_create(
   zynjacku_midiccmap_point_created(map_obj_ptr, cc_value, parameter_value);
 }
 
-void
-zynjacku_midiccmap_point_remove(
-  ZynjackuMidiCcMap * map_obj_ptr,
+static
+struct point *
+zynjacku_midiccmap_point_find(
+  struct zynjacku_midi_cc_map * map_ptr,
   guint cc_value)
 {
-  struct zynjacku_midi_cc_map * map_ptr;
   struct list_head * node_ptr;
   struct point * point_ptr;
-
-  LOG_DEBUG("zynjacku_midiccmap_point_remove() called.");
-
-  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
 
   list_for_each(node_ptr, &map_ptr->points)
   {
@@ -340,12 +336,33 @@ zynjacku_midiccmap_point_remove(
 
     if (point_ptr->cc_value == cc_value)
     {
-      zynjacku_midiccmap_point_removed(map_obj_ptr, cc_value);
-      return;
+      return point_ptr;
     }
   }
 
-  LOG_ERROR("cannot find point with cc value of %u", cc_value);
+  return NULL;
+}
+
+void
+zynjacku_midiccmap_point_remove(
+  ZynjackuMidiCcMap * map_obj_ptr,
+  guint cc_value)
+{
+  struct zynjacku_midi_cc_map * map_ptr;
+  struct point * point_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_point_remove() called.");
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  point_ptr = zynjacku_midiccmap_point_find(map_ptr, cc_value);
+  if (point_ptr == NULL)
+  {
+    LOG_ERROR("cannot find point with cc value of %u", cc_value);
+    return;
+  }
+
+  zynjacku_midiccmap_point_removed(map_obj_ptr, cc_value);
 }
 
 void
@@ -354,6 +371,22 @@ zynjacku_midiccmap_point_cc_value_change(
   guint cc_value_old,
   guint cc_value_new)
 {
+  struct zynjacku_midi_cc_map * map_ptr;
+  struct point * point_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_point_cc_value_change() called.");
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  point_ptr = zynjacku_midiccmap_point_find(map_ptr, cc_value_old);
+  if (point_ptr == NULL)
+  {
+    LOG_ERROR("cannot find point with cc value of %u", cc_value_old);
+    return;
+  }
+
+  point_ptr->cc_value = cc_value_new;
+
   zynjacku_midiccmap_point_cc_changed(map_obj_ptr, cc_value_old, cc_value_new);
 }
 
@@ -363,5 +396,21 @@ zynjacku_midiccmap_point_parameter_value_change(
   guint cc_value,
   gfloat parameter_value)
 {
+  struct zynjacku_midi_cc_map * map_ptr;
+  struct point * point_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_point_parameter_value_change() called.");
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  point_ptr = zynjacku_midiccmap_point_find(map_ptr, cc_value);
+  if (point_ptr == NULL)
+  {
+    LOG_ERROR("cannot find point with cc value of %u", cc_value);
+    return;
+  }
+
+  point_ptr->parameter_value = parameter_value;
+
   zynjacku_midiccmap_point_value_changed(map_obj_ptr, cc_value, parameter_value);
 }

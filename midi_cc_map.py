@@ -349,9 +349,11 @@ class midiccmap:
 
     def revert_points(self):
         path = self.ls.get_path(self.current_row)
-        self.ls.clear()
+        for row in self.ls:
+            self.map.point_remove(int(row[0]))
+        
         for point in self.points:
-            self.new_point(point[0], point[1])
+            self.map.point_create(point[0], point[1])
         if path[0] >= len(self.ls):
             path = (len(self.ls) - 1,)
         self.tv.get_selection().select_path(path)
