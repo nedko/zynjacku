@@ -79,6 +79,8 @@ zynjacku_c_la_SOURCES += lv2_event_helpers.h
 zynjacku_c_la_SOURCES += lv2_uri_map.h
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
+zynjacku_c_la_SOURCES += midi_cc_map.c
+zynjacku_c_la_SOURCES += midi_cc_map.h
 
 #nodist_zynjacku_la_SOURCES = 
 
@@ -86,7 +88,7 @@ zynjacku_c_la_SOURCES += rtmempool.h
 PYGTK_DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 PYGTK_CODEGEN=`pkg-config --variable=codegendir pygtk-2.0`
 
-zynjacku.defs: engine.h rack.h plugin.h enum.h hints.h
+zynjacku.defs: engine.h rack.h plugin.h enum.h hints.h midi_cc_map.h
 	python $(PYGTK_CODEGEN)/h2def.py $^ > $@
 
 # Generate the C wrapper from the defs and our override file

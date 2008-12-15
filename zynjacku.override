@@ -10,6 +10,7 @@ headers
 #include "rack.h"
 #include "enum.h"
 #include "hints.h"
+#include "midi_cc_map.h"
 %%
 modulename zynjacku_c
 %%
