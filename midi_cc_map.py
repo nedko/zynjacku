@@ -230,7 +230,7 @@ class curve_widget(gtk.DrawingArea):
             cairo_ctx.fill()
 
 class midiccmap:
-    def __init__(self, map, parameter_name, cc_no, min_value=0.0, max_value=1.0, value=0.5):
+    def __init__(self, map, parameter_name, min_value=0.0, max_value=1.0, value=0.5):
         self.parameter_name = parameter_name
         self.min_value = min_value
         self.max_value = max_value
@@ -260,7 +260,7 @@ class midiccmap:
         align.add(hbox_top)
         vbox.pack_start(align, False)
 
-        self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
+        self.adj_cc_no = gtk.Adjustment(-1, -1, 127, 1, 19)
         self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
         cc_no = gtk.SpinButton(self.adj_cc_no, 0.0, 0)
         cc_no_box = gtk.HBox()
@@ -473,7 +473,11 @@ class midiccmap:
             return ret
 
     def set_title(self):
-        self.window.set_title('Parameter "%s" MIDI CC #%u map' % (self.parameter_name, int(self.adj_cc_no.value)))
+        title = 'Parameter "%s" MIDI CC' % self.parameter_name
+        if self.adj_cc_no.value >= 0:
+            title += " #%u" % int(self.adj_cc_no.value)
+        title += ' map'
+        self.window.set_title(title)
 
     def on_set_full_range(self, button, full_range):
         self.curve.set_full_range(full_range)
@@ -481,6 +485,9 @@ class midiccmap:
 
     def on_cc_no_changed(self, adj):
         self.set_title()
+        if int(adj.value) != -1 and int(adj.lower) == -1:
+            adj.lower = 0
+        self.map.cc_no_assign(int(adj.value));
 
     def on_value_change_request(self, adj):
         #print "on_value_change_request() called. value = %f" % adj.value
@@ -568,4 +575,4 @@ if __name__ == '__main__':
     for point in values_flat:
         map.point_create(point[0], point[1])
 
-    midiccmap(map, "Modulation", 23, 0, 1, 0.5).run()
+    midiccmap(map, "Modulation", 0, 1, 0.5).run()

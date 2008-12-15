@@ -480,3 +480,26 @@ zynjacku_midiccmap_point_midi_cc(
       cc_value);
   }
 }
+
+void
+zynjacku_midiccmap_cc_no_assign(
+  ZynjackuMidiCcMap * map_obj_ptr,
+  guint cc_no)
+{
+  struct zynjacku_midi_cc_map * map_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_cc_no_assign(%u) called.", cc_no);
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  if (map_ptr->cc_no != cc_no)
+  {
+    map_ptr->cc_no = cc_no;
+
+    g_signal_emit(
+      map_obj_ptr,
+      g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED],
+      0,
+      cc_no);
+  }
+}

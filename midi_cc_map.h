@@ -77,6 +77,11 @@ zynjacku_midiccmap_point_parameter_value_change(
   guint cc_value,
   gfloat parameter_value);
 
+void
+zynjacku_midiccmap_cc_no_assign(
+  ZynjackuMidiCcMap * map_obj_ptr,
+  guint cc_no);
+
 G_END_DECLS
 
 #endif /* #ifndef MIDI_CC_MAP_H__CD0E5008_4B6A_4003_BF06_3F6FC6475FDF__INCLUDED */
