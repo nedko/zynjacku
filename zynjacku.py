@@ -396,8 +396,7 @@ class midiccmap:
         self.value_spin = gtk.SpinButton(digits=2)
         hbox_bottom.pack_start(self.value_spin, False)
 
-        self.floating_adj = gtk.Adjustment(value, self.min_value, self.max_value, 0.01, 0.2)
-        self.floating_adj.connect("value-changed", self.on_value_change_request)
+        self.floating_adj = self.create_value_adjustment(value)
         self.smart_point_creation_enabled = True
         self.value_adj = None
 
@@ -412,6 +411,12 @@ class midiccmap:
 
         self.set_title()
 
+    def create_value_adjustment(self, value):
+        range = self.max_value - self.min_value
+        adj = gtk.Adjustment(value, self.min_value, self.max_value, range / 100, range / 5)
+        adj.connect("value-changed", self.on_value_change_request)
+        return adj
+
     def on_point_created(self, map, cc_value, parameter_value):
         #print "on_point_created(%u, %f)" % (cc_value, parameter_value)
 
@@ -422,10 +427,9 @@ class midiccmap:
                 break
             prev_iter = row.iter
         
-        adj = gtk.Adjustment(parameter_value, self.min_value, self.max_value, 0.01, 0.2)
+        adj = self.create_value_adjustment(parameter_value)
         self.curve.add_point(cc_value, adj)
         iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, cc_value == 0 or cc_value == 127, "->"])
-        adj.connect("value-changed", self.on_value_change_request)
         self.update_point_value(iter, parameter_value)
 
         if self.initial_points:
