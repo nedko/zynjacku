@@ -396,6 +396,11 @@ class midiccmap:
         self.value_spin = gtk.SpinButton(digits=2)
         hbox_bottom.pack_start(self.value_spin, False)
 
+        self.floating_adj = gtk.Adjustment(value, self.min_value, self.max_value, 0.01, 0.2)
+        self.floating_adj.connect("value-changed", self.on_value_change_request)
+        self.smart_point_creation_enabled = True
+        self.value_adj = None
+
         self.initial_points = True
         self.points = []
         self.map.get_points()
@@ -427,6 +432,7 @@ class midiccmap:
             self.points.append([cc_value, parameter_value])
 
         self.tv.get_selection().select_iter(iter)
+        self.set_value_adjustment(adj)
         self.curve.invalidate_all()
 
     def on_point_removed(self, map, cc_value):
@@ -464,6 +470,8 @@ class midiccmap:
         for row in self.ls:
             if int(row[0]) == cc_value_old:
                 row[0] = cc_value_new
+                self.set_value_adjustment(row[2])
+        self.curve.set_moving_point_cc(cc_value_new, self.map_cc_value(cc_value_new))
 
     def on_point_value_changed(self, map, cc_value, parameter_value):
         #print "on_point_value_changed(%u, %f)" % (cc_value, parameter_value)
@@ -561,7 +569,8 @@ class midiccmap:
 
         #print "not found"
         #self.curve.set_moving_point_cc(cc_value, adj.value)
-        self.map.point_create(cc_value, adj.value)
+        if self.smart_point_creation_enabled:
+            self.map.point_create(cc_value, adj.value)
 
     def update_point_value(self, iter, value):
         self.ls[iter][1] = "%.2f" % value
@@ -586,6 +595,7 @@ class midiccmap:
         #self.on_cc_value_changed(row[2])
 
     def on_cc_value_changed(self, adj):
+        #print "on_cc_value_changed"
         cc_value = int(adj.value)
         parameter_value = self.map_cc_value(cc_value)
         self.curve.set_moving_point_cc(cc_value, parameter_value)
@@ -598,11 +608,21 @@ class midiccmap:
         self.cc_value_new_button.set_sensitive(True)
         self.cc_value_change_button.set_sensitive(not self.current_immutable)
 
-        adj = gtk.Adjustment(parameter_value, self.min_value, self.max_value, 0.01, 0.2)
-        adj.connect("value-changed", self.on_value_change_request)
-        self.set_value_adjustment(adj)
+        self.set_value_adjustment(self.floating_adj)
+        self.smart_point_creation_enabled = False
+        self.floating_adj.value = parameter_value
+        self.smart_point_creation_enabled = True
 
     def set_value_adjustment(self, adj):
+        #print "set_value_adjustment"
+        if self.value_adj == adj:
+            return
+
+        #if adj == self.floating_adj:
+        #    print "floating adjustment"
+        #else:
+        #    print "point adjustment"
+
         self.value_adj = adj
         if self.value_knob:
             self.value_knob.set_adjustment(adj)
