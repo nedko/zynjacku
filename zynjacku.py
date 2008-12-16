@@ -132,30 +132,15 @@ class curve_widget(gtk.DrawingArea):
         self.add_point(cc_value_new, adj)
         self.invalidate_all()
 
-    def set_moving_point_cc(self, cc_value):
+    def set_moving_point_cc(self, cc_value, parameter_value):
         self.moving_point_cc = cc_value
+        self.moving_point_value = parameter_value
         self.invalidate_all()
 
     def get_moving_point(self, min_value, max_value):
         if self.moving_point_cc >= 0:
             x = self.get_x(self.moving_point_cc)
-
-            prev_point = self.points[0]
-            for point in self.points:
-                if point[0] == self.moving_point_cc:
-                    y3 = point[1].value
-                    break
-                elif point[0] > self.moving_point_cc:
-                    x1 = float(prev_point[0])
-                    y1 = prev_point[1].value
-                    x2 = float(point[0])
-                    y2 = point[1].value
-                    x3 = float(self.moving_point_cc)
-                    y3 = y1 + ((x3 - x1) * (y2 - y1) / (x2 - x1))
-                    break
-                prev_point = point
-
-            y = self.get_y(min_value, max_value, y3)
+            y = self.get_y(min_value, max_value, self.moving_point_value)
 
             return x, y
 
@@ -436,7 +421,7 @@ class midiccmap:
         self.curve.add_point(cc_value, adj)
         iter = self.ls.insert_after(prev_iter, [str(cc_value), "", adj, cc_value == 0 or cc_value == 127, "->"])
         adj.connect("value-changed", self.on_value_change_request)
-        self.on_value_changed(iter, parameter_value)
+        self.update_point_value(iter, parameter_value)
 
         if self.initial_points:
             self.points.append([cc_value, parameter_value])
@@ -484,7 +469,8 @@ class midiccmap:
         #print "on_point_value_changed(%u, %f)" % (cc_value, parameter_value)
         for row in self.ls:
             if int(row[0]) == cc_value:
-                self.on_value_changed(row.iter, parameter_value)
+                self.update_point_value(row.iter, parameter_value)
+                self.curve.invalidate_all()
 
     def on_cc_no_assigned(self, map, cc_no):
         #print "on_cc_no_assigned(%u)" % cc_no
@@ -493,7 +479,24 @@ class midiccmap:
     def on_cc_map_value_changed(self, map, cc_value):
         #print "on_cc_map_value_changed(%u)" % cc_value
         self.adj_cc_value.value = cc_value
-        self.curve.set_moving_point_cc(cc_value)
+
+    def map_cc_value(self, cc_value):
+        if len(self.ls) < 2:
+            return None
+        row = self.ls[0]
+        x1 = float(row[0])
+        y1 = row[2].value
+        x3 = float(cc_value)
+        for row in self.ls:
+            x2 = float(row[0])
+            y2 = row[2].value
+            if int(x2) == cc_value:
+                return y2
+            if int(x2) > cc_value:
+                return y1 + ((x3 - x1) * (y2 - y1) / (x2 - x1))
+            x1 = x2
+            y1 = y2
+        return None
 
     def revert_points(self):
         path = self.ls.get_path(self.current_row)
@@ -537,7 +540,6 @@ class midiccmap:
 
     def on_set_full_range(self, button, full_range):
         self.curve.set_full_range(full_range)
-        self.curve.invalidate_all()
 
     def on_cc_no_changed(self, adj):
         self.set_title()
@@ -548,17 +550,21 @@ class midiccmap:
     def on_value_change_request(self, adj):
         #print "on_value_change_request() called. value = %f" % adj.value
 
+        cc_value = int(self.adj_cc_value.value)
+
         for row in self.ls:
             if row[2] == adj:
                 #print "found"
                 self.map.point_parameter_value_change(int(row[0]), adj.value)
+                self.curve.set_moving_point_cc(cc_value, self.map_cc_value(cc_value))
                 return
 
         #print "not found"
+        #self.curve.set_moving_point_cc(cc_value, adj.value)
+        self.map.point_create(cc_value, adj.value)
 
-    def on_value_changed(self, iter, value):
+    def update_point_value(self, iter, value):
         self.ls[iter][1] = "%.2f" % value
-        self.curve.invalidate_all()
 
     def on_selection_changed(self, obj):
         iter = self.tv.get_selection().get_selected()[1]
@@ -574,15 +580,15 @@ class midiccmap:
         self.cc_value_delete_button.set_sensitive(not immutable)
         self.current_immutable = immutable
 
-        if self.value_knob:
-            self.value_knob.set_adjustment(row[2])
-        self.value_spin.set_adjustment(row[2])
-        self.value_spin.set_value(row[2].value)
+        self.set_value_adjustment(row[2])
         self.cc_value.set_value(int(row[0]))
 
-        self.on_cc_value_changed(row[2])
+        #self.on_cc_value_changed(row[2])
 
     def on_cc_value_changed(self, adj):
+        cc_value = int(adj.value)
+        parameter_value = self.map_cc_value(cc_value)
+        self.curve.set_moving_point_cc(cc_value, parameter_value)
         for row in self.ls:
             #print "%s ?= %s" % (row[0], int(adj.value))
             if int(row[0]) == int(adj.value):
@@ -592,13 +598,24 @@ class midiccmap:
         self.cc_value_new_button.set_sensitive(True)
         self.cc_value_change_button.set_sensitive(not self.current_immutable)
 
+        adj = gtk.Adjustment(parameter_value, self.min_value, self.max_value, 0.01, 0.2)
+        adj.connect("value-changed", self.on_value_change_request)
+        self.set_value_adjustment(adj)
+
+    def set_value_adjustment(self, adj):
+        self.value_adj = adj
+        if self.value_knob:
+            self.value_knob.set_adjustment(adj)
+        self.value_spin.set_adjustment(adj)
+        self.value_spin.set_value(adj.value)
+
     def on_button_clicked(self, button):
         if button == self.cc_value_change_button:
             #print "change cc value"
             self.map.point_cc_value_change(int(self.ls[self.current_row][0]), int(self.adj_cc_value.value))
         elif button == self.cc_value_new_button:
             #print "new cc value"
-            self.map.point_create(int(self.adj_cc_value.value), self.ls[self.current_row][2].value)
+            self.map.point_create(int(self.adj_cc_value.value), self.value_adj.value)
         elif button == self.cc_value_delete_button:
             #print "delete cc value"
             self.map.point_remove(int(self.ls[self.current_row][0]))
