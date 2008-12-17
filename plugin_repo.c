@@ -796,7 +796,7 @@ zynjacku_plugin_repo_create_port_internal(
     {
       int i;
       
-      port_ptr->type = PORT_TYPE_PARAMETER;
+      port_ptr->type = PORT_TYPE_LV2_FLOAT_PARAM;
 
       /* port symbol */
       port_ptr->symbol = strdup(symbol_str);

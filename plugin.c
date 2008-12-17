@@ -766,7 +766,7 @@ zynjacku_free_plugin_ports(
     node_ptr = plugin_ptr->parameter_ports.next;
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-    assert(port_ptr->type == PORT_TYPE_PARAMETER);
+    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT_PARAM);
 
     list_del(node_ptr);
 
@@ -871,7 +871,7 @@ zynjacku_plugin_destruct(
 }
 
 void
-dynparam_group_appeared(
+dynparam_ui_group_appeared(
   lv2dynparam_host_group group_handle,
   void * instance_ui_context,
   void * parent_group_ui_context,
@@ -913,7 +913,7 @@ dynparam_group_appeared(
 }
 
 void
-dynparam_group_disappeared(
+dynparam_ui_group_disappeared(
   void * instance_ui_context,
   void * parent_group_ui_context,
   void * group_ui_context)
@@ -930,168 +930,15 @@ dynparam_group_disappeared(
 }
 
 void
-dynparam_parameter_boolean_disappeared(
-  void * instance_ui_context,
-  void * parent_group_ui_context,
-  void * parameter_ui_context)
-{
-  LOG_DEBUG("dynparam_parameter_boolean_disappeared() called.");
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED],
-    0,
-    parameter_ui_context);
-
-  g_object_unref(parameter_ui_context);
-}
-
-void
-dynparam_parameter_float_disappeared(
-  void * instance_ui_context,
-  void * parent_group_ui_context,
-  void * parameter_ui_context)
-{
-  struct zynjacku_port * port_ptr;
-
-  LOG_DEBUG("dynparam_parameter_float_disappeared() called.");
-
-  port_ptr = (struct zynjacku_port *)parameter_ui_context;
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED],
-    0,
-    port_ptr->ui_context);
-
-  g_object_unref(port_ptr->ui_context);
-}
-
-void
-dynparam_parameter_enum_disappeared(
-  void * instance_ui_context,
-  void * parent_group_ui_context,
-  void * parameter_ui_context)
-{
-  LOG_DEBUG("dynparam_parameter_enum_disappeared() called.");
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED],
-    0,
-    parameter_ui_context);
-
-  g_object_unref(parameter_ui_context);
-}
-
-void
-dynparam_parameter_int_disappeared(
-  void * instance_ui_context,
-  void * parent_group_ui_context,
-  void * parameter_ui_context)
-{
-  LOG_DEBUG("dynparam_parameter_int_disappeared() called.");
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED],
-    0,
-    parameter_ui_context);
-
-  g_object_unref(parameter_ui_context);
-}
-
-void
-dynparam_parameter_boolean_appeared(
+zynjacku_plugin_dynparam_parameter_created(
+  void * instance_context,
   lv2dynparam_host_parameter parameter_handle,
-  void * instance_ui_context,
-  void * group_ui_context,
-  const char * parameter_name,
-  const struct lv2dynparam_hints * hints_ptr,
-  bool value,
-  void ** parameter_ui_context)
+  void ** parameter_context_ptr)
 {
-  GObject * ret_obj_ptr;
-  ZynjackuHints * hints_obj_ptr;
-
-  LOG_DEBUG(
-    "Boolean parameter \"%s\" appeared, value %s, handle %p",
-    parameter_name,
-    value ? "TRUE" : "FALSE",
-    parameter_handle);
-
-  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
-
-  zynjacku_hints_set(
-    hints_obj_ptr,
-    hints_ptr->count,
-    (const gchar * const *)hints_ptr->names,
-    (const gchar * const *)hints_ptr->values);
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED],
-    0,
-    group_ui_context,
-    parameter_name,
-    hints_obj_ptr,
-    (gboolean)value,
-    zynjacku_plugin_context_to_string(parameter_handle),
-    &ret_obj_ptr);
-
-  LOG_DEBUG("bool-appeared signal returned object ptr is %p", ret_obj_ptr);
-
-  g_object_unref(hints_obj_ptr);
-
-  *parameter_ui_context = ret_obj_ptr;
-}
-
-void
-zynjacku_plugin_bool_set(
-  ZynjackuPlugin * plugin_obj_ptr,
-  gchar * string_context,
-  gboolean value)
-{
-  void * context;
-  struct zynjacku_plugin * plugin_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-
-  context = zynjacku_plugin_context_from_string(string_context);
-
-  LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", context);
-
-  lv2dynparam_parameter_boolean_change(
-    plugin_ptr->dynparams,
-    (lv2dynparam_host_parameter)context,
-    value);
-}
-
-void
-dynparam_parameter_float_appeared(
-  lv2dynparam_host_parameter parameter_handle,
-  void * instance_ui_context,
-  void * group_ui_context,
-  const char * parameter_name,
-  const struct lv2dynparam_hints * hints_ptr,
-  float value,
-  float min,
-  float max,
-  void ** parameter_ui_context)
-{
-  ZynjackuHints * hints_obj_ptr;
   struct zynjacku_port * port_ptr;
   struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG(
-    "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
-    parameter_name,
-    value,
-    min,
-    max,
-    parameter_handle);
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_ui_context);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_context);
 
   port_ptr = malloc(sizeof(struct zynjacku_port));
   if (port_ptr == NULL)
@@ -1108,6 +955,123 @@ dynparam_parameter_float_appeared(
   port_ptr->data.dynparam = parameter_handle;
   list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->dynparam_ports);
 
+  *parameter_context_ptr = port_ptr;
+}
+
+#define port_ptr ((struct zynjacku_port *)parameter_context)
+
+void
+zynjacku_plugin_dynparam_parameter_destroying(
+  void * instance_context,
+  void * parameter_context)
+{
+    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+
+    list_del(&port_ptr->plugin_siblings);
+
+    free(port_ptr);
+}
+
+void
+dynparam_ui_parameter_disappeared(
+  void * instance_ui_context,
+  void * parent_group_ui_context,
+  unsigned int parameter_type,
+  void * parameter_context,
+  void * parameter_ui_context)
+{
+  unsigned int signal_index;
+
+  LOG_DEBUG("dynparam_parameter_disappeared() called.");
+
+  switch (parameter_type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+    signal_index = ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED;
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    signal_index = ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED;
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_ENUM:
+    signal_index = ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED;
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_INT:
+    signal_index = ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED;
+    break;
+  default:
+    return;
+  }
+
+  g_signal_emit(
+    (ZynjackuPlugin *)instance_ui_context,
+    g_zynjacku_plugin_signals[signal_index],
+    0,
+    port_ptr->ui_context);
+
+  g_object_unref(port_ptr->ui_context);
+}
+
+void
+dynparam_ui_parameter_appeared(
+  lv2dynparam_host_parameter parameter_handle,
+  void * instance_ui_context,
+  void * group_ui_context,
+  unsigned int parameter_type,
+  const char * parameter_name,
+  const struct lv2dynparam_hints * hints_ptr,
+  union lv2dynparam_host_parameter_value value,
+  union lv2dynparam_host_parameter_range range,
+  void * parameter_context,
+  void ** parameter_ui_context)
+{
+  GObject * ret_obj_ptr;
+  ZynjackuHints * hints_obj_ptr;
+  unsigned int i;
+  ZynjackuEnum * enum_ptr;
+
+  switch (parameter_type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+    LOG_DEBUG(
+      "Boolean parameter \"%s\" appeared, value %s, handle %p",
+      parameter_name,
+      value.boolean ? "TRUE" : "FALSE",
+      parameter_handle);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    LOG_DEBUG(
+      "Float parameter \"%s\" appeared, value %f, min %f, max %f, handle %p",
+      parameter_name,
+      value.fpoint,
+      range.fpoint.min,
+      range.fpoint.max,
+      parameter_handle);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_ENUM:
+    LOG_DEBUG(
+      "Enum parameter \"%s\" appeared, %u possible values, handle %p",
+      parameter_name,
+      range.enumeration.values_count,
+      parameter_handle);
+
+    for (i = 0 ; i < range.enumeration.values_count ; i++)
+    {
+      LOG_DEBUG("\"%s\"%s", range.enumeration.values[i], value.enum_selected_index == i ? " [SELECTED]" : "");
+    }
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_INT:
+    break;
+    LOG_DEBUG(
+      "Integer parameter \"%s\" appeared, value %d, min %d, max %d, handle %p",
+      parameter_name,
+      value.integer,
+      range.integer.min,
+      range.integer.max,
+      parameter_handle);
+  default:
+    return;
+  }
+
   hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
 
   zynjacku_hints_set(
@@ -1116,24 +1080,100 @@ dynparam_parameter_float_appeared(
     (const gchar * const *)hints_ptr->names,
     (const gchar * const *)hints_ptr->values);
 
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
-    0,
-    group_ui_context,
-    parameter_name,
-    hints_obj_ptr,
-    (gfloat)value,
-    (gfloat)min,
-    (gfloat)max,
-    zynjacku_plugin_context_to_string(port_ptr),
-    &port_ptr->ui_context);
+  switch (parameter_type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+    g_signal_emit(
+      (ZynjackuPlugin *)instance_ui_context,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED],
+      0,
+      group_ui_context,
+      parameter_name,
+      hints_obj_ptr,
+      (gboolean)value.boolean,
+      zynjacku_plugin_context_to_string(parameter_handle),
+      &ret_obj_ptr);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    g_signal_emit(
+      (ZynjackuPlugin *)instance_ui_context,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
+      0,
+      group_ui_context,
+      parameter_name,
+      hints_obj_ptr,
+      (gfloat)value.fpoint,
+      (gfloat)range.fpoint.min,
+      (gfloat)range.fpoint.max,
+      zynjacku_plugin_context_to_string(parameter_handle),
+      &ret_obj_ptr);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_ENUM:
+    enum_ptr = g_object_new(ZYNJACKU_ENUM_TYPE, NULL);
 
-  LOG_DEBUG("float-appeared signal returned object ptr is %p", ret_obj_ptr);
+    zynjacku_enum_set(enum_ptr, (const gchar * const *)range.enumeration.values, range.enumeration.values_count);
+
+    g_signal_emit(
+      (ZynjackuPlugin *)instance_ui_context,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED],
+      0,
+      group_ui_context,
+      parameter_name,
+      hints_obj_ptr,
+      (guint)value.enum_selected_index,
+      enum_ptr,
+      zynjacku_plugin_context_to_string(parameter_handle),
+      &ret_obj_ptr);
+
+    g_object_unref(enum_ptr);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_INT:
+    g_signal_emit(
+      (ZynjackuPlugin *)instance_ui_context,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED],
+      0,
+      group_ui_context,
+      parameter_name,
+      hints_obj_ptr,
+      (gint)value.integer,
+      (gint)range.integer.min,
+      (gint)range.integer.max,
+      zynjacku_plugin_context_to_string(parameter_handle),
+      &ret_obj_ptr);
+    break;
+  }
+
+  LOG_DEBUG("parameter appeared signal returned object ptr is %p", ret_obj_ptr);
 
   g_object_unref(hints_obj_ptr);
 
-  *parameter_ui_context = port_ptr;
+  port_ptr->ui_context = ret_obj_ptr;
+  *parameter_ui_context = NULL;
+}
+
+#undef port_ptr
+
+void
+zynjacku_plugin_bool_set(
+  ZynjackuPlugin * plugin_obj_ptr,
+  gchar * string_context,
+  gboolean value)
+{
+  void * context;
+  struct zynjacku_plugin * plugin_ptr;
+  union lv2dynparam_host_parameter_value dynparam_value;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  context = zynjacku_plugin_context_from_string(string_context);
+
+  LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", context);
+
+  dynparam_value.boolean = value;
+  lv2dynparam_parameter_change(
+    plugin_ptr->dynparams,
+    (lv2dynparam_host_parameter)context,
+    dynparam_value);
 }
 
 void
@@ -1144,85 +1184,26 @@ zynjacku_plugin_float_set(
 {
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
+  //union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", context);
+  //LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", port_ptr);
 
   if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_parameter_float_change(
-      plugin_ptr->dynparams,
-      port_ptr->data.dynparam,
-      value);
+/*     dynparam_value.fpoint = value; */
+/*     lv2dynparam_parameter_change( */
+/*       plugin_ptr->dynparams, */
+/*       port_ptr->data.dynparam, */
+/*       dynparam_value); */
   }
   else
   {
     port_ptr->data.parameter.value = value;
   }
-}
-
-void
-dynparam_parameter_enum_appeared(
-  lv2dynparam_host_parameter parameter_handle,
-  void * instance_ui_context,
-  void * group_ui_context,
-  const char * parameter_name,
-  const struct lv2dynparam_hints * hints_ptr,
-  unsigned int selected_value,
-  const char * const * values,
-  unsigned int values_count,
-  void ** parameter_ui_context)
-{
-  unsigned int i;
-  GObject * ret_obj_ptr;
-  ZynjackuEnum * enum_ptr;
-  ZynjackuHints * hints_obj_ptr;
-
-  LOG_DEBUG(
-    "Enum parameter \"%s\" appeared, %u possible values, handle %p",
-    parameter_name,
-    values_count,
-    parameter_handle);
-
-  for (i = 0 ; i < values_count ; i++)
-  {
-    LOG_DEBUG("\"%s\"%s", values[i], selected_value == i ? " [SELECTED]" : "");
-  }
-
-  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
-
-  zynjacku_hints_set(
-    hints_obj_ptr,
-    hints_ptr->count,
-    (const gchar * const *)hints_ptr->names,
-    (const gchar * const *)hints_ptr->values);
-
-  enum_ptr = g_object_new(ZYNJACKU_ENUM_TYPE, NULL);
-
-  zynjacku_enum_set(enum_ptr, values, values_count);
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED],
-    0,
-    group_ui_context,
-    parameter_name,
-    hints_obj_ptr,
-    (guint)selected_value,
-    enum_ptr,
-    zynjacku_plugin_context_to_string(parameter_handle),
-    &ret_obj_ptr);
-
-  LOG_DEBUG("enum-appeared signal returned object ptr is %p", ret_obj_ptr);
-
-  g_object_unref(hints_obj_ptr);
-
-  g_object_unref(enum_ptr);
-
-  *parameter_ui_context = ret_obj_ptr;
 }
 
 void
@@ -1233,6 +1214,7 @@ zynjacku_plugin_enum_set(
 {
   void * context;
   struct zynjacku_plugin * plugin_ptr;
+  union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
@@ -1242,62 +1224,12 @@ zynjacku_plugin_enum_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_parameter_enum_change(
+    dynparam_value.enum_selected_index = value;
+    lv2dynparam_parameter_change(
       plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
-      value);
+      dynparam_value);
   }
-}
-
-void
-dynparam_parameter_int_appeared(
-  lv2dynparam_host_parameter parameter_handle,
-  void * instance_ui_context,
-  void * group_ui_context,
-  const char * parameter_name,
-  const struct lv2dynparam_hints * hints_ptr,
-  signed int value,
-  signed int min,
-  signed int max,
-  void ** parameter_ui_context)
-{
-  GObject * ret_obj_ptr;
-  ZynjackuHints * hints_obj_ptr;
-
-  LOG_DEBUG(
-    "Integer parameter \"%s\" appeared, value %d, min %d, max %d, handle %p",
-    parameter_name,
-    value,
-    min,
-    max,
-    parameter_handle);
-
-  hints_obj_ptr = g_object_new(ZYNJACKU_HINTS_TYPE, NULL);
-
-  zynjacku_hints_set(
-    hints_obj_ptr,
-    hints_ptr->count,
-    (const gchar * const *)hints_ptr->names,
-    (const gchar * const *)hints_ptr->values);
-
-  g_signal_emit(
-    (ZynjackuPlugin *)instance_ui_context,
-    g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED],
-    0,
-    group_ui_context,
-    parameter_name,
-    hints_obj_ptr,
-    (gint)value,
-    (gint)min,
-    (gint)max,
-    zynjacku_plugin_context_to_string(parameter_handle),
-    &ret_obj_ptr);
-
-  LOG_DEBUG("int-appeared signal returned object ptr is %p", ret_obj_ptr);
-
-  g_object_unref(hints_obj_ptr);
-
-  *parameter_ui_context = ret_obj_ptr;
 }
 
 void
@@ -1308,6 +1240,7 @@ zynjacku_plugin_int_set(
 {
   void * context;
   struct zynjacku_plugin * plugin_ptr;
+  union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
@@ -1317,10 +1250,11 @@ zynjacku_plugin_int_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_parameter_int_change(
+    dynparam_value.integer = value;
+    lv2dynparam_parameter_change(
       plugin_ptr->dynparams,
       (lv2dynparam_host_parameter)context,
-      value);
+      dynparam_value);
   }
 }
 
@@ -1443,7 +1377,7 @@ zynjacku_plugin_get_midi_cc_map(
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_get_midi_cc_map() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_get_midi_cc_map() called, context %p", port_ptr);
 
   if (port_ptr->midi_cc_map_obj_ptr == NULL)
   {
@@ -1466,7 +1400,7 @@ zynjacku_plugin_set_midi_cc_map(
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_set_midi_cc_map() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_set_midi_cc_map() called, context %p", port_ptr);
 
   if (port_ptr->midi_cc_map_obj_ptr != NULL)
   {
@@ -1488,7 +1422,7 @@ zynjacku_plugin_remove_midi_cc_map(
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_remove_midi_cc_map() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_remove_midi_cc_map() called, context %p", port_ptr);
 
   if (port_ptr->midi_cc_map_obj_ptr != NULL)
   {

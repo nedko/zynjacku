@@ -33,7 +33,7 @@
 #define PORT_TYPE_AUDIO            1 /* LV2 audio out port */
 #define PORT_TYPE_MIDI             2 /* LV2 midi in port */
 #define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
-#define PORT_TYPE_PARAMETER        4 /* LV2 control rate input port used for synth/effect parameters */
+#define PORT_TYPE_LV2_FLOAT_PARAM  4 /* LV2 control rate input port used for synth/effect parameters */
 #define PORT_TYPE_MEASURE          5 /* LV2 control rate output port used for plugin output (leds, meters, etc.) */
 #define PORT_TYPE_DYNPARAM         6
 
@@ -47,8 +47,8 @@ struct zynjacku_port
   unsigned int type;            /* one of PORT_TYPE_XXX */
   unsigned int flags;
   uint32_t index;               /* LV2 port index within owning plugin */
-  char * symbol;                /* valid only when type is PORT_TYPE_PARAMETER */
-  char * name;                  /* valid only when type is PORT_TYPE_PARAMETER */
+  char * symbol;                /* valid only when type is PORT_TYPE_LV2_FLOAT_PARAM */
+  char * name;                  /* valid only when type is PORT_TYPE_LV2_FLOAT_PARAM */
   union
   {
     struct
@@ -56,7 +56,7 @@ struct zynjacku_port
       float value;
       float min;
       float max;
-    } parameter;                /* for PORT_TYPE_PARAMETER */
+    } parameter;                /* for PORT_TYPE_LV2_FLOAT_PARAM */
     struct _LV2_String_Data * string;
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
     lv2dynparam_host_parameter dynparam; /* for PORT_TYPE_DYNPARAM */
@@ -140,5 +140,16 @@ zynjacku_plugin_midi_cc(
   struct zynjacku_plugin * plugin_ptr,
   unsigned int cc_no,
   unsigned int cc_value);
+
+void
+zynjacku_plugin_dynparam_parameter_created(
+  void * instance_context,
+  lv2dynparam_host_parameter parameter_handle,
+  void ** parameter_context_ptr);
+
+void
+zynjacku_plugin_dynparam_parameter_destroying(
+  void * instance_context,
+  void * parameter_context);
 
 #endif /* #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED */

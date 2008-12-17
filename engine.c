@@ -1061,6 +1061,8 @@ zynjacku_plugin_construct_synth(
           zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
           &engine_ptr->mempool_allocator,
           plugin_obj_ptr,
+          zynjacku_plugin_dynparam_parameter_created,
+          zynjacku_plugin_dynparam_parameter_destroying,
           &plugin_ptr->dynparams))
     {
       LOG_ERROR("Failed to instantiate dynparams extension.");
