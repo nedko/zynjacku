@@ -100,13 +100,13 @@ class lv2rack(zynjacku.host):
 
         zynjacku.host.__del__(self)
 
-    def load_plugin(self, uri, parameters=[]):
+    def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
         self.statusbar.pop(statusbar_id)
-        effect = self.new_plugin(uri, parameters)
+        effect = self.new_plugin(uri, parameters, maps)
         if not effect:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:

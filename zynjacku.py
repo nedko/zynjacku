@@ -1414,7 +1414,7 @@ class host:
     def plugin_ui_available(self, plugin):
         return plugin.supports_custom_ui() or plugin.supports_generic_ui()
 
-    def new_plugin(self, uri, parameters=[]):
+    def new_plugin(self, uri, parameters=[], maps={}):
         plugin = zynjacku.Plugin(uri=uri)
         if not plugin.construct(self.engine):
             return False
@@ -1422,7 +1422,14 @@ class host:
         for parameter in parameters:
             name = parameter[0]
             value = parameter[1]
-            plugin.set_parameter(name, value)
+            mapid = parameter[2]
+
+            if mapid:
+                mapobj = maps[mapid]
+            else:
+                mapobj = None
+
+            plugin.set_parameter(name, value, mapobj)
 
         plugin.uri = uri
         plugin.ui_win = None
@@ -1499,12 +1506,38 @@ class host:
                 dialog.hide()
                 return
 
-    def on_plugin_parameter_value(self, plugin, parameter, value):
-        self.xml += "%s<parameter name='%s'>%s</parameter>\n" % (self.xml_indent, parameter, value)
+    def on_plugin_parameter_map_point(self, mapobj, cc_value, parameter_value):
+        self.xml += "%s<point cc_value='%u' parameter_value='%f' />\n" % (self.xml_indent, cc_value, parameter_value)
+
+    def on_plugin_parameter_value(self, plugin, parameter, value, mapobj):
+        if mapobj:
+            self.xml_map_id += 1
+            mapid = " mapid='%u'" % self.xml_map_id
+        else:
+            mapid = ""
+
+        self.xml += "%s<parameter name='%s'%s>%s</parameter>\n" % (self.xml_indent, parameter, mapid, value)
+
+        if mapobj:
+            self.xml += "%s<midi_cc_map id='%u' cc_no='?'>\n" % (self.xml_indent, self.xml_map_id)
+
+            cbid = mapobj.connect("point-created", self.on_plugin_parameter_map_point)
+
+            oldindent = self.xml_indent
+            self.xml_indent = self.xml_indent + "  "
+
+            mapobj.get_points()
+
+            self.xml_indent = oldindent
+
+            mapobj.disconnect(cbid)
+
+            self.xml += "%s</midi_cc_map>\n" % self.xml_indent
 
     def get_plugins_xml(self, indent):
         self.xml = ""
         self.xml_indent = indent + "  "
+        self.xml_map_id = 0
         for plugin in self.plugins:
             self.xml += "%s<plugin uri='%s'>\n" % (indent, plugin.uri)
             cbid = plugin.connect("parameter-value", self.on_plugin_parameter_value)
@@ -1514,7 +1547,7 @@ class host:
 
         return self.xml
 
-    def load_plugin(self, uri, parameters=[]):
+    def load_plugin(self, uri, parameters=[], maps={}):
         pass
 
     def preset_load(self, filename):
@@ -1527,15 +1560,29 @@ class host:
             uri = plugin.getAttribute("uri")
             name = None
             parameters = []
+            maps = {}
             for node in plugin.childNodes:
                 if node.nodeType == node.ELEMENT_NODE:
-                    name = node.getAttribute("name")
-                    node.normalize()
-                    value = node.childNodes[0].data
-                    #print "%s='%f'" % (name, value)
-                    parameters.append([name, value])
+                    if node.nodeName == 'parameter':
+                        name = node.getAttribute("name")
+                        node.normalize()
+                        value = node.childNodes[0].data
+                        #print "%s='%f'" % (name, value)
+                        parameters.append([name, value, node.getAttribute("mapid")])
+                    elif node.nodeName == 'midi_cc_map':
+                        mapobj = zynjacku.MidiCcMap()
+                        mapid = node.getAttribute("id")
 
-            self.load_plugin(uri, parameters)
+                        for pointnode in node.childNodes:
+                            if pointnode.nodeType == node.ELEMENT_NODE:
+                                if pointnode.nodeName == 'point':
+                                    mapobj.point_create(int(pointnode.getAttribute("cc_value")), float(pointnode.getAttribute("parameter_value")))
+
+                        maps[mapid] = mapobj
+                    else:
+                        print "<%s> ?" % node.nodeName
+
+            self.load_plugin(uri, parameters, maps)
 
     def setup_file_dialog_filters(self, file_dialog):
         # Create and add the filter
@@ -1734,13 +1781,13 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.midi_led.set(self.engine.get_midi_activity())
         return True
 
-    def load_plugin(self, uri, parameters=[]):
+    def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
         self.statusbar.pop(statusbar_id)
-        synth = self.new_plugin(uri, parameters)
+        synth = self.new_plugin(uri, parameters, maps)
         if not synth:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:

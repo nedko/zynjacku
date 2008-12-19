@@ -448,9 +448,10 @@ zynjacku_plugin_class_init(
       NULL,                     /* accu_data */
       NULL,                     /* c_marshaller */
       G_TYPE_NONE,              /* return type */
-      2,                        /* n_params */
+      3,                        /* n_params */
       G_TYPE_STRING,            /* parameter name */
-      G_TYPE_STRING);           /* parameter value */
+      G_TYPE_STRING,            /* parameter value */
+      G_TYPE_OBJECT);           /* midi map cc object */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_plugin_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_plugin_set_property;
@@ -938,6 +939,8 @@ zynjacku_plugin_dynparam_parameter_created(
   struct zynjacku_port * port_ptr;
   struct zynjacku_plugin * plugin_ptr;
 
+  LOG_DEBUG("zynjacku_plugin_dynparam_parameter_created() called.");
+
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_context);
 
   port_ptr = malloc(sizeof(struct zynjacku_port));
@@ -965,11 +968,13 @@ zynjacku_plugin_dynparam_parameter_destroying(
   void * instance_context,
   void * parameter_context)
 {
-    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+  LOG_DEBUG("zynjacku_plugin_dynparam_parameter_destroying() called.");
 
-    list_del(&port_ptr->plugin_siblings);
+  assert(port_ptr->type == PORT_TYPE_DYNPARAM);
 
-    free(port_ptr);
+  list_del(&port_ptr->plugin_siblings);
+
+  free(port_ptr);
 }
 
 void
@@ -1091,7 +1096,7 @@ dynparam_ui_parameter_appeared(
       parameter_name,
       hints_obj_ptr,
       (gboolean)value.boolean,
-      zynjacku_plugin_context_to_string(parameter_handle),
+      zynjacku_plugin_context_to_string(port_ptr),
       &ret_obj_ptr);
     break;
   case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
@@ -1105,7 +1110,7 @@ dynparam_ui_parameter_appeared(
       (gfloat)value.fpoint,
       (gfloat)range.fpoint.min,
       (gfloat)range.fpoint.max,
-      zynjacku_plugin_context_to_string(parameter_handle),
+      zynjacku_plugin_context_to_string(port_ptr),
       &ret_obj_ptr);
     break;
   case LV2DYNPARAM_PARAMETER_TYPE_ENUM:
@@ -1122,7 +1127,7 @@ dynparam_ui_parameter_appeared(
       hints_obj_ptr,
       (guint)value.enum_selected_index,
       enum_ptr,
-      zynjacku_plugin_context_to_string(parameter_handle),
+      zynjacku_plugin_context_to_string(port_ptr),
       &ret_obj_ptr);
 
     g_object_unref(enum_ptr);
@@ -1138,7 +1143,7 @@ dynparam_ui_parameter_appeared(
       (gint)value.integer,
       (gint)range.integer.min,
       (gint)range.integer.max,
-      zynjacku_plugin_context_to_string(parameter_handle),
+      zynjacku_plugin_context_to_string(port_ptr),
       &ret_obj_ptr);
     break;
   }
@@ -1268,12 +1273,15 @@ zynjacku_plugin_dynparameter_get_callback(
   const char * parameter_name,
   const char * parameter_value)
 {
+  LOG_DEBUG("zynjacku_plugin_dynparameter_get_callback(%p, %p, %s, %s) called.", context, parameter_context, parameter_name, parameter_value);
+
   g_signal_emit(
     plugin_obj_ptr,
     g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
     0,
     parameter_name,
-    parameter_value);
+    parameter_value,
+    port_ptr->midi_cc_map_obj_ptr);
 }
 
 #undef port_ptr
@@ -1314,7 +1322,8 @@ zynjacku_plugin_get_parameters(
         g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE],
         0,
         port_ptr->symbol,
-        value);
+        value,
+        port_ptr->midi_cc_map_obj_ptr);
     }
 
     free(locale);
@@ -1325,7 +1334,8 @@ gboolean
 zynjacku_plugin_set_parameter(
   ZynjackuPlugin * plugin_obj_ptr,
   gchar * parameter,
-  gchar * value)
+  gchar * value,
+  GObject * midi_cc_map_obj_ptr)
 {
   struct zynjacku_plugin * plugin_ptr;
   struct list_head * node_ptr;
@@ -1334,7 +1344,7 @@ zynjacku_plugin_set_parameter(
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s') called.", parameter, value);
+  LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s', %p) called.", parameter, value, midi_cc_map_obj_ptr);
 
   if (plugin_ptr->dynparams != NULL)
   {
@@ -1359,6 +1369,13 @@ zynjacku_plugin_set_parameter(
         setlocale(LC_NUMERIC, locale);
 
         free(locale);
+
+        if (port_ptr->midi_cc_map_obj_ptr != NULL)
+        {
+          g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+        }
+
+        port_ptr->midi_cc_map_obj_ptr = g_object_ref(midi_cc_map_obj_ptr);
 
         return TRUE;
       }

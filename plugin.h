@@ -119,7 +119,8 @@ gboolean
 zynjacku_plugin_set_parameter(
   ZynjackuPlugin * obj_ptr,
   gchar * parameter,
-  gchar * value);
+  gchar * value,
+  GObject * midi_cc_map_obj_ptr);
 
 GObject *
 zynjacku_plugin_get_midi_cc_map(
