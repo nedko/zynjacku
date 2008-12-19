@@ -1259,10 +1259,12 @@ zynjacku_plugin_int_set(
 }
 
 #define plugin_obj_ptr ((ZynjackuPlugin *)context)
+#define port_ptr ((struct zynjacku_port *)parameter_context)
 
 void
 zynjacku_plugin_dynparameter_get_callback(
   void * context,
+  void * parameter_context,
   const char * parameter_name,
   const char * parameter_value)
 {
@@ -1274,6 +1276,7 @@ zynjacku_plugin_dynparameter_get_callback(
     parameter_value);
 }
 
+#undef port_ptr
 #undef plugin_obj_ptr
 
 void
