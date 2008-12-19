@@ -152,4 +152,10 @@ zynjacku_plugin_dynparam_parameter_destroying(
   void * instance_context,
   void * parameter_context);
 
+void
+zynjacku_plugin_dynparam_parameter_value_change_context(
+  void * instance_context,
+  void * parameter_context,
+  void * value_change_context);
+
 #endif /* #ifndef ZYNJACKU_H__8BEF69EC_22B2_42AB_AE27_163F1ED2F7F0__INCLUDED */

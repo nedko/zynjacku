@@ -1063,6 +1063,7 @@ zynjacku_plugin_construct_synth(
           plugin_obj_ptr,
           zynjacku_plugin_dynparam_parameter_created,
           zynjacku_plugin_dynparam_parameter_destroying,
+          zynjacku_plugin_dynparam_parameter_value_change_context,
           &plugin_ptr->dynparams))
     {
       LOG_ERROR("Failed to instantiate dynparams extension.");

@@ -939,7 +939,7 @@ zynjacku_plugin_dynparam_parameter_created(
   struct zynjacku_port * port_ptr;
   struct zynjacku_plugin * plugin_ptr;
 
-  LOG_DEBUG("zynjacku_plugin_dynparam_parameter_created() called.");
+  LOG_DEBUG("zynjacku_plugin_dynparam_parameter_created(%p, %p) called.", instance_context, parameter_handle);
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE((ZynjackuPlugin *)instance_context);
 
@@ -958,10 +958,29 @@ zynjacku_plugin_dynparam_parameter_created(
   port_ptr->data.dynparam = parameter_handle;
   list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->dynparam_ports);
 
+  LOG_DEBUG("dynparam port %p created", port_ptr);
   *parameter_context_ptr = port_ptr;
 }
 
 #define port_ptr ((struct zynjacku_port *)parameter_context)
+
+void
+zynjacku_plugin_dynparam_parameter_value_change_context(
+  void * instance_context,
+  void * parameter_context,
+  void * value_change_context)
+{
+  LOG_DEBUG("zynjacku_plugin_dynparam_parameter_value_change_context(%p, %p, %p)", instance_context, parameter_context, value_change_context);
+
+  assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+
+  if (port_ptr->midi_cc_map_obj_ptr != NULL)
+  {
+    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+  }
+
+  port_ptr->midi_cc_map_obj_ptr = G_OBJECT(value_change_context);
+}
 
 void
 zynjacku_plugin_dynparam_parameter_destroying(
@@ -1348,7 +1367,12 @@ zynjacku_plugin_set_parameter(
 
   if (plugin_ptr->dynparams != NULL)
   {
-    lv2dynparam_set_parameter(plugin_ptr->dynparams, parameter, value);
+    if (midi_cc_map_obj_ptr != NULL)
+    {
+      g_object_ref(midi_cc_map_obj_ptr);
+    }
+
+    lv2dynparam_set_parameter(plugin_ptr->dynparams, parameter, value, midi_cc_map_obj_ptr);
   }
   else
   {
@@ -1375,7 +1399,12 @@ zynjacku_plugin_set_parameter(
           g_object_unref(port_ptr->midi_cc_map_obj_ptr);
         }
 
-        port_ptr->midi_cc_map_obj_ptr = g_object_ref(midi_cc_map_obj_ptr);
+        if (midi_cc_map_obj_ptr != NULL)
+        {
+          g_object_ref(midi_cc_map_obj_ptr);
+        }
+
+        port_ptr->midi_cc_map_obj_ptr = midi_cc_map_obj_ptr;
 
         return TRUE;
       }
