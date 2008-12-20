@@ -1363,7 +1363,7 @@ class host:
 
             lash.lash_jack_client_name(lash_client, client_name)
 
-            gobject.timeout_add(1000, self.lash_check_events)
+            self.lash_check_events_callback_id = gobject.timeout_add(1000, self.lash_check_events)
 
             if not self.preset_extension:
                 self.preset_extension = "xml"
@@ -1698,6 +1698,8 @@ class host:
         ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
+        if self.lash_client:
+            gobject.source_remove(self.lash_check_events_callback_id)
 
         for plugin in self.plugins:
             if plugin.ui_win:
@@ -1734,15 +1736,22 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.midi_led_frame.add(self.midi_led);
         self.hbox_menubar.pack_start(self.midi_led_frame, False, False)
 
-	#Create our dictionay and connect it
-        dic = {"on_quit_activate" : gtk.main_quit,
-               "on_about_activate" : self.on_about,
-               "on_preset_load_activate" : self.on_preset_load,
-               "on_preset_save_as_activate" : self.on_preset_save_as,
-               "on_synth_load_activate" : self.on_synth_load,
-               "on_synth_clear_activate" : self.on_synth_clear,
+	# Create our dictionary and connect it
+        dic = {"quit" : self.on_quit,
+               "about" : self.on_about,
+               "preset_load" : self.on_preset_load,
+               "preset_save_as" : self.on_preset_save_as,
+               "load" : self.on_synth_load,
+               "clear" : self.on_synth_clear,
                }
-        glade_xml.signal_autoconnect(dic)
+
+        self.signal_ids = []
+        for k, v in dic.items():
+            w = glade_xml.get_widget(k)
+            if not w:
+                print "failed to get glade widget '%s'" % k
+                continue
+            self.signal_ids.append([w, w.connect("activate", v)])
 
         self.the_license = the_license
 
@@ -1767,13 +1776,26 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.synths_widget.set_model(self.store)
 
         self.main_window.show_all()
-        self.main_window.connect("destroy", gtk.main_quit)
+        self.main_window.connect("destroy", self.on_quit)
 
         if len(uris) == 1 and uris[0][-9:] == ".zynjacku":
             self.preset_load(uris[0])
         else:
             for uri in uris:
                 self.load_plugin(uri)
+
+    def on_quit(self, window):
+        for cid in self.signal_ids:
+            #print repr(cid)
+            cid[0].disconnect(cid[1])
+        gtk.main_quit()
+
+    def disconnect_signals(self):
+        print self.signal_ids
+        for cid in self.signal_ids:
+            #print repr(cid)
+            cid[0].disconnect(cid[1])
+            pass
 
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."
