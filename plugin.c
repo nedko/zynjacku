@@ -1183,20 +1183,22 @@ zynjacku_plugin_bool_set(
   gchar * string_context,
   gboolean value)
 {
-  void * context;
   struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_plugin_context_from_string(string_context);
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_bool_set() called, context %p", port_ptr);
+
+  assert(port_ptr->type == PORT_TYPE_DYNPARAM);
 
   dynparam_value.boolean = value;
   lv2dynparam_parameter_change(
     plugin_ptr->dynparams,
-    (lv2dynparam_host_parameter)context,
+    port_ptr->data.dynparam,
     dynparam_value);
 }
 
@@ -1208,21 +1210,21 @@ zynjacku_plugin_float_set(
 {
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
-  //union lv2dynparam_host_parameter_value dynparam_value;
+  union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  //LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", port_ptr);
+  LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", port_ptr);
 
   if (plugin_ptr->dynparams != NULL)
   {
-/*     dynparam_value.fpoint = value; */
-/*     lv2dynparam_parameter_change( */
-/*       plugin_ptr->dynparams, */
-/*       port_ptr->data.dynparam, */
-/*       dynparam_value); */
+    dynparam_value.fpoint = value;
+    lv2dynparam_parameter_change(
+      plugin_ptr->dynparams,
+      port_ptr->data.dynparam,
+      dynparam_value);
   }
   else
   {
@@ -1236,24 +1238,23 @@ zynjacku_plugin_enum_set(
   gchar * string_context,
   guint value)
 {
-  void * context;
   struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_plugin_context_from_string(string_context);
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_NOTICE("zynjacku_plugin_enum_set() called, context %p, value %u", context, value);
+  LOG_DEBUG("zynjacku_plugin_enum_set() called, context %p, value %u", port_ptr, value);
 
-  if (plugin_ptr->dynparams != NULL)
-  {
-    dynparam_value.enum_selected_index = value;
-    lv2dynparam_parameter_change(
-      plugin_ptr->dynparams,
-      (lv2dynparam_host_parameter)context,
-      dynparam_value);
-  }
+  assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+
+  dynparam_value.enum_selected_index = value;
+  lv2dynparam_parameter_change(
+    plugin_ptr->dynparams,
+    port_ptr->data.dynparam,
+    dynparam_value);
 }
 
 void
@@ -1262,24 +1263,21 @@ zynjacku_plugin_int_set(
   gchar * string_context,
   gint value)
 {
-  void * context;
   struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
-  context = zynjacku_plugin_context_from_string(string_context);
+  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
-  LOG_DEBUG("zynjacku_plugin_int_set() called, context %p", context);
+  LOG_DEBUG("zynjacku_plugin_int_set() called, context %p", port_ptr);
 
-  if (plugin_ptr->dynparams != NULL)
-  {
-    dynparam_value.integer = value;
-    lv2dynparam_parameter_change(
-      plugin_ptr->dynparams,
-      (lv2dynparam_host_parameter)context,
-      dynparam_value);
-  }
+  dynparam_value.integer = value;
+  lv2dynparam_parameter_change(
+    plugin_ptr->dynparams,
+    port_ptr->data.dynparam,
+    dynparam_value);
 }
 
 #define plugin_obj_ptr ((ZynjackuPlugin *)context)
