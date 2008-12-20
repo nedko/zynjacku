@@ -1741,8 +1741,8 @@ class ZynjackuHostMulti(ZynjackuHost):
                "about" : self.on_about,
                "preset_load" : self.on_preset_load,
                "preset_save_as" : self.on_preset_save_as,
-               "load" : self.on_synth_load,
-               "clear" : self.on_synth_clear,
+               "synth_load" : self.on_synth_load,
+               "synth_clear" : self.on_synth_clear,
                }
 
         self.signal_ids = []

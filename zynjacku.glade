@@ -80,7 +80,7 @@
                     <child>
                       <widget class="GtkMenu" id="synth_menu">
                         <child>
-                          <widget class="GtkImageMenuItem" id="load">
+                          <widget class="GtkImageMenuItem" id="synth_load">
                             <property name="visible">True</property>
                             <property name="label" translatable="yes">_Load...</property>
                             <property name="use_underline">True</property>
@@ -95,7 +95,7 @@
                           </widget>
                         </child>
                         <child>
-                          <widget class="GtkImageMenuItem" id="clear">
+                          <widget class="GtkImageMenuItem" id="synth_clear">
                             <property name="visible">True</property>
                             <property name="label" translatable="yes">_Clear</property>
                             <property name="use_underline">True</property>
