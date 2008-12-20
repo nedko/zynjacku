@@ -1456,29 +1456,12 @@ zynjacku_plugin_set_midi_cc_map(
     g_object_unref(port_ptr->midi_cc_map_obj_ptr);
   }
 
-  port_ptr->midi_cc_map_obj_ptr = g_object_ref(midi_cc_map_obj_ptr);
-}
-
-void
-zynjacku_plugin_remove_midi_cc_map(
-  ZynjackuPlugin * plugin_obj_ptr,
-  gchar * string_context)
-{
-  struct zynjacku_plugin * plugin_ptr;
-  struct zynjacku_port * port_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-
-  port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
-
-  LOG_DEBUG("zynjacku_plugin_remove_midi_cc_map() called, context %p", port_ptr);
-
-  if (port_ptr->midi_cc_map_obj_ptr != NULL)
+  if (midi_cc_map_obj_ptr != NULL)
   {
-    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+    g_object_ref(midi_cc_map_obj_ptr);
   }
 
-  port_ptr->midi_cc_map_obj_ptr = NULL;
+  port_ptr->midi_cc_map_obj_ptr = midi_cc_map_obj_ptr;
 }
 
 void
