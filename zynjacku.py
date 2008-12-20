@@ -1379,7 +1379,7 @@ class host:
             event_type = lash.lash_event_get_type(event)
             if event_type == lash.LASH_Quit:
                 print "LASH ordered quit."
-                gtk.main_quit()
+                self.on_quit()
                 return False
             elif event_type == lash.LASH_Save_File:
                 directory = lash.lash_event_get_string(event)
@@ -1784,18 +1784,11 @@ class ZynjackuHostMulti(ZynjackuHost):
             for uri in uris:
                 self.load_plugin(uri)
 
-    def on_quit(self, window):
+    def on_quit(self, window=None):
         for cid in self.signal_ids:
             #print repr(cid)
             cid[0].disconnect(cid[1])
         gtk.main_quit()
-
-    def disconnect_signals(self):
-        print self.signal_ids
-        for cid in self.signal_ids:
-            #print repr(cid)
-            cid[0].disconnect(cid[1])
-            pass
 
     def __del__(self):
         #print "ZynjackuHostMulti destructor called."

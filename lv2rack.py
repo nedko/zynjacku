@@ -52,15 +52,22 @@ class lv2rack(zynjacku.host):
 
         self.statusbar = self.glade_xml.get_widget("lv2rack_statusbar")
 
-	#Create our dictionay and connect it
-        dic = {"lv2rack_on_quit_activate" : gtk.main_quit,
-               "lv2rack_on_about_activate" : self.on_about,
-               "lv2rack_on_preset_load_activate" : self.on_preset_load,
-               "lv2rack_on_preset_save_as_activate" : self.on_preset_save_as,
-               "lv2rack_on_effect_load_activate" : self.on_effect_load,
-               "lv2rack_on_effect_clear_activate" : self.on_effect_clear,
+	# Create our dictionary and connect it
+        dic = {"lv2rack_quit_menuitem" : self.on_quit,
+               "lv2rack_help_about_menuitem" : self.on_about,
+               "lv2rack_preset_load_menuitem" : self.on_preset_load,
+               "lv2rack_preset_save_as_menuitem" : self.on_preset_save_as,
+               "lv2rack_effect_load_menuitem" : self.on_effect_load,
+               "lv2rack_effect_clear_menuitem" : self.on_effect_clear,
                }
-        glade_xml.signal_autoconnect(dic)
+
+        self.signal_ids = []
+        for k, v in dic.items():
+            w = glade_xml.get_widget(k)
+            if not w:
+                print "failed to get glade widget '%s'" % k
+                continue
+            self.signal_ids.append([w, w.connect("activate", v)])
 
         self.the_license = the_license
 
@@ -92,6 +99,12 @@ class lv2rack(zynjacku.host):
         else:
             for uri in uris:
                 self.load_plugin(uri)
+
+    def on_quit(self, window=None):
+        for cid in self.signal_ids:
+            #print repr(cid)
+            cid[0].disconnect(cid[1])
+        gtk.main_quit()
 
     def __del__(self):
         #print "lv2rack destructor called."
