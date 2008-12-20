@@ -1699,7 +1699,9 @@ class host:
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
         if self.lash_client:
+            #print "removing lash handler, host object refcount is %u" % sys.getrefcount(self)
             gobject.source_remove(self.lash_check_events_callback_id)
+            #print "removed lash handler, host object refcount is %u" % sys.getrefcount(self)
 
         for plugin in self.plugins:
             if plugin.ui_win:
@@ -1776,7 +1778,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.synths_widget.set_model(self.store)
 
         self.main_window.show_all()
-        self.main_window.connect("destroy", self.on_quit)
+        self.signal_ids.append([self.main_window, self.main_window.connect("destroy", self.on_quit)])
 
         if len(uris) == 1 and uris[0][-9:] == ".zynjacku":
             self.preset_load(uris[0])
@@ -1785,9 +1787,11 @@ class ZynjackuHostMulti(ZynjackuHost):
                 self.load_plugin(uri)
 
     def on_quit(self, window=None):
+        #print "ZynjackuHostMulti::on_quit() called"
         for cid in self.signal_ids:
-            #print repr(cid)
+            #print "disconnecting %u" % cid[1]
             cid[0].disconnect(cid[1])
+            #print "host object refcount is %u" % sys.getrefcount(self)
         gtk.main_quit()
 
     def __del__(self):
@@ -1986,6 +1990,10 @@ def main():
         host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:], lash_client)
 
     host.run()
+
+    #print "stone after host.run(), host object refcount is %u" % sys.getrefcount(host)
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 if __name__ == '__main__':
     main()

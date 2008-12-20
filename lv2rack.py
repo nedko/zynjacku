@@ -92,7 +92,7 @@ class lv2rack(zynjacku.host):
         self.effects_widget.set_model(self.store)
 
         self.main_window.show_all()
-        self.main_window.connect("destroy", gtk.main_quit)
+        self.signal_ids.append([self.main_window, self.main_window.connect("destroy", self.on_quit)])
 
         if len(uris) == 1 and uris[0][-8:] == ".lv2rack":
             self.preset_load(uris[0])
@@ -101,9 +101,11 @@ class lv2rack(zynjacku.host):
                 self.load_plugin(uri)
 
     def on_quit(self, window=None):
+        #print "ZynjackuHostMulti::on_quit() called"
         for cid in self.signal_ids:
-            #print repr(cid)
+            #print "disconnecting %u" % cid[1]
             cid[0].disconnect(cid[1])
+            #print "host object refcount is %u" % sys.getrefcount(self)
         gtk.main_quit()
 
     def __del__(self):
@@ -225,6 +227,9 @@ def main():
         print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
 
     lv2rack(data_dir, glade_xml, "lv2rack", the_license, sys.argv[1:], lash_client).run()
+
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 if __name__ == '__main__':
     main()
