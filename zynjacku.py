@@ -295,7 +295,11 @@ class midiccmap:
         align.add(hbox_top)
         vbox.pack_start(align, False)
 
-        self.adj_cc_no = gtk.Adjustment(-1, -1, 127, 1, 19)
+        cc_no = map.get_cc_no()
+        if cc_no == -1:
+            self.adj_cc_no = gtk.Adjustment(-1, -1, 127, 1, 19)
+        else:
+            self.adj_cc_no = gtk.Adjustment(cc_no, 0, 127, 1, 19)
         self.adj_cc_no.connect("value-changed", self.on_cc_no_changed)
         cc_no = gtk.SpinButton(self.adj_cc_no, 0.0, 0)
         cc_no_box = gtk.HBox()
@@ -1519,7 +1523,7 @@ class host:
         self.xml += "%s<parameter name='%s'%s>%s</parameter>\n" % (self.xml_indent, parameter, mapid, value)
 
         if mapobj:
-            self.xml += "%s<midi_cc_map id='%u' cc_no='?'>\n" % (self.xml_indent, self.xml_map_id)
+            self.xml += "%s<midi_cc_map id='%u' cc_no='%d'>\n" % (self.xml_indent, self.xml_map_id, mapobj.get_cc_no())
 
             cbid = mapobj.connect("point-created", self.on_plugin_parameter_map_point)
 
@@ -1572,6 +1576,7 @@ class host:
                     elif node.nodeName == 'midi_cc_map':
                         mapobj = zynjacku.MidiCcMap()
                         mapid = node.getAttribute("id")
+                        mapobj.cc_no_assign(int(node.getAttribute("cc_no")))
 
                         for pointnode in node.childNodes:
                             if pointnode.nodeType == node.ELEMENT_NODE:

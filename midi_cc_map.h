@@ -82,6 +82,10 @@ zynjacku_midiccmap_cc_no_assign(
   ZynjackuMidiCcMap * map_obj_ptr,
   guint cc_no);
 
+gint
+zynjacku_midiccmap_get_cc_no(
+  ZynjackuMidiCcMap * map_obj_ptr);
+
 G_END_DECLS
 
 #endif /* #ifndef MIDI_CC_MAP_H__CD0E5008_4B6A_4003_BF06_3F6FC6475FDF__INCLUDED */

@@ -51,7 +51,7 @@ struct zynjacku_midi_cc_map
 {
   gboolean dispose_has_run;
 
-  guint cc_no;
+  gint cc_no;
   struct list_head points;
 };
 
@@ -502,4 +502,15 @@ zynjacku_midiccmap_cc_no_assign(
       0,
       cc_no);
   }
+}
+
+gint
+zynjacku_midiccmap_get_cc_no(
+  ZynjackuMidiCcMap * map_obj_ptr)
+{
+  struct zynjacku_midi_cc_map * map_ptr;
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  return map_ptr->cc_no;
 }
