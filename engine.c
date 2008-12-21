@@ -33,6 +33,7 @@
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#include <slv2/lv2_ui.h>
 
 #include "config.h"
 
@@ -234,8 +235,8 @@ zynjacku_uri_to_id(
   {
     return ZYNJACKU_MIDI_EVENT_ID;
   }
-  else if (strcmp(map, "http://lv2plug.in/ns/extensions/ui") == 0 &&
-      strcmp(uri, LV2_STRING_PORT_URI) == 0)
+  else if (strcmp(map, LV2_UI_URI) == 0 &&
+           strcmp(uri, LV2_STRING_PORT_URI) == 0)
   {
     return ZYNJACKU_STRING_XFER_ID;
   }
