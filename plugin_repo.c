@@ -39,6 +39,7 @@
 #include "lv2.h"
 #include "gtk2gui.h"
 #include "zynjacku.h"
+#include "plugin_internal.h"
 #include "plugin_repo.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"

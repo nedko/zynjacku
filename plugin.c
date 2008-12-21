@@ -50,6 +50,7 @@
 #include "gtk2gui.h"
 
 #include "zynjacku.h"
+#include "plugin_internal.h"
 #include "plugin_repo.h"
 #include "synth.h"
 #include "effect.h"
