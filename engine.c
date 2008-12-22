@@ -80,8 +80,8 @@ struct zynjacku_engine
   struct list_head plugins_all; /* accessed only from ui thread */
   struct list_head plugins_active; /* accessed only from rt thread */
 
-  pthread_mutex_t active_plugins_lock;
-  struct list_head plugins_pending_activation; /* protected using active_plugins_lock */
+  pthread_mutex_t rt_lock;
+  struct list_head plugins_pending_activation; /* protected using rt_lock */
 
   struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_port"s linked by port_type_siblings */
   struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_port"s linked by port_type_siblings */
@@ -103,11 +103,10 @@ struct zynjacku_engine
   LV2_Feature host_feature_stringport;
   const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
 
-  pthread_mutex_t cc_lock;
   struct
   {
     signed char value_rt;      /* accessed by rt-thread only */
-    signed char value;         /* protected by cc_lock */
+    signed char value;         /* protected by rt_lock */
     signed char value_changed; /* accessed by ui-thread only */
     signed char value_ui;      /* accessed by ui-thread only */
   } cc[127];
@@ -154,8 +153,7 @@ zynjacku_engine_dispose(GObject * obj)
     zynjacku_plugin_repo_uninit();
   }
 
-  pthread_mutex_destroy(&engine_ptr->active_plugins_lock);
-  pthread_mutex_destroy(&engine_ptr->cc_lock);
+  pthread_mutex_destroy(&engine_ptr->rt_lock);
 
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
@@ -270,8 +268,7 @@ zynjacku_engine_init(
 
   engine_ptr->jack_client = NULL;
 
-  pthread_mutex_init(&engine_ptr->active_plugins_lock, NULL);
-  pthread_mutex_init(&engine_ptr->cc_lock, NULL);
+  pthread_mutex_init(&engine_ptr->rt_lock, NULL);
 
   for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
   {
@@ -605,14 +602,14 @@ zynjacku_jackmidi_cc(
 
   if (changes)
   {
-    if (pthread_mutex_trylock(&engine_ptr->active_plugins_lock) == 0)
+    if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
     {
       for (i = 0; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]); i++)
       {
         engine_ptr->cc[i].value = engine_ptr->cc[i].value_rt;
       }
 
-      pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
+      pthread_mutex_unlock(&engine_ptr->rt_lock);
     }
   }
 }
@@ -642,7 +639,7 @@ jack_process_cb(
 
   zynjacku_jackmidi_cc(engine_ptr, engine_ptr->jack_midi_in, nframes);
 
-  if (pthread_mutex_trylock(&engine_ptr->active_plugins_lock) == 0)
+  if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
   {
     /* Iterate over plugins pending activation */
     while (!list_empty(&engine_ptr->plugins_pending_activation))
@@ -652,7 +649,7 @@ jack_process_cb(
       list_add_tail(synth_node_ptr, &engine_ptr->plugins_active);
     }
 
-    pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
+    pthread_mutex_unlock(&engine_ptr->rt_lock);
   }
 
   /* Iterate over plugins */
@@ -753,7 +750,7 @@ zynjacku_engine_ui_run(
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
-  pthread_mutex_lock(&engine_ptr->cc_lock);
+  pthread_mutex_lock(&engine_ptr->rt_lock);
   for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
   {
     if (engine_ptr->cc[i].value != engine_ptr->cc[i].value_ui)
@@ -762,7 +759,7 @@ zynjacku_engine_ui_run(
       engine_ptr->cc[i].value_ui = engine_ptr->cc[i].value;
     }
   }
-  pthread_mutex_unlock(&engine_ptr->cc_lock);
+  pthread_mutex_unlock(&engine_ptr->rt_lock);
 
   for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
   {
@@ -1153,9 +1150,9 @@ zynjacku_plugin_construct_synth(
 
   list_add_tail(&plugin_ptr->siblings_all, &engine_ptr->plugins_all);
 
-  pthread_mutex_lock(&engine_ptr->active_plugins_lock);
+  pthread_mutex_lock(&engine_ptr->rt_lock);
   list_add_tail(&plugin_ptr->siblings_active, &engine_ptr->plugins_pending_activation);
-  pthread_mutex_unlock(&engine_ptr->active_plugins_lock);
+  pthread_mutex_unlock(&engine_ptr->rt_lock);
 
   g_object_ref(plugin_ptr->engine_object_ptr);
 
