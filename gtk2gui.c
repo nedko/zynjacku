@@ -275,7 +275,7 @@ zynjacku_gtk2gui_callback_write(
     LV2_String_Data *old_dest = ui_ptr->ports[port_index]->data.string;
     LV2_String_Data *dest = malloc(sizeof(LV2_String_Data));
     const LV2_String_Data *src = (const LV2_String_Data *)buffer;
-    struct zynjacku_rt_command cmd;
+    struct zynjacku_rt_plugin_command cmd;
     int t = 1;
     
     memcpy(dest, old_dest, sizeof(LV2_String_Data));

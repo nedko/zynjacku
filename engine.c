@@ -655,7 +655,7 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each_safe(synth_node_ptr, temp_node_ptr, &engine_ptr->plugins_active)
   {
-    struct zynjacku_rt_command * cmd;
+    struct zynjacku_rt_plugin_command * cmd;
     synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings_active);
     
     if (synth_ptr->recycle)

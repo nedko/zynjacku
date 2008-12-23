@@ -400,7 +400,7 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each_safe(effect_node_ptr, temp_node_ptr, &rack_ptr->plugins_active)
   {
-    struct zynjacku_rt_command * cmd;
+    struct zynjacku_rt_plugin_command * cmd;
 
     effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_active);
 

@@ -27,7 +27,7 @@
 #define PLUGIN_TYPE_SYNTH    1
 #define PLUGIN_TYPE_EFFECT   2
 
-struct zynjacku_rt_command
+struct zynjacku_rt_plugin_command
 {
   struct zynjacku_port * port; /* port to set data for */
   void *data;     /* new data */
@@ -74,8 +74,8 @@ struct zynjacku_plugin
     } effect;
   } subtype;
   
-  struct zynjacku_rt_command * volatile command; /* command to execute */
-  struct zynjacku_rt_command * volatile command_result; /* command that has been executed */
+  struct zynjacku_rt_plugin_command * volatile command; /* command to execute */
+  struct zynjacku_rt_plugin_command * volatile command_result; /* command that has been executed */
 
   void (* deactivate)(GObject * synth_obj_ptr);
   void (* free_ports)(GObject * synth_obj_ptr);
