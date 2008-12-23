@@ -59,11 +59,6 @@ void
 zynjacku_engine_stop_jack(
   ZynjackuEngine * obj_ptr);
 
-void
-zynjacku_engine_activate_synth(
-  ZynjackuEngine * engine_obj_ptr,
-  GObject * synth_obj_ptr);
-
 guint
 zynjacku_engine_get_sample_rate(
   ZynjackuEngine * engine_obj_ptr);
