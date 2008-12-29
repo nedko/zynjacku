@@ -174,11 +174,11 @@ zynjacku_lv2_connect_port(
 
 void
 zynjacku_lv2_message(
-  zynjacku_lv2_handle lv2handle)
+  zynjacku_lv2_handle lv2handle,
+  const void *input_data,
+  void *output_data)
 {
-  static uint32_t output_data[1024];
-  // TODO: handle output data properly
-  plugin_ptr->lv2msg->message_run(plugin_ptr->lv2handle, output_data);
+  plugin_ptr->lv2msg->message_run(plugin_ptr->lv2handle, input_data, output_data);
 }
 
 void

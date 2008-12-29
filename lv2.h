@@ -66,6 +66,8 @@ zynjacku_lv2_get_handle(
 
 void
 zynjacku_lv2_message(
-  zynjacku_lv2_handle lv2handle);
+  zynjacku_lv2_handle lv2handle,
+  const void *input_data,
+  void *output_data);
 
 #endif /* #ifndef LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED */

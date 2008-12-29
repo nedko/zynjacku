@@ -40,6 +40,7 @@
 #include "lv2_uri_map.h"
 #include "lv2_data_access.h"
 #include "lv2_string_port.h"
+#include "lv2_contexts.h"
 
 #include "list.h"
 #include "lv2.h"
@@ -251,6 +252,22 @@ zynjacku_gtk2gui_destroy(
   free(ui_ptr);
 }
 
+static void send_message(LV2UI_Controller ui_handle, uint32_t port_index, const void *dest)
+{
+  if (port_index < 4096 * 8) {
+    static uint8_t input_data[4096];
+    static uint8_t output_data[4096];
+    /* send it via message context */
+    zynjacku_lv2_connect_port(ui_ptr->lv2plugin, ui_ptr->ports[port_index], (void *)dest);
+    lv2_contexts_set_port_valid(input_data, port_index);
+    zynjacku_lv2_message(ui_ptr->lv2plugin, input_data, output_data);
+    /* unset so that the same static array can be reused later */
+    lv2_contexts_unset_port_valid(input_data, port_index);
+  }
+  else
+    LOG_WARNING("Ignoring message port %d (it exceeds the arbitrary limit)", port_index);
+}
+
 /* LV2UI_Write_Function */
 void
 zynjacku_gtk2gui_callback_write(
@@ -288,9 +305,7 @@ zynjacku_gtk2gui_callback_write(
     
     if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
     {
-      /* send it via message context */
-      zynjacku_lv2_connect_port(ui_ptr->lv2plugin, ui_ptr->ports[port_index], dest);
-      zynjacku_lv2_message(ui_ptr->lv2plugin);
+      send_message(ui_handle, port_index, dest);
       dest->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
     }
     else
@@ -322,7 +337,7 @@ zynjacku_gtk2gui_callback_write(
     assert(buffer_size == sizeof(float));
     if (ui_ptr->ports[port_index]->flags & PORT_FLAGS_MSGCONTEXT)
     {
-      zynjacku_lv2_message(ui_ptr->lv2plugin);
+      send_message(ui_handle, port_index, buffer);
     }
   }
 
