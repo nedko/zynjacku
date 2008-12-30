@@ -23,6 +23,8 @@
 #ifndef PLUGIN_INTERNAL_H__7D5A9DB4_4DBC_4BD1_BA4B_B2EE0BD931A1__INCLUDED
 #define PLUGIN_INTERNAL_H__7D5A9DB4_4DBC_4BD1_BA4B_B2EE0BD931A1__INCLUDED
 
+#ifdef LV2_H_INCLUDED
+
 #define PLUGIN_TYPE_UNKNOWN  0
 #define PLUGIN_TYPE_SYNTH    1
 #define PLUGIN_TYPE_EFFECT   2
@@ -79,6 +81,8 @@ struct zynjacku_plugin
 
   void (* deactivate)(GObject * synth_obj_ptr);
   void (* free_ports)(GObject * synth_obj_ptr);
+  bool (* set_midi_cc_map)(GObject * engine_obj_ptr, struct zynjacku_port * port_ptr, GObject * midi_cc_map_obj_ptr);
+  bool (* midi_cc_map_cc_no_assign)(GObject * engine_obj_ptr, GObject * midi_cc_map_obj_ptr, guint cc_no);
 };
 
 #define ZYNJACKU_PLUGIN_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_TYPE, struct zynjacku_plugin))
@@ -90,12 +94,6 @@ zynjacku_free_plugin_ports(
 void
 zynjacku_plugin_ui_run(
   struct zynjacku_plugin * plugin_ptr);
-
-void
-zynjacku_plugin_midi_cc(
-  struct zynjacku_plugin * plugin_ptr,
-  unsigned int cc_no,
-  unsigned int cc_value);
 
 void
 zynjacku_plugin_dynparam_parameter_created(
@@ -113,5 +111,13 @@ zynjacku_plugin_dynparam_parameter_value_change_context(
   void * instance_context,
   void * parameter_context,
   void * value_change_context);
+
+#endif /* LV2_H_INCLUDED defined */
+
+gboolean
+zynjacku_plugin_midi_cc_map_cc_no_assign(
+  GObject * plugin_obj_ptr,
+  GObject * midi_cc_map_obj_ptr,
+  guint cc_no);
 
 #endif /* #ifndef PLUGIN_INTERNAL_H__7D5A9DB4_4DBC_4BD1_BA4B_B2EE0BD931A1__INCLUDED */

@@ -26,10 +26,14 @@
 G_BEGIN_DECLS
 
 void
-zynjacku_midiccmap_point_midi_cc(
+zynjacku_midiccmap_midi_cc_rt(
   ZynjackuMidiCcMap * map_obj_ptr,
   guint cc_no,
   guint cc_value);
+
+void
+zynjacku_midiccmap_ui_run(
+  ZynjackuMidiCcMap * map_obj_ptr);
 
 G_END_DECLS
 

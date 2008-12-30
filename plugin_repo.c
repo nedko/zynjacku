@@ -783,6 +783,7 @@ zynjacku_plugin_repo_create_port_internal(
     port_ptr->index = port_index;
     port_ptr->flags = 0;
     port_ptr->ui_context = NULL;
+    port_ptr->plugin_ptr = plugin_ptr;
     port_ptr->midi_cc_map_obj_ptr = NULL;
 
     if (output_port)

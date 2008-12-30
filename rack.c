@@ -857,6 +857,10 @@ zynjacku_plugin_construct_effect(
   plugin_ptr->deactivate = zynjacku_rack_deactivate_effect;
   plugin_ptr->free_ports = zynjacku_free_effect_ports;
 
+  /* we dont support midi cc maps for lv2rack yet */
+  plugin_ptr->set_midi_cc_map = NULL;
+  plugin_ptr->midi_cc_map_cc_no_assign = NULL;
+
   LOG_DEBUG("Constructed plugin <%s>, gtk2gui <%p>", plugin_ptr->uri, plugin_ptr->gtk2gui);
 
   return true;

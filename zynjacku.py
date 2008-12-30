@@ -1188,7 +1188,9 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
             map = zynjacku.MidiCcMap()
             map.point_create(0, self.adjustment.lower)
             map.point_create(127, self.adjustment.upper)
-            self.window.plugin.set_midi_cc_map(self.context, map)
+            if not self.window.plugin.set_midi_cc_map(self.context, map):
+                # TODO display error message to user
+                return
         else:
             #print "existing map"
             new_map = False

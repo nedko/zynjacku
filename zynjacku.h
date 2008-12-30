@@ -64,6 +64,7 @@ struct zynjacku_port
 
   GObject * ui_context;
 
+  struct zynjacku_plugin * plugin_ptr;
   GObject * midi_cc_map_obj_ptr;
 };
 

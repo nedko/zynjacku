@@ -127,7 +127,7 @@ zynjacku_plugin_get_midi_cc_map(
   ZynjackuPlugin * obj_ptr,
   gchar * parameter_context);
 
-void
+gboolean
 zynjacku_plugin_set_midi_cc_map(
   ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,

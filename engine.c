@@ -61,6 +61,7 @@
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 #include "midi_cc_map.h"
+#include "midi_cc_map_internal.h"
 
 #define ZYNJACKU_ENGINE_SIGNAL_TICK    0 /* plugin iterated */
 #define ZYNJACKU_ENGINE_SIGNAL_TACK    1 /* "good" plugin found */
@@ -70,6 +71,25 @@
 #define ZYNJACKU_MIDI_EVENT_ID 1
 
 #define ZYNJACKU_ENGINE_FEATURES 7
+
+#define MIDICC_COUNT 127
+
+struct zynjacku_midicc
+{
+  struct list_head siblings;    /* link in engine's midicc_pending_activation, unassigned_midicc_rt or a midicc_rt list */
+  struct list_head siblings_ui; /* link in engine's midicc_ui list */
+  struct list_head siblings_pending_cc_value_change; /* link in engine's midicc_pending_cc_value_change list */
+  struct list_head siblings_pending_cc_no_change; /* link in engine's midicc_pending_cc_no_change list */
+  struct list_head siblings_pending_deactivation; /* link in engine's midicc_pending_deactivation list */
+
+  guint cc_no;
+  guint cc_value;
+
+  guint pending_cc_no;          /* protected using engine's rt_lock */
+
+  ZynjackuMidiCcMap * map_obj_ptr;
+  struct zynjacku_port * port_ptr;
+};
 
 struct zynjacku_engine
 {
@@ -103,13 +123,16 @@ struct zynjacku_engine
   LV2_Feature host_feature_stringport;
   const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
 
-  struct
-  {
-    signed char value_rt;      /* accessed by rt-thread only */
-    signed char value;         /* protected by rt_lock */
-    signed char value_changed; /* accessed by ui-thread only */
-    signed char value_ui;      /* accessed by ui-thread only */
-  } cc[127];
+  struct list_head midicc_ui;   /* accessed only from ui thread */
+  struct list_head midicc_pending_activation; /* protected using rt_lock */
+  struct list_head midicc_pending_deactivation; /* protected using rt_lock */
+
+  struct list_head midicc_rt[MIDICC_COUNT]; /* accessed only from rt thread */
+  struct list_head midicc_pending_cc_value_change; /* accessed only from rt thread */
+
+  struct list_head midicc_pending_cc_no_change; /* protected using rt_lock */
+
+  struct list_head unassigned_midicc_rt; /* accessed only from ui thread */
 };
 
 #define ZYNJACKU_ENGINE_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_ENGINE_TYPE, struct zynjacku_engine))
@@ -258,7 +281,6 @@ zynjacku_engine_init(
 {
   struct zynjacku_engine * engine_ptr;
   int count;
-  int i;
 
   LOG_DEBUG("zynjacku_engine_init() called.");
 
@@ -269,14 +291,6 @@ zynjacku_engine_init(
   engine_ptr->jack_client = NULL;
 
   pthread_mutex_init(&engine_ptr->rt_lock, NULL);
-
-  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
-  {
-    engine_ptr->cc[i].value_rt = 255;
-    engine_ptr->cc[i].value = 255;
-    engine_ptr->cc[i].value_changed = false;
-    engine_ptr->cc[i].value_ui = 255;
-  }
 
   /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&engine_ptr->mempool_allocator);
@@ -354,6 +368,7 @@ zynjacku_engine_start_jack(
   gboolean ret;
   int iret;
   struct zynjacku_engine * engine_ptr;
+  unsigned int i;
 
   LOG_DEBUG("zynjacku_engine_start_jack() called.");
 
@@ -370,6 +385,19 @@ zynjacku_engine_start_jack(
   INIT_LIST_HEAD(&engine_ptr->plugins_pending_activation);
   INIT_LIST_HEAD(&engine_ptr->midi_ports);
   INIT_LIST_HEAD(&engine_ptr->audio_ports);
+
+  INIT_LIST_HEAD(&engine_ptr->midicc_ui);
+  INIT_LIST_HEAD(&engine_ptr->midicc_pending_activation);
+  INIT_LIST_HEAD(&engine_ptr->midicc_pending_deactivation);
+
+  for (i = 0; i < MIDICC_COUNT; i++)
+  {
+    INIT_LIST_HEAD(&engine_ptr->midicc_rt[i]);
+  }
+
+  INIT_LIST_HEAD(&engine_ptr->midicc_pending_cc_value_change);
+  INIT_LIST_HEAD(&engine_ptr->midicc_pending_cc_no_change);
+  INIT_LIST_HEAD(&engine_ptr->unassigned_midicc_rt);
 
   /* Connect to JACK (with plugin name as client name) */
   engine_ptr->jack_client = jack_client_open(client_name, JackNullOption, NULL);
@@ -566,24 +594,104 @@ zynjacku_jackmidi_to_lv2midi(
   return input_event_count != 0;
 }
 
-static
+//static
 void
 zynjacku_jackmidi_cc(
   struct zynjacku_engine * engine_ptr,
   jack_port_t * jack_port,
   jack_nframes_t nframes)
 {
+  struct list_head * node_ptr;
+  struct zynjacku_midicc * midicc_ptr;
   void * input_buf;
   jack_midi_event_t input_event;
   jack_nframes_t input_event_count;
   jack_nframes_t i;
-  int cc_no;
-  bool changes;
+  guint cc_no;
+  guint cc_value;
+
+  if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
+  {
+    /* Iterate over midicc pending activation */
+    while (!list_empty(&engine_ptr->midicc_pending_activation))
+    {
+      node_ptr = engine_ptr->midicc_pending_activation.next;
+      midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings);
+
+      assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+      list_del(node_ptr); /* remove from engine_ptr->midicc_pending_activation */
+
+      if (midicc_ptr->cc_no == G_MAXUINT)
+      {
+        list_add_tail(node_ptr, &engine_ptr->unassigned_midicc_rt);
+      }
+      else
+      {
+        list_add_tail(node_ptr, engine_ptr->midicc_rt + midicc_ptr->cc_no);
+      }
+    }
+
+    /* Iterate over midicc pending deactivation  */
+    while (!list_empty(&engine_ptr->midicc_pending_deactivation))
+    {
+      node_ptr = engine_ptr->midicc_pending_deactivation.next;
+      midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_pending_deactivation);
+
+      assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+      /* remove from engine_ptr->midicc_pending_deactivation */
+      list_del_init(node_ptr);
+
+      /* remove from engine's unassigned_midicc_rt or one of midicc_rt list */
+      list_del(&midicc_ptr->siblings);
+
+      if (!list_empty(&midicc_ptr->siblings_pending_cc_no_change))
+      {
+        list_del(&midicc_ptr->siblings_pending_cc_no_change);
+      }
+
+      if (!list_empty(&midicc_ptr->siblings_pending_cc_value_change))
+      {
+        list_del(&midicc_ptr->siblings_pending_cc_value_change);
+      }
+    }
+
+    /* Iterate over midicc with pending cc no change */
+    while (!list_empty(&engine_ptr->midicc_pending_cc_no_change))
+    {
+      node_ptr = engine_ptr->midicc_pending_cc_no_change.next;
+      midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_pending_cc_no_change);
+
+      assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+      list_del_init(node_ptr); /* remove from engine_ptr->midicc_pending_cc_no_change */
+
+      list_del(&midicc_ptr->siblings); /* remove from current midicc_rt list */
+
+      midicc_ptr->cc_no = midicc_ptr->pending_cc_no;
+      midicc_ptr->pending_cc_no = G_MAXUINT;
+      list_add_tail(node_ptr, engine_ptr->midicc_rt + midicc_ptr->cc_no);
+    }
+
+    /* Iterate over midicc with pending value change */
+    while (!list_empty(&engine_ptr->midicc_pending_cc_value_change))
+    {
+      node_ptr = engine_ptr->midicc_pending_cc_value_change.next;
+      midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_pending_cc_value_change);
+
+      assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+      list_del_init(node_ptr); /* remove from engine_ptr->midicc_pending_cc_value_change */
+
+      zynjacku_midiccmap_midi_cc_rt(midicc_ptr->map_obj_ptr, midicc_ptr->cc_no, midicc_ptr->cc_value);
+    }
+
+    pthread_mutex_unlock(&engine_ptr->rt_lock);
+  }
 
   input_buf = jack_port_get_buffer(jack_port, nframes);
   input_event_count = jack_midi_get_event_count(input_buf);
-
-  changes = false;
 
   /* iterate over all incoming JACK MIDI events */
   for (i = 0; i < input_event_count; i++)
@@ -595,21 +703,43 @@ zynjacku_jackmidi_cc(
     {
       //LOG_DEBUG("CC %u, value %u, channel %u", input_event.buffer[1], input_event.buffer[2], (input_event.buffer[0] & 0x0F));
       cc_no = input_event.buffer[1] & 0x7F;
-      engine_ptr->cc[cc_no].value_rt = input_event.buffer[2] & 0x7F;
-      changes = true;
-    }
-  }
+      cc_value = input_event.buffer[2] & 0x7F;
 
-  if (changes)
-  {
-    if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
-    {
-      for (i = 0; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]); i++)
+      /* assign all unassigned midicc maps */
+      while (!list_empty(&engine_ptr->unassigned_midicc_rt))
       {
-        engine_ptr->cc[i].value = engine_ptr->cc[i].value_rt;
+        node_ptr = engine_ptr->unassigned_midicc_rt.next;
+        midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings);
+
+        assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+        //LOG_DEBUG("assigning  cc no %u to map %p", cc_no, midicc_ptr);
+
+        midicc_ptr->cc_no = cc_no;
+
+        list_del(node_ptr); /* remove from engine_ptr->unassigned_midicc_rt */
+        list_add_tail(node_ptr, engine_ptr->midicc_rt + cc_no);
       }
 
-      pthread_mutex_unlock(&engine_ptr->rt_lock);
+      list_for_each(node_ptr, engine_ptr->midicc_rt + cc_no)
+      {
+        midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings);
+
+        assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+
+        if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
+        {
+          zynjacku_midiccmap_midi_cc_rt(midicc_ptr->map_obj_ptr, cc_no, cc_value);
+          pthread_mutex_unlock(&engine_ptr->rt_lock);
+        }
+        else
+        {
+          /* we are not lucky enough, ui thread is holding the lock */
+          /* postpone value change for next cycle */
+          midicc_ptr->cc_value = cc_value;
+          list_add_tail(&midicc_ptr->siblings_pending_cc_value_change, &engine_ptr->midicc_pending_cc_value_change);
+        }
+      }
     }
   }
 }
@@ -741,41 +871,25 @@ void
 zynjacku_engine_ui_run(
   ZynjackuEngine * engine_obj_ptr)
 {
-  struct list_head * node_ptr;
-  struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_engine * engine_ptr;
-  unsigned int i;
+  struct list_head * node_ptr;
+  struct zynjacku_midicc * midicc_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
 //  LOG_DEBUG("zynjacku_engine_ui_run() called.");
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
   pthread_mutex_lock(&engine_ptr->rt_lock);
-  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
+
+  /* Iterate over midi cc maps */
+  list_for_each(node_ptr, &engine_ptr->midicc_ui)
   {
-    if (engine_ptr->cc[i].value != engine_ptr->cc[i].value_ui)
-    {
-      engine_ptr->cc[i].value_changed = true;
-      engine_ptr->cc[i].value_ui = engine_ptr->cc[i].value;
-    }
+    midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_ui);
+    zynjacku_midiccmap_ui_run(midicc_ptr->map_obj_ptr);
   }
+
   pthread_mutex_unlock(&engine_ptr->rt_lock);
-
-  for (i = 0 ; i < sizeof(engine_ptr->cc) / sizeof(engine_ptr->cc[0]) ; i++)
-  {
-    if (engine_ptr->cc[i].value_changed)
-    {
-      /* Iterate over plugins */
-      list_for_each(node_ptr, &engine_ptr->plugins_all)
-      {
-        plugin_ptr = list_entry(node_ptr, struct zynjacku_plugin, siblings_all);
-
-        zynjacku_plugin_midi_cc(plugin_ptr, i, (unsigned int)engine_ptr->cc[i].value_ui);
-      }
-
-      engine_ptr->cc[i].value_changed = false;
-    }
-  }
 
   /* Iterate over plugins */
   list_for_each(node_ptr, &engine_ptr->plugins_all)
@@ -1014,6 +1128,141 @@ zynjacku_synth_create_port(
 }
 
 #undef synth_ptr
+
+static
+bool
+zynjacku_set_midi_cc_map(
+  GObject * engine_obj_ptr,
+  struct zynjacku_port * port_ptr,
+  GObject * midi_cc_map_obj_ptr)
+{
+  struct zynjacku_engine * engine_ptr;
+  struct zynjacku_midicc * midicc_ptr;
+  struct list_head * node_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  LOG_DEBUG("zynjacku_set_midi_cc_map(port=%p, map=%p) called.", port_ptr, midi_cc_map_obj_ptr);
+
+  if (midi_cc_map_obj_ptr != NULL)
+  {
+    LOG_DEBUG("new midicc");
+
+    midicc_ptr = malloc(sizeof(struct zynjacku_midicc));
+    //LOG_DEBUG("midicc struct at %p", midicc_ptr);
+    if (midicc_ptr == NULL)
+    {
+      LOG_ERROR("Failed to allocate memory for struct zynjacku_midicc");
+      return false;
+    }
+
+    assert(midi_cc_map_obj_ptr != NULL);
+
+    midicc_ptr->port_ptr = port_ptr;
+
+    g_object_ref(midi_cc_map_obj_ptr);
+    midicc_ptr->map_obj_ptr = ZYNJACKU_MIDI_CC_MAP(midi_cc_map_obj_ptr);
+    //LOG_DEBUG("midi cc map is %p", midicc_ptr->map_obj_ptr);
+    assert(midicc_ptr->map_obj_ptr != NULL);
+
+    midicc_ptr->cc_no = zynjacku_midiccmap_get_cc_no(midicc_ptr->map_obj_ptr);
+    midicc_ptr->pending_cc_no = G_MAXUINT;
+
+    INIT_LIST_HEAD(&midicc_ptr->siblings_pending_cc_no_change);
+    INIT_LIST_HEAD(&midicc_ptr->siblings_pending_cc_value_change);
+
+    pthread_mutex_lock(&engine_ptr->rt_lock);
+    list_add_tail(&midicc_ptr->siblings, &engine_ptr->midicc_pending_activation);
+    pthread_mutex_unlock(&engine_ptr->rt_lock);
+
+    list_add_tail(&midicc_ptr->siblings_ui, &engine_ptr->midicc_ui);
+
+    return true;
+  }
+
+  LOG_DEBUG("remove midicc");
+
+  /* Iterate over midi cc maps */
+  list_for_each(node_ptr, &engine_ptr->midicc_ui)
+  {
+    midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_ui);
+
+    if (midicc_ptr->port_ptr == port_ptr)
+    {
+      /* add to pending deactivation list */
+      pthread_mutex_lock(&engine_ptr->rt_lock);
+      list_add_tail(&midicc_ptr->siblings_pending_deactivation, &engine_ptr->midicc_pending_deactivation);
+      pthread_mutex_unlock(&engine_ptr->rt_lock);
+
+      /* unfortunately condvars dont always work with realtime threads */
+      pthread_mutex_lock(&engine_ptr->rt_lock);
+      while (!list_empty(&midicc_ptr->siblings_pending_deactivation))
+      {
+        pthread_mutex_unlock(&engine_ptr->rt_lock);
+        usleep(10000);
+        pthread_mutex_lock(&engine_ptr->rt_lock);
+      }
+      pthread_mutex_unlock(&engine_ptr->rt_lock);
+
+      list_del(&midicc_ptr->siblings_ui); /* remove from engine_ptr->midicc_ui */
+
+      g_object_ref(midicc_ptr->map_obj_ptr);
+      free(midicc_ptr);
+
+      return true;
+    }
+  }
+
+  LOG_ERROR("Cannot remove MIDI CC map because cannot find the port %p", port_ptr);
+  return false;
+}
+
+static
+bool
+zynjacku_midi_cc_map_cc_no_assign(
+  GObject * engine_obj_ptr,
+  GObject * midi_cc_map_obj_ptr,
+  guint cc_no)
+{
+  struct zynjacku_engine * engine_ptr;
+  ZynjackuMidiCcMap * map_obj_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_midicc * midicc_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+  map_obj_ptr = ZYNJACKU_MIDI_CC_MAP(midi_cc_map_obj_ptr);
+
+  LOG_DEBUG("zynjacku_midi_cc_map_cc_no_assign() called.");
+
+  if (cc_no == G_MAXUINT)
+  {
+    assert(0);
+    return false;
+  }
+
+  /* Iterate over midi cc maps */
+  list_for_each(node_ptr, &engine_ptr->midicc_ui)
+  {
+    midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings_ui);
+
+    if (midicc_ptr->map_obj_ptr == map_obj_ptr)
+    {
+      pthread_mutex_lock(&engine_ptr->rt_lock);
+
+      if (midicc_ptr->cc_no != cc_no)
+      {
+        midicc_ptr->pending_cc_no = cc_no;
+        list_add_tail(&midicc_ptr->siblings_pending_cc_no_change, &engine_ptr->midicc_pending_cc_no_change);
+      }
+
+      pthread_mutex_unlock(&engine_ptr->rt_lock);
+    }
+  }
+
+  LOG_ERROR("Cannot assign MIDI CC No because cannot find the map %p", midi_cc_map_obj_ptr);
+  return false;                 /* not found */
+}
+
 #define synth_ptr (&plugin_ptr->subtype.synth)
 
 bool
@@ -1162,6 +1411,8 @@ zynjacku_plugin_construct_synth(
 
   plugin_ptr->deactivate = zynjacku_engine_deactivate_synth;
   plugin_ptr->free_ports = zynjacku_free_synth_ports;
+  plugin_ptr->set_midi_cc_map = zynjacku_set_midi_cc_map;
+  plugin_ptr->midi_cc_map_cc_no_assign = zynjacku_midi_cc_map_cc_no_assign;
 
   LOG_DEBUG("Constructed plugin <%s>, gtk2gui <%p>", plugin_ptr->uri, plugin_ptr->gtk2gui);
 

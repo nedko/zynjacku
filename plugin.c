@@ -954,6 +954,7 @@ zynjacku_plugin_dynparam_parameter_created(
   port_ptr->index = 0;
   port_ptr->flags = 0;
   port_ptr->ui_context = NULL;
+  port_ptr->plugin_ptr = plugin_ptr;
   port_ptr->midi_cc_map_obj_ptr = NULL;
   port_ptr->type = PORT_TYPE_DYNPARAM;
   port_ptr->data.dynparam = parameter_handle;
@@ -961,6 +962,50 @@ zynjacku_plugin_dynparam_parameter_created(
 
   LOG_DEBUG("dynparam port %p created", port_ptr);
   *parameter_context_ptr = port_ptr;
+}
+
+static
+gboolean
+zynjacku_plugin_set_midi_cc_map_internal(
+  struct zynjacku_port * port_ptr,
+  GObject * midi_cc_map_obj_ptr)
+{
+  struct zynjacku_plugin * plugin_ptr;
+
+  assert(port_ptr->plugin_ptr != NULL);
+
+  plugin_ptr = port_ptr->plugin_ptr;
+
+  if (port_ptr->midi_cc_map_obj_ptr != NULL)
+  {
+    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
+    port_ptr->midi_cc_map_obj_ptr = NULL;
+  }
+
+  if (plugin_ptr->set_midi_cc_map == NULL)
+  {
+    LOG_ERROR("Cannot set midi cc map for plugin without engine");
+    assert(0);
+    return false;
+  }
+
+  if (!plugin_ptr->set_midi_cc_map(
+        plugin_ptr->engine_object_ptr,
+        port_ptr,
+        midi_cc_map_obj_ptr))
+  {
+    LOG_ERROR("failed to submit midi cc map change to engine");
+    return false;
+  }
+
+  if (midi_cc_map_obj_ptr != NULL)
+  {
+    g_object_ref(midi_cc_map_obj_ptr);
+  }
+
+  port_ptr->midi_cc_map_obj_ptr = midi_cc_map_obj_ptr;
+
+  return true;
 }
 
 #define port_ptr ((struct zynjacku_port *)parameter_context)
@@ -971,16 +1016,16 @@ zynjacku_plugin_dynparam_parameter_value_change_context(
   void * parameter_context,
   void * value_change_context)
 {
+  GObject * midi_cc_map_obj_ptr;
+
   LOG_DEBUG("zynjacku_plugin_dynparam_parameter_value_change_context(%p, %p, %p)", instance_context, parameter_context, value_change_context);
+
+  midi_cc_map_obj_ptr = G_OBJECT(value_change_context);
 
   assert(port_ptr->type == PORT_TYPE_DYNPARAM);
 
-  if (port_ptr->midi_cc_map_obj_ptr != NULL)
-  {
-    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
-  }
-
-  port_ptr->midi_cc_map_obj_ptr = G_OBJECT(value_change_context);
+  zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
+  g_object_unref(midi_cc_map_obj_ptr);
 }
 
 void
@@ -1393,17 +1438,7 @@ zynjacku_plugin_set_parameter(
 
         free(locale);
 
-        if (port_ptr->midi_cc_map_obj_ptr != NULL)
-        {
-          g_object_unref(port_ptr->midi_cc_map_obj_ptr);
-        }
-
-        if (midi_cc_map_obj_ptr != NULL)
-        {
-          g_object_ref(midi_cc_map_obj_ptr);
-        }
-
-        port_ptr->midi_cc_map_obj_ptr = midi_cc_map_obj_ptr;
+        zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
 
         return TRUE;
       }
@@ -1435,50 +1470,37 @@ zynjacku_plugin_get_midi_cc_map(
   return g_object_ref(port_ptr->midi_cc_map_obj_ptr);
 }
 
-void
+gboolean
 zynjacku_plugin_set_midi_cc_map(
   ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   GObject * midi_cc_map_obj_ptr)
 {
-  struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
   port_ptr = (struct zynjacku_port *)zynjacku_plugin_context_from_string(string_context);
 
   LOG_DEBUG("zynjacku_plugin_set_midi_cc_map() called, context %p", port_ptr);
 
-  if (port_ptr->midi_cc_map_obj_ptr != NULL)
-  {
-    g_object_unref(port_ptr->midi_cc_map_obj_ptr);
-  }
-
-  if (midi_cc_map_obj_ptr != NULL)
-  {
-    g_object_ref(midi_cc_map_obj_ptr);
-  }
-
-  port_ptr->midi_cc_map_obj_ptr = midi_cc_map_obj_ptr;
+  return zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
 }
 
-void
-zynjacku_plugin_midi_cc(
-  struct zynjacku_plugin * plugin_ptr,
-  unsigned int cc_no,
-  unsigned int cc_value)
+gboolean
+zynjacku_plugin_midi_cc_map_cc_no_assign(
+  GObject * plugin_obj_ptr,
+  GObject * midi_cc_map_obj_ptr,
+  guint cc_no)
 {
-  struct list_head * node_ptr;
-  struct zynjacku_port * port_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
-  list_for_each(node_ptr, &plugin_ptr->dynparam_ports)
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  if (plugin_ptr->engine_object_ptr == NULL || plugin_ptr->midi_cc_map_cc_no_assign == NULL)
   {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    if (port_ptr->midi_cc_map_obj_ptr != NULL)
-    {
-      zynjacku_midiccmap_point_midi_cc(ZYNJACKU_MIDI_CC_MAP(port_ptr->midi_cc_map_obj_ptr), cc_no, cc_value);
-    }
+    LOG_ERROR("Cannot set midi cc map for plugin without engine");
+    assert(0);
+    return false;
   }
+
+  return plugin_ptr->midi_cc_map_cc_no_assign(plugin_ptr->engine_object_ptr, midi_cc_map_obj_ptr, cc_no);
 }

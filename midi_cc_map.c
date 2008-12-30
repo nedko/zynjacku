@@ -21,12 +21,14 @@
  *****************************************************************************/
 
 #include <stdlib.h>
+#include <assert.h>
 #include <glib-object.h>
 
 #include "midi_cc_map.h"
 
 #include "list.h"
 #include "midi_cc_map_internal.h"
+#include "plugin_internal.h"
 
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
@@ -52,6 +54,13 @@ struct zynjacku_midi_cc_map
   gboolean dispose_has_run;
 
   gint cc_no;
+  gint cc_value;
+
+  gboolean pending_assign;
+  gboolean pending_value_change;
+
+  GObject * plugin_obj_ptr;
+
   struct list_head points;
 };
 
@@ -221,6 +230,8 @@ zynjacku_midi_cc_map_init(
 
   INIT_LIST_HEAD(&map_ptr->points);
   map_ptr->cc_no = G_MAXUINT;
+  map_ptr->pending_assign = FALSE;
+  map_ptr->pending_value_change = FALSE;
 }
 
 GType zynjacku_midiccmap_get_type()
@@ -449,39 +460,63 @@ zynjacku_midiccmap_point_parameter_value_change(
 }
 
 void
-zynjacku_midiccmap_point_midi_cc(
+zynjacku_midiccmap_midi_cc_rt(
   ZynjackuMidiCcMap * map_obj_ptr,
   guint cc_no,
   guint cc_value)
 {
   struct zynjacku_midi_cc_map * map_ptr;
 
-  LOG_DEBUG("zynjacku_midiccmap_point_midi_cc(%u, %u) called.", cc_no, cc_value);
+  LOG_DEBUG("zynjacku_midiccmap_midi_cc_rt_cc(%u, %u) called.", cc_no, cc_value);
 
   map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
 
+  assert(map_ptr != NULL);
+
   if (map_ptr->cc_no == G_MAXUINT)
   {
-    map_ptr->cc_no = cc_no;
+    map_ptr->pending_assign = TRUE;
+  }
 
+  map_ptr->cc_no = cc_no;
+  map_ptr->cc_value = cc_value;
+  map_ptr->pending_value_change = TRUE;
+}
+
+void
+zynjacku_midiccmap_ui_run(
+  ZynjackuMidiCcMap * map_obj_ptr)
+{
+  struct zynjacku_midi_cc_map * map_ptr;
+
+  LOG_DEBUG("zynjacku_midiccmap_ui_run() called.");
+
+  map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+
+  if (map_ptr->pending_assign)
+  {
     g_signal_emit(
       map_obj_ptr,
       g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED],
       0,
-      cc_no);
+      map_ptr->cc_no);
+
+    map_ptr->pending_assign = FALSE;
   }
 
-  if (map_ptr->cc_no == cc_no)
+  if (map_ptr->pending_value_change)
   {
     g_signal_emit(
       map_obj_ptr,
       g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_VALUE_CHANGED],
       0,
-      cc_value);
+      map_ptr->cc_value);
+
+    map_ptr->pending_value_change = FALSE;
   }
 }
 
-void
+gboolean
 zynjacku_midiccmap_cc_no_assign(
   ZynjackuMidiCcMap * map_obj_ptr,
   guint cc_no)
@@ -492,16 +527,29 @@ zynjacku_midiccmap_cc_no_assign(
 
   map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
 
-  if (map_ptr->cc_no != cc_no)
+  if (map_ptr->plugin_obj_ptr == NULL)
   {
-    map_ptr->cc_no = cc_no;
+    //LOG_DEBUG("no plugin associated");
 
-    g_signal_emit(
-      map_obj_ptr,
-      g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED],
-      0,
-      cc_no);
+    if (map_ptr->cc_no != cc_no)
+    {
+      map_ptr->cc_no = cc_no;
+
+      g_signal_emit(
+        map_obj_ptr,
+        g_zynjacku_midi_cc_map_signals[ZYNJACKU_MIDI_CC_MAP_SIGNAL_CC_NO_ASSIGNED],
+        0,
+        cc_no);
+    }
+
+    return TRUE;
   }
+  else
+  {
+    //LOG_DEBUG("plugin associated");
+  }
+
+  return zynjacku_plugin_midi_cc_map_cc_no_assign(map_ptr->plugin_obj_ptr, G_OBJECT(map_obj_ptr), cc_no);
 }
 
 gint
