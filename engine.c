@@ -72,8 +72,6 @@
 
 #define ZYNJACKU_ENGINE_FEATURES 7
 
-#define MIDICC_COUNT 127
-
 struct zynjacku_midicc
 {
   struct list_head siblings;    /* link in engine's midicc_pending_activation, unassigned_midicc_rt or a midicc_rt list */
@@ -88,6 +86,7 @@ struct zynjacku_midicc
   guint pending_cc_no;          /* protected using engine's rt_lock */
 
   ZynjackuMidiCcMap * map_obj_ptr;
+  void * map_internal_ptr;      /* ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE is not good to be used in realtime thread */
   struct zynjacku_port * port_ptr;
 };
 
@@ -739,6 +738,8 @@ zynjacku_jackmidi_cc(
           midicc_ptr->cc_value = cc_value;
           list_add_tail(&midicc_ptr->siblings_pending_cc_value_change, &engine_ptr->midicc_pending_cc_value_change);
         }
+
+        LOG_DEBUG("mapped to %f", (float)zynjacku_midiccmap_map_cc_rt(midicc_ptr->map_internal_ptr, cc_value));
       }
     }
   }
@@ -1165,6 +1166,7 @@ zynjacku_set_midi_cc_map(
     //LOG_DEBUG("midi cc map is %p", midicc_ptr->map_obj_ptr);
     assert(midicc_ptr->map_obj_ptr != NULL);
 
+    midicc_ptr->map_internal_ptr = zynjacku_midiccmap_get_internal_ptr(midicc_ptr->map_obj_ptr);
     midicc_ptr->cc_no = zynjacku_midiccmap_get_cc_no(midicc_ptr->map_obj_ptr);
     midicc_ptr->pending_cc_no = G_MAXUINT;
 

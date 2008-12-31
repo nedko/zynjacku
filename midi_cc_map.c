@@ -21,6 +21,7 @@
  *****************************************************************************/
 
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <glib-object.h>
 
@@ -49,6 +50,16 @@ struct point
   gfloat parameter_value;
 };
 
+struct point_and_func
+{
+  guint next_cc_value;
+
+  /* slope and y-intercept of linear function that matches this point and next one */
+  /* these are not valid if next_cc_value is G_MAXUINT */
+  gfloat slope;
+  gfloat y_intercept;
+};
+
 struct zynjacku_midi_cc_map
 {
   gboolean dispose_has_run;
@@ -62,6 +73,11 @@ struct zynjacku_midi_cc_map
   GObject * plugin_obj_ptr;
 
   struct list_head points;
+
+  gboolean points_need_ui_update;
+  gboolean points_need_rt_update;
+  struct point_and_func points_rt[MIDICC_COUNT];
+  struct point_and_func points_ui[MIDICC_COUNT];
 };
 
 #define ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_MIDI_CC_MAP_TYPE, struct zynjacku_midi_cc_map))
@@ -232,6 +248,9 @@ zynjacku_midi_cc_map_init(
   map_ptr->cc_no = G_MAXUINT;
   map_ptr->pending_assign = FALSE;
   map_ptr->pending_value_change = FALSE;
+  map_ptr->points_rt[0].next_cc_value = G_MAXUINT;
+  map_ptr->points_need_ui_update = FALSE;
+  map_ptr->points_need_rt_update = FALSE;
 }
 
 GType zynjacku_midiccmap_get_type()
@@ -362,6 +381,8 @@ zynjacku_midiccmap_point_create(
 
   list_add_tail(&point_ptr->siblings, &map_ptr->points);
 
+  map_ptr->points_need_ui_update = TRUE;
+
   zynjacku_midiccmap_point_created(map_obj_ptr, cc_value, parameter_value);
 }
 
@@ -406,6 +427,8 @@ zynjacku_midiccmap_point_remove(
     return;
   }
 
+  map_ptr->points_need_ui_update = TRUE;
+
   zynjacku_midiccmap_point_removed(map_obj_ptr, cc_value);
 }
 
@@ -430,6 +453,8 @@ zynjacku_midiccmap_point_cc_value_change(
   }
 
   point_ptr->cc_value = cc_value_new;
+
+  map_ptr->points_need_ui_update = TRUE;
 
   zynjacku_midiccmap_point_cc_changed(map_obj_ptr, cc_value_old, cc_value_new);
 }
@@ -456,6 +481,8 @@ zynjacku_midiccmap_point_parameter_value_change(
 
   point_ptr->parameter_value = parameter_value;
 
+  map_ptr->points_need_ui_update = TRUE;
+
   zynjacku_midiccmap_point_value_changed(map_obj_ptr, cc_value, parameter_value);
 }
 
@@ -481,6 +508,13 @@ zynjacku_midiccmap_midi_cc_rt(
   map_ptr->cc_no = cc_no;
   map_ptr->cc_value = cc_value;
   map_ptr->pending_value_change = TRUE;
+
+  if (map_ptr->points_need_rt_update)
+  {
+    LOG_DEBUG("updating points_rt array...");
+    memcpy(map_ptr->points_rt, map_ptr->points_ui, sizeof(map_ptr->points_rt));
+    map_ptr->points_need_rt_update = FALSE;
+  }
 }
 
 void
@@ -488,6 +522,12 @@ zynjacku_midiccmap_ui_run(
   ZynjackuMidiCcMap * map_obj_ptr)
 {
   struct zynjacku_midi_cc_map * map_ptr;
+  struct list_head * node_ptr;
+  struct point * point_ptr;
+  struct point * points_map[MIDICC_COUNT];
+  int index;
+  int prev;
+  gfloat x1, x2, y1, y2;
 
   LOG_DEBUG("zynjacku_midiccmap_ui_run() called.");
 
@@ -514,6 +554,70 @@ zynjacku_midiccmap_ui_run(
 
     map_ptr->pending_value_change = FALSE;
   }
+
+  if (!map_ptr->points_need_ui_update)
+  {
+    return;
+  }
+
+  /* regenerate points_ui array from points list */
+
+  LOG_DEBUG("regenerating points_ui array of map %p", map_ptr);
+
+  map_ptr->points_need_ui_update = FALSE;
+
+  memset(points_map, 0, sizeof(points_map));
+
+  list_for_each(node_ptr, &map_ptr->points)
+  {
+    point_ptr = list_entry(node_ptr, struct point, siblings);
+    assert(point_ptr->cc_value < MIDICC_COUNT);
+    points_map[point_ptr->cc_value] = point_ptr;
+  }
+
+  if (points_map[0] == NULL || points_map[MIDICC_COUNT - 1] == NULL)
+  {
+    /* if we dont have the extreme points then map is not complete
+       and thus it cannot be used for mapping */
+    LOG_DEBUG("not complete map");
+    return;
+  }
+
+  prev = -1;
+  for (index = 0; index < MIDICC_COUNT; index++)
+  {
+    map_ptr->points_ui[index].next_cc_value = G_MAXUINT;
+
+    if (points_map[index] == NULL)
+    {
+      continue;
+    }
+
+    if (prev == -1)
+    {
+      prev = index;
+      continue;
+    }
+
+    map_ptr->points_ui[prev].next_cc_value = index;
+
+    x1 = (gfloat)prev;
+    x2 = (gfloat)index;
+    y1 = points_map[prev]->parameter_value;
+    y2 = points_map[index]->parameter_value;
+
+    map_ptr->points_ui[prev].slope = (y2 - y1) / (x2 - x1);
+    map_ptr->points_ui[prev].y_intercept = (y1 * x2 - x1 * y2) / (x2 - x1);
+
+    LOG_DEBUG("%u -> %u has slope of %f and y-intercept of %f", prev, index, map_ptr->points_ui[prev].slope, map_ptr->points_ui[prev].y_intercept);
+
+    prev = index;
+  }
+
+  /* schedule update of points_rt array on next zynjacku_midiccmap_midi_cc_rt() call */
+  /* this function and zynjacku_midiccmap_midi_cc_rt() are called with same lock obtained */
+  /* however zynjacku_midiccmap_map_cc_rt() is called without lock obtained */
+  map_ptr->points_need_rt_update = TRUE;
 }
 
 gboolean
@@ -562,3 +666,46 @@ zynjacku_midiccmap_get_cc_no(
 
   return map_ptr->cc_no;
 }
+
+/* we meed this function because engine has to call zynjacku_midiccmap_map_cc_rt
+   and ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE is not good to be used in realtime thread */
+void *
+zynjacku_midiccmap_get_internal_ptr(
+  ZynjackuMidiCcMap * map_obj_ptr)
+{
+  return ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
+}
+
+#define map_ptr ((struct zynjacku_midi_cc_map *)internal_ptr)
+
+gfloat
+zynjacku_midiccmap_map_cc_rt(
+  void * internal_ptr,
+  guint cc_value)
+{
+  int index;
+
+  LOG_DEBUG("zynjacku_midiccmap_map_cc_rt(%p, %u)", map_ptr, cc_value);
+
+  if (map_ptr->points_rt[0].next_cc_value == G_MAXUINT)
+  {
+    /* no valid map */
+    LOG_DEBUG("no valid map");
+    return 0.0;
+  }
+
+  assert(cc_value < MIDICC_COUNT);
+  index = cc_value;
+
+  while (map_ptr->points_rt[index].next_cc_value == G_MAXUINT)
+  {
+    index--;
+    assert(index >= 0);
+  }
+
+  LOG_DEBUG("%u -> %u has slope of %f and y-intercept of %f", index, map_ptr->points_rt[index].next_cc_value, map_ptr->points_rt[index].slope, map_ptr->points_rt[index].y_intercept);
+
+  return map_ptr->points_rt[index].slope * (gfloat)cc_value + map_ptr->points_rt[index].y_intercept;
+}
+
+#undef map_ptr

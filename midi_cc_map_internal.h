@@ -35,6 +35,17 @@ void
 zynjacku_midiccmap_ui_run(
   ZynjackuMidiCcMap * map_obj_ptr);
 
+void *
+zynjacku_midiccmap_get_internal_ptr(
+  ZynjackuMidiCcMap * map_obj_ptr);
+
+gfloat
+zynjacku_midiccmap_map_cc_rt(
+  void * internal_ptr,
+  guint cc_value);
+
+#define MIDICC_COUNT 128
+
 G_END_DECLS
 
 #endif /* #ifndef MIDI_CC_MAP_INTERNAL_H__1BF0EA4F_D9DB_4A93_9A6D_9A77E5FFD9EA__INCLUDED */
