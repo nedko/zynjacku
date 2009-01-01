@@ -99,6 +99,8 @@ void
 zynjacku_plugin_dynparam_parameter_created(
   void * instance_context,
   lv2dynparam_host_parameter parameter_handle,
+  unsigned int parameter_type,
+  const char * parameter_name,
   void ** parameter_context_ptr);
 
 void

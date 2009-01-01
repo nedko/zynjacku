@@ -58,20 +58,21 @@
 #include "midi_cc_map_internal.h"
 
 /* signals */
-#define ZYNJACKU_PLUGIN_SIGNAL_TEST                0
-#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED      1
-#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED   2
-#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED       3
-#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED    4
-#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED      5
-#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED   6
-#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED       7
-#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED    8
-#define ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED        9
-#define ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED    10
-#define ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF      11
-#define ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE    12
-#define ZYNJACKU_PLUGIN_SIGNALS_COUNT             13
+#define ZYNJACKU_PLUGIN_SIGNAL_TEST                  0
+#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_APPEARED        1
+#define ZYNJACKU_PLUGIN_SIGNAL_GROUP_DISAPPEARED     2
+#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_APPEARED         3
+#define ZYNJACKU_PLUGIN_SIGNAL_BOOL_DISAPPEARED      4
+#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED        5
+#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_DISAPPEARED     6
+#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_APPEARED         7
+#define ZYNJACKU_PLUGIN_SIGNAL_ENUM_DISAPPEARED      8
+#define ZYNJACKU_PLUGIN_SIGNAL_INT_APPEARED          9
+#define ZYNJACKU_PLUGIN_SIGNAL_INT_DISAPPEARED      10
+#define ZYNJACKU_PLUGIN_SIGNAL_CUSTOM_GUI_OF        11
+#define ZYNJACKU_PLUGIN_SIGNAL_PARAMETER_VALUE      12
+#define ZYNJACKU_PLUGIN_SIGNAL_FLOAT_VALUE_CHANGED  13
+#define ZYNJACKU_PLUGIN_SIGNALS_COUNT               14
 
 /* properties */
 #define ZYNJACKU_PLUGIN_PROP_URI                1
@@ -453,6 +454,21 @@ zynjacku_plugin_class_init(
       G_TYPE_STRING,            /* parameter name */
       G_TYPE_STRING,            /* parameter value */
       G_TYPE_OBJECT);           /* midi map cc object */
+
+  g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_VALUE_CHANGED] =
+    g_signal_new(
+      "float-value-changed",    /* signal_name */
+      ZYNJACKU_PLUGIN_TYPE,     /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      2,                        /* n_params */
+      G_TYPE_OBJECT,            /* object */
+      G_TYPE_FLOAT);            /* value */
 
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_plugin_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_plugin_set_property;
@@ -935,6 +951,8 @@ void
 zynjacku_plugin_dynparam_parameter_created(
   void * instance_context,
   lv2dynparam_host_parameter parameter_handle,
+  unsigned int parameter_type,
+  const char * parameter_name,
   void ** parameter_context_ptr)
 {
   struct zynjacku_port * port_ptr;
@@ -957,7 +975,8 @@ zynjacku_plugin_dynparam_parameter_created(
   port_ptr->plugin_ptr = plugin_ptr;
   port_ptr->midi_cc_map_obj_ptr = NULL;
   port_ptr->type = PORT_TYPE_DYNPARAM;
-  port_ptr->data.dynparam = parameter_handle;
+  port_ptr->data.dynparam.type = parameter_type;
+  port_ptr->data.dynparam.handle = parameter_handle;
   list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->dynparam_ports);
 
   LOG_DEBUG("dynparam port %p created", port_ptr);
@@ -1221,6 +1240,31 @@ dynparam_ui_parameter_appeared(
   *parameter_ui_context = NULL;
 }
 
+void
+dynparam_ui_parameter_value_changed(
+  void * instance_ui_context,
+  void * parameter_context,
+  void * parameter_ui_context,
+  union lv2dynparam_host_parameter_value value)
+{
+  switch (port_ptr->data.dynparam.type)
+  {
+  case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+    g_signal_emit(
+      (ZynjackuPlugin *)instance_ui_context,
+      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_VALUE_CHANGED],
+      0,
+      port_ptr->ui_context,
+      (gfloat)value.fpoint);
+    break;
+  case LV2DYNPARAM_PARAMETER_TYPE_ENUM:
+  case LV2DYNPARAM_PARAMETER_TYPE_INT:
+  case LV2DYNPARAM_PARAMETER_TYPE_BOOLEAN:
+    /* not implemented */
+    break;
+  }
+}
+
 #undef port_ptr
 
 void
@@ -1244,7 +1288,7 @@ zynjacku_plugin_bool_set(
   dynparam_value.boolean = value;
   lv2dynparam_parameter_change(
     plugin_ptr->dynparams,
-    port_ptr->data.dynparam,
+    port_ptr->data.dynparam.handle,
     dynparam_value);
 }
 
@@ -1269,7 +1313,7 @@ zynjacku_plugin_float_set(
     dynparam_value.fpoint = value;
     lv2dynparam_parameter_change(
       plugin_ptr->dynparams,
-      port_ptr->data.dynparam,
+      port_ptr->data.dynparam.handle,
       dynparam_value);
   }
   else
@@ -1299,7 +1343,7 @@ zynjacku_plugin_enum_set(
   dynparam_value.enum_selected_index = value;
   lv2dynparam_parameter_change(
     plugin_ptr->dynparams,
-    port_ptr->data.dynparam,
+    port_ptr->data.dynparam.handle,
     dynparam_value);
 }
 
@@ -1322,7 +1366,7 @@ zynjacku_plugin_int_set(
   dynparam_value.integer = value;
   lv2dynparam_parameter_change(
     plugin_ptr->dynparams,
-    port_ptr->data.dynparam,
+    port_ptr->data.dynparam.handle,
     dynparam_value);
 }
 

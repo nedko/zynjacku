@@ -59,7 +59,11 @@ struct zynjacku_port
     } parameter;                /* for PORT_TYPE_LV2_FLOAT_PARAM */
     struct _LV2_String_Data * string;
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
-    lv2dynparam_host_parameter dynparam; /* for PORT_TYPE_DYNPARAM */
+    struct
+    {
+      unsigned int type;
+      lv2dynparam_host_parameter handle;
+    } dynparam; /* for PORT_TYPE_DYNPARAM */
   } data;
 
   GObject * ui_context;

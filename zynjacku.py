@@ -769,6 +769,7 @@ class PluginUIUniversal(PluginUI):
             self.plugin.disconnect(self.enum_appeared_connect_id)
             self.plugin.disconnect(self.float_disappeared_connect_id)
             self.plugin.disconnect(self.float_appeared_connect_id)
+            self.plugin.disconnect(self.float_value_changed_id)
             self.plugin.disconnect(self.bool_disappeared_connect_id)
             self.plugin.disconnect(self.bool_appeared_connect_id)
             self.plugin.disconnect(self.group_disappeared_connect_id)
@@ -790,6 +791,7 @@ class PluginUIUniversal(PluginUI):
             self.bool_disappeared_connect_id = self.plugin.connect("bool-disappeared", self.on_bool_disappeared)
             self.float_appeared_connect_id = self.plugin.connect("float-appeared", self.on_float_appeared)
             self.float_disappeared_connect_id = self.plugin.connect("float-disappeared", self.on_float_disappeared)
+            self.float_value_changed_id = self.plugin.connect("float-value-changed", self.on_float_value_changed)
             self.enum_appeared_connect_id = self.plugin.connect("enum-appeared", self.on_enum_appeared)
             self.enum_disappeared_connect_id = self.plugin.connect("enum-disappeared", self.on_enum_disappeared)
             self.int_appeared_connect_id = self.plugin.connect("int-appeared", self.on_int_appeared)
@@ -877,6 +879,13 @@ class PluginUIUniversal(PluginUI):
         #print repr(self.parent_group)
         #print repr(obj)
         obj.remove()
+
+    def on_float_value_changed(self, synth, obj, value):
+        #print "-------------- Float \"%s\" value changed to %f" % (obj.parameter_name, value)
+        #print repr(self.parent_group)
+        #print repr(obj)
+        #print "value: %s" % repr(value)
+        obj.value_changed(value)
 
     def on_enum_appeared(self, synth, parent, name, hints, selected_value_index, valid_values, context):
         #print "-------------- Enum \"%s\" appeared" % name
@@ -1172,6 +1181,8 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         self.knob.connect("button-press-event", self.on_clicked)
 
+        self.automation = False
+
         #print "Float \"%s\" created: %s" % (name, repr(self))
 
     def on_clicked(self, widget, event):
@@ -1205,9 +1216,19 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
     def get_top_widget(self):
         return self.top
 
+    # UI change -> engine change
     def on_value_changed(self, adjustment):
+        if self.automation:
+            return
+
         #print "Float changed. \"%s\" set to %f" % (self.parameter_name, adjustment.get_value())
         self.window.plugin.float_set(self.context, adjustment.get_value())
+
+    # engine change -> UI change
+    def value_changed(self, value):
+        self.automation = True
+        self.adjustment.value = value
+        self.automation = False
 
     def set_sensitive(self, sensitive):
         self.knob.set_sensitive(sensitive)

@@ -608,6 +608,8 @@ zynjacku_jackmidi_cc(
   jack_nframes_t i;
   guint cc_no;
   guint cc_value;
+  gfloat mapvalue;
+  union lv2dynparam_host_parameter_value dynvalue;
 
   if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
   {
@@ -739,7 +741,31 @@ zynjacku_jackmidi_cc(
           list_add_tail(&midicc_ptr->siblings_pending_cc_value_change, &engine_ptr->midicc_pending_cc_value_change);
         }
 
-        LOG_DEBUG("mapped to %f", (float)zynjacku_midiccmap_map_cc_rt(midicc_ptr->map_internal_ptr, cc_value));
+        mapvalue = zynjacku_midiccmap_map_cc_rt(midicc_ptr->map_internal_ptr, cc_value);
+        LOG_DEBUG("%u mapped to %f", (unsigned int)cc_value, (float)mapvalue);
+
+        switch (midicc_ptr->port_ptr->type)
+        {
+        case PORT_TYPE_LV2_FLOAT_PARAM:
+          if ((midicc_ptr->port_ptr->flags & PORT_FLAGS_IS_STRING) != 0)
+          {
+            /* can we do something for string ports at all? */
+            break;
+          }
+
+          midicc_ptr->port_ptr->data.parameter.value = mapvalue;
+          break;
+        case PORT_TYPE_DYNPARAM:
+          switch (midicc_ptr->port_ptr->data.dynparam.type)
+          {
+          case LV2DYNPARAM_PARAMETER_TYPE_FLOAT:
+            dynvalue.fpoint = mapvalue;
+            lv2dynparam_parameter_change_rt(midicc_ptr->port_ptr->plugin_ptr->dynparams, midicc_ptr->port_ptr->data.dynparam.handle, dynvalue);
+            break;
+          }
+
+          break;
+        }
       }
     }
   }
