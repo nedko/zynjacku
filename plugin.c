@@ -888,6 +888,23 @@ zynjacku_connect_plugin_ports(
   return true;
 }
 
+static
+void
+zynjacku_free_port(
+  struct zynjacku_port * port_ptr)
+{
+  assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
+
+  if (port_ptr->type == PORT_TYPE_LV2_STRING)
+  {
+    free(port_ptr->data.lv2string.data);
+  }
+
+  free(port_ptr->symbol);
+  free(port_ptr->name);
+  free(port_ptr);
+}
+
 void
 zynjacku_free_plugin_ports(
   struct zynjacku_plugin * plugin_ptr)
@@ -901,13 +918,10 @@ zynjacku_free_plugin_ports(
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     assert(PORT_IS_INPUT(port_ptr));
-    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
 
     list_del(node_ptr);
 
-    free(port_ptr->symbol);
-    free(port_ptr->name);
-    free(port_ptr);
+    zynjacku_free_port(port_ptr);
   }
 
   while (!list_empty(&plugin_ptr->measure_ports))
@@ -916,11 +930,10 @@ zynjacku_free_plugin_ports(
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
     assert(PORT_IS_OUTPUT(port_ptr));
-    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
 
     list_del(node_ptr);
 
-    free(port_ptr);
+    zynjacku_free_port(port_ptr);
   }
 
   while (!list_empty(&plugin_ptr->dynparam_ports))
