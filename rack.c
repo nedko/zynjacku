@@ -379,6 +379,7 @@ jack_process_cb(
   void * left;
   void * right;
   bool mono;
+  void * old_data;
 
   if (pthread_mutex_trylock(&rack_ptr->active_plugins_lock) == 0)
   {
@@ -400,8 +401,6 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each_safe(effect_node_ptr, temp_node_ptr, &rack_ptr->plugins_active)
   {
-    struct zynjacku_rt_plugin_command * cmd;
-
     effect_ptr = list_entry(effect_node_ptr, struct zynjacku_plugin, siblings_active);
 
     if (effect_ptr->recycle)
@@ -411,15 +410,7 @@ jack_process_cb(
       continue;
     }
 
-    cmd = effect_ptr->command;
-
-    /* Execute the command */
-    if (cmd)
-    {
-      assert(!effect_ptr->command_result);
-      assert(!(cmd->port->flags & PORT_FLAGS_MSGCONTEXT));
-      zynjacku_lv2_connect_port(effect_ptr->lv2plugin, cmd->port, cmd->data);
-    }
+    old_data = zynjacku_plugin_prerun_rt(effect_ptr);
 
     if (effect_ptr->dynparams)
     {
@@ -460,14 +451,7 @@ jack_process_cb(
     /* Run plugin for this cycle */
     zynjacku_lv2_run(effect_ptr->lv2plugin, nframes);
     
-    /* Acknowledge the command */
-    if (cmd)
-    {
-      if (cmd->port->flags & PORT_FLAGS_IS_STRING)
-        ((LV2_String_Data *)(cmd->data))->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
-      effect_ptr->command = NULL;
-      effect_ptr->command_result = cmd;
-    }
+    zynjacku_plugin_postrun_rt(effect_ptr, old_data);
   }
 
   return 0;
@@ -738,8 +722,6 @@ zynjacku_plugin_construct_effect(
   char * port_name;
   size_t size_name;
   size_t size_id;
-  struct list_head * node_ptr;
-  struct zynjacku_port * port_ptr;
   struct lv2rack_engine * rack_ptr;
 
   rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_object_ptr);
@@ -766,43 +748,14 @@ zynjacku_plugin_construct_effect(
     goto fail;
   }
 
-  if (plugin_ptr->dynparams_supported)
+  /* connect parameter/measure ports */
+
+  if (!zynjacku_connect_plugin_ports(plugin_ptr, plugin_obj_ptr, rack_object_ptr, &rack_ptr->mempool_allocator))
   {
-    if (!lv2dynparam_host_attach(
-          zynjacku_lv2_get_descriptor(plugin_ptr->lv2plugin),
-          zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
-          &rack_ptr->mempool_allocator,
-          plugin_obj_ptr,
-          zynjacku_plugin_dynparam_parameter_created,
-          zynjacku_plugin_dynparam_parameter_destroying,
-          zynjacku_plugin_dynparam_parameter_value_change_context,
-          &plugin_ptr->dynparams))
-    {
-      LOG_ERROR("Failed to instantiate dynparams extension.");
-      goto fail_unload;
-    }
-  }
-  else
-  {
-    plugin_ptr->dynparams = NULL;
+    goto fail_unload;
   }
 
-  plugin_ptr->engine_object_ptr = rack_object_ptr;
-
-  /* connect parameter ports */
-  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
-  {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
-    LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
-  }
-
-  /* connect measurement ports */
-  list_for_each(node_ptr, &plugin_ptr->measure_ports)
-  {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
-  }
+  /* setup audio ports (they are connected in jack process callback */
 
   size_name = strlen(plugin_ptr->name);
   port_name = malloc(size_name + 1024);
@@ -812,7 +765,6 @@ zynjacku_plugin_construct_effect(
     goto fail_free_ports;
   }
 
-  /* setup audio ports (they are connected in jack process callback */
   size_id = sprintf(port_name, "%u:", id);
   memcpy(port_name + size_id, plugin_ptr->name, size_name);
 

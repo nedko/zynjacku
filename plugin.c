@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
+#include <unistd.h>
 #include <slv2/slv2.h>
 //#include <slv2/query.h>
 #include <jack/jack.h>
@@ -48,6 +49,9 @@
 #include "hints.h"
 #include "lv2.h"
 #include "gtk2gui.h"
+
+#include "lv2_string_port.h"
+#include "lv2_contexts.h"
 
 #include "zynjacku.h"
 #include "plugin_internal.h"
@@ -78,6 +82,25 @@
 #define ZYNJACKU_PLUGIN_PROP_URI                1
 
 static guint g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNALS_COUNT];
+
+void
+zynjacku_plugin_dynparam_parameter_created(
+  void * instance_context,
+  lv2dynparam_host_parameter parameter_handle,
+  unsigned int parameter_type,
+  const char * parameter_name,
+  void ** parameter_context_ptr);
+
+void
+zynjacku_plugin_dynparam_parameter_destroying(
+  void * instance_context,
+  void * parameter_context);
+
+void
+zynjacku_plugin_dynparam_parameter_value_change_context(
+  void * instance_context,
+  void * parameter_context,
+  void * value_change_context);
 
 /* UGLY: We convert dynparam context poitners to string to pass them
    as opaque types through Python. Silly, but codegen fails to create
@@ -602,18 +625,26 @@ zynjacku_plugin_generic_lv2_ui_on(
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-    g_signal_emit(
-      plugin_obj_ptr,
-      g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
-      0,
-      plugin_ptr->root_group_ui_context,
-      port_ptr->name,
-      hints_obj_ptr,
-      port_ptr->data.parameter.value,
-      port_ptr->data.parameter.min,
-      port_ptr->data.parameter.max,
-      zynjacku_plugin_context_to_string(port_ptr),
-      &port_ptr->ui_context);
+    switch (port_ptr->type)
+    {
+    case PORT_TYPE_LV2_FLOAT:
+      g_signal_emit(
+        plugin_obj_ptr,
+        g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNAL_FLOAT_APPEARED],
+        0,
+        plugin_ptr->root_group_ui_context,
+        port_ptr->name,
+        hints_obj_ptr,
+        port_ptr->data.lv2float.value,
+        port_ptr->data.lv2float.min,
+        port_ptr->data.lv2float.max,
+        zynjacku_plugin_context_to_string(port_ptr),
+        &port_ptr->ui_context);
+      break;
+    case PORT_TYPE_LV2_STRING:
+      /* TODO */
+      break;
+    }
   }
 
   g_object_unref(hints_obj_ptr);
@@ -772,6 +803,91 @@ zynjacku_gtk2gui_on_ui_destroyed(
     NULL);
 }
 
+bool
+zynjacku_connect_plugin_ports(
+  struct zynjacku_plugin * plugin_ptr,
+  ZynjackuPlugin * plugin_obj_ptr,
+  GObject * engine_object_ptr,
+  struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr)
+{
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+
+  plugin_ptr->engine_object_ptr = engine_object_ptr;
+
+  if (plugin_ptr->dynparams_supported)
+  {
+    if (!lv2dynparam_host_attach(
+          zynjacku_lv2_get_descriptor(plugin_ptr->lv2plugin),
+          zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
+          mempool_allocator_ptr,
+          plugin_obj_ptr,
+          zynjacku_plugin_dynparam_parameter_created,
+          zynjacku_plugin_dynparam_parameter_destroying,
+          zynjacku_plugin_dynparam_parameter_value_change_context,
+          &plugin_ptr->dynparams))
+    {
+      LOG_ERROR("Failed to instantiate dynparams extension.");
+      return false;
+    }
+
+    return true;
+  }
+
+  plugin_ptr->dynparams = NULL;
+
+  /* connect parameter ports */
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    if (PORT_IS_MSGCONTEXT(port_ptr))
+    {
+      /* TODO: ask drobilla whether msgcontext [prts they should be connceted on instantiation */
+    }
+    else
+    {
+      switch (port_ptr->type)
+      {
+      case PORT_TYPE_LV2_FLOAT:
+        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float);
+        LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.lv2float);
+        break;
+      case PORT_TYPE_LV2_STRING:
+        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2string);
+        LOG_INFO("Set %s to '%s'", port_ptr->symbol, port_ptr->data.lv2string.data);
+        break;
+      }
+    }
+  }
+
+  /* connect measurement ports */
+  list_for_each(node_ptr, &plugin_ptr->measure_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+
+    if (PORT_IS_MSGCONTEXT(port_ptr))
+    {
+      /* TODO: ask drobilla whether msgcontext [prts they should be connceted on instantiation */
+    }
+    else
+    {
+      switch (port_ptr->type)
+      {
+      case PORT_TYPE_LV2_FLOAT:
+        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float);
+        break;
+      case PORT_TYPE_LV2_STRING:
+        /* TODO measure string ports are broken for now */
+        break;
+      }
+    }
+  }
+
+  return true;
+}
+
 void
 zynjacku_free_plugin_ports(
   struct zynjacku_plugin * plugin_ptr)
@@ -784,7 +900,8 @@ zynjacku_free_plugin_ports(
     node_ptr = plugin_ptr->parameter_ports.next;
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT_PARAM);
+    assert(PORT_IS_INPUT(port_ptr));
+    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
 
     list_del(node_ptr);
 
@@ -798,7 +915,8 @@ zynjacku_free_plugin_ports(
     node_ptr = plugin_ptr->measure_ports.next;
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-    assert(port_ptr->type == PORT_TYPE_MEASURE);
+    assert(PORT_IS_OUTPUT(port_ptr));
+    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
 
     list_del(node_ptr);
 
@@ -1301,6 +1419,7 @@ zynjacku_plugin_float_set(
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
+  float fvalue;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
@@ -1310,6 +1429,7 @@ zynjacku_plugin_float_set(
 
   if (plugin_ptr->dynparams != NULL)
   {
+    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
     dynparam_value.fpoint = value;
     lv2dynparam_parameter_change(
       plugin_ptr->dynparams,
@@ -1318,7 +1438,9 @@ zynjacku_plugin_float_set(
   }
   else
   {
-    port_ptr->data.parameter.value = value;
+    assert(port_ptr->type == PORT_TYPE_LV2_FLOAT);
+    fvalue = value;
+    zynjacku_plugin_ui_set_port_value(plugin_ptr, port_ptr, &fvalue, sizeof(fvalue));
   }
 }
 
@@ -1420,9 +1542,16 @@ zynjacku_plugin_get_parameters(
     {
       port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-      setlocale(LC_NUMERIC, "POSIX");
-      sprintf(value, "%f", port_ptr->data.parameter.value);
-      setlocale(LC_NUMERIC, locale);
+      switch (port_ptr->type)
+      {
+      case PORT_TYPE_LV2_FLOAT:
+        setlocale(LC_NUMERIC, "POSIX");
+        sprintf(value, "%f", port_ptr->data.lv2float.value);
+        setlocale(LC_NUMERIC, locale);
+        break;
+      default:
+        continue;
+      }
 
       g_signal_emit(
         plugin_obj_ptr,
@@ -1448,6 +1577,7 @@ zynjacku_plugin_set_parameter(
   struct list_head * node_ptr;
   struct zynjacku_port * port_ptr;
   char * locale;
+  gboolean ret;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
@@ -1473,18 +1603,30 @@ zynjacku_plugin_set_parameter(
         locale = strdup(setlocale(LC_NUMERIC, NULL));
         setlocale(LC_NUMERIC, "POSIX");
 
-        if (sscanf(value, "%f", &port_ptr->data.parameter.value) != 1)
+        switch (port_ptr->type)
         {
-          LOG_ERROR("failed to convert value '%s' of parameter '%s' to float", value, parameter);
+        case PORT_TYPE_LV2_FLOAT:
+          ret = sscanf(value, "%f", &port_ptr->data.lv2float.value) == 1;
+          if (!ret)
+          {
+            LOG_ERROR("failed to convert value '%s' of parameter '%s' to float", value, parameter);
+          }
+          break;
+        default:
+          /* TODO */
+          ret = FALSE;
+          break;
         }
 
         setlocale(LC_NUMERIC, locale);
-
         free(locale);
 
-        zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
+        if (ret)
+        {
+          zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
+        }
 
-        return TRUE;
+        return ret;
       }
     }
   }
@@ -1547,4 +1689,159 @@ zynjacku_plugin_midi_cc_map_cc_no_assign(
   }
 
   return plugin_ptr->midi_cc_map_cc_no_assign(plugin_ptr->engine_object_ptr, midi_cc_map_obj_ptr, cc_no);
+}
+
+static
+void
+send_message(
+  struct zynjacku_plugin * plugin_ptr,
+  struct zynjacku_port * port_ptr,
+  const void *dest)
+{
+  static uint8_t input_data[4096];
+  static uint8_t output_data[4096];
+
+  if (port_ptr->index >= 4096 * 8)
+  {
+    LOG_WARNING("Ignoring message port %d (it exceeds the arbitrary limit)", port_ptr->index);
+    return;
+  }
+
+  /* send it via message context */
+  zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, (void *)dest);
+  lv2_contexts_set_port_valid(input_data, port_ptr->index);
+  zynjacku_lv2_message(plugin_ptr->lv2plugin, input_data, output_data);
+  /* unset so that the same static array can be reused later */
+  lv2_contexts_unset_port_valid(input_data, port_ptr->index);
+}
+
+void
+zynjacku_plugin_ui_set_port_value(
+  struct zynjacku_plugin * plugin_ptr,
+  struct zynjacku_port * port_ptr,
+  const void * value_ptr,
+  size_t value_size)
+{
+  LV2_String_Data lv2string;
+  const LV2_String_Data * src;
+  struct zynjacku_rt_plugin_command cmd;
+  int t;
+
+  switch (port_ptr->type)
+  {
+  case PORT_TYPE_LV2_FLOAT:
+    LOG_DEBUG("setting port %s to %f", port_ptr->symbol, *(float *)value_ptr);
+
+    port_ptr->data.lv2float.value = *(float *)value_ptr;
+    /* se support only lv2:ControlPort ATM */
+    assert(value_size == sizeof(float));
+    if (PORT_IS_MSGCONTEXT(port_ptr))
+    {
+      send_message(plugin_ptr, port_ptr, value_ptr);
+    }
+    return;
+  case PORT_TYPE_LV2_STRING:
+    assert(value_size == sizeof(LV2_String_Data));
+    src = (const LV2_String_Data *)value_ptr;
+
+    lv2string = port_ptr->data.lv2string;
+    
+    if (src->len + 1 > lv2string.storage)
+    {
+      lv2string.storage = src->len + 65; /* alloc 64 bytes more, just in case */
+    }
+
+    lv2string.data = malloc(lv2string.storage);
+    strcpy(lv2string.data, src->data);
+    lv2string.len = src->len;
+    lv2string.flags |= LV2_STRING_DATA_CHANGED_FLAG;
+    
+    if (PORT_IS_MSGCONTEXT(port_ptr))
+    {
+      send_message(plugin_ptr, port_ptr, &lv2string);
+      lv2string.flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
+
+      free(port_ptr->data.lv2string.data);
+      port_ptr->data.lv2string = lv2string;
+      return;
+    }
+
+    /* send it via RT thread */
+    cmd.port = port_ptr;
+    cmd.data = &lv2string;
+    assert(plugin_ptr->command_result = NULL);
+    plugin_ptr->command = &cmd;
+
+    /* wait RT thread to execute the command */
+    t = 1;
+    while (plugin_ptr->command_result == NULL)
+    {
+      usleep(10000 * t);
+      t *= 2;
+    }
+
+    /* MAYBE: any memory barriers needed here? */
+    assert(!plugin_ptr->command);
+    assert(plugin_ptr->command_result == &cmd);
+    free(cmd.data);             /* free the old string storage */
+    plugin_ptr->command_result = NULL;
+    return;
+  }
+}
+
+void *
+zynjacku_plugin_prerun_rt(
+  struct zynjacku_plugin * plugin_ptr)
+{
+  struct zynjacku_rt_plugin_command * cmd;
+  void * old_data;
+
+  cmd = plugin_ptr->command;
+
+  if (cmd == NULL)
+  {
+    return NULL;
+  }
+
+  /* Execute the command */
+  assert(!plugin_ptr->command_result);
+  assert(!(cmd->port->flags & PORT_FLAGS_MSGCONTEXT));
+  zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, cmd->port, cmd->data);
+
+  if (cmd->port->type == PORT_TYPE_LV2_STRING)
+  {
+    old_data = cmd->port->data.lv2string.data;
+    cmd->port->data.lv2string = *((LV2_String_Data *)cmd->data);
+  }
+  else
+  {
+    old_data = NULL;
+  }
+
+  return old_data;
+}
+
+void
+zynjacku_plugin_postrun_rt(
+  struct zynjacku_plugin * plugin_ptr,
+  void * old_data)
+{
+  struct zynjacku_rt_plugin_command * cmd;
+
+  cmd = plugin_ptr->command;
+
+  if (cmd == NULL)
+  {
+    return;
+  }
+
+  /* Acknowledge the command */
+  if (cmd->port->type == PORT_TYPE_LV2_STRING)
+  {
+    ((LV2_String_Data *)cmd->data)->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
+    cmd->data = old_data;
+  }
+
+  plugin_ptr->command = NULL;
+  plugin_ptr->command_result = cmd;
 }

@@ -39,6 +39,7 @@
 #include "lv2.h"
 #include "gtk2gui.h"
 #include "zynjacku.h"
+#include "plugin.h"
 #include "plugin_internal.h"
 #include "plugin_repo.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
@@ -730,182 +731,217 @@ zynjacku_plugin_repo_get_bundle_path(
 }
 
 static
+struct zynjacku_port *
+new_lv2parameter_port(
+  struct zynjacku_plugin_info * info_ptr,
+  SLV2Port port,
+  uint32_t index,
+  const char * symbol_str,
+  struct zynjacku_plugin * plugin_ptr)
+{
+  struct zynjacku_port * port_ptr;
+  SLV2Value name;
+  const char * name_str;
+  SLV2Values contexts;
+  int i;
+
+  port_ptr = malloc(sizeof(struct zynjacku_port));
+  if (port_ptr == NULL)
+  {
+    LOG_ERROR("malloc() failed to allocate memory for struct zynjacku_port.");
+    goto fail;
+  }
+
+  port_ptr->index = index;
+  port_ptr->flags = 0;
+  port_ptr->ui_context = NULL;
+  port_ptr->plugin_ptr = plugin_ptr;
+  port_ptr->midi_cc_map_obj_ptr = NULL;
+
+  port_ptr->symbol = strdup(symbol_str);
+  if (port_ptr->symbol == NULL)
+  {
+    LOG_ERROR("strdup() failed.");
+    goto fail_free_port;
+  }
+
+  /* port name */
+  name = slv2_port_get_name(info_ptr->slv2info, port);
+  if (name == NULL)
+  {
+    LOG_ERROR("slv2_port_get_name() failed.");
+    goto fail_free_symbol;
+  }
+
+  name_str = slv2_value_as_string_smart(name);
+  if (name_str == NULL)
+  {
+    LOG_ERROR("port symbol is not string.");
+    goto fail_free_symbol;
+  }
+
+  port_ptr->name = strdup(name_str);
+
+  slv2_value_free(name);
+
+  if (port_ptr->name == NULL)
+  {
+    LOG_ERROR("strdup() failed.");
+    goto fail_free_symbol;
+  }
+
+  contexts = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_port_context);
+  for (i = 0; i < slv2_values_size(contexts); i++)
+  {
+    if (slv2_value_equals(slv2_values_get_at(contexts, i), g_slv2uri_message_context))
+    {
+      port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
+      LOG_DEBUG("Port %d has message context", port_index);
+      break;
+    }
+  }
+
+  return port_ptr;
+      
+fail_free_symbol:
+  free(port_ptr->symbol);
+
+fail_free_port:
+  free(port_ptr);
+
+fail:
+  return NULL;
+}
+
+static
 bool
 zynjacku_plugin_repo_create_port_internal(
-  struct zynjacku_plugin_info *info_ptr,
+  struct zynjacku_plugin_info * info_ptr,
   uint32_t port_index,
   struct zynjacku_plugin * plugin_ptr,
   void * context,
   zynjacku_plugin_repo_create_port create_port)
 {
-  SLV2Value symbol;
-  SLV2Value name;
   struct zynjacku_port * port_ptr;
   SLV2Port port;
+  SLV2Value symbol;
+  const char * symbol_str;
   SLV2Value default_value;
   SLV2Value min_value;
   SLV2Value max_value;
-  SLV2Values contexts;
-  const char * symbol_str;
-  const char * name_str;
   unsigned int port_type;
-  bool output_port, is_control;
+  bool output_port;
+  SLV2Values defs;
+  SLV2Value defval;
+  const char * defval_str;
+  size_t defval_len;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
-  /* Get the port symbol (label) for console printing */
+  output_port = slv2_port_is_output(info_ptr->slv2info, port);
+
+  /* port symbol */
   symbol = slv2_port_get_symbol(info_ptr->slv2info, port);
   if (symbol == NULL)
   {
     LOG_ERROR("slv2_port_get_symbol() failed.");
-    goto fail;
+    return false;
   }
 
   symbol_str = slv2_value_as_string_smart(symbol);
   if (symbol_str == NULL)
   {
     LOG_ERROR("port symbol is not string.");
-    goto fail;
+    return false;
   }
 
-  output_port = slv2_port_is_output(info_ptr->slv2info, port);
-
-  is_control = slv2_port_is_control(info_ptr->slv2info, port);
-  if (is_control || slv2_port_is_string(info_ptr->slv2info, port))
+  if (slv2_port_is_control(info_ptr->slv2info, port))
   {
-    port_ptr = malloc(sizeof(struct zynjacku_port));
-    if (port_ptr == NULL)
-    {
-      LOG_ERROR("malloc() failed.");
-      goto fail;
-    }
+    port_ptr = new_lv2parameter_port(info_ptr, port, port_index, symbol_str, plugin_ptr);
 
-    port_ptr->index = port_index;
-    port_ptr->flags = 0;
-    port_ptr->ui_context = NULL;
-    port_ptr->plugin_ptr = plugin_ptr;
-    port_ptr->midi_cc_map_obj_ptr = NULL;
+    port_ptr->type = PORT_TYPE_LV2_FLOAT;
 
     if (output_port)
     {
-      port_ptr->type = PORT_TYPE_MEASURE;
-      
-      /* TODO measure string ports are broken for now */
-
+      port_ptr->flags |= PORT_FLAGS_OUTPUT;
       list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->measure_ports);
+      return true;
     }
-    else
+
+    /* port range */
+    slv2_port_get_range(
+      info_ptr->slv2info,
+      port,
+      &default_value,
+      &min_value,
+      &max_value);
+
+    if (default_value != NULL)
     {
-      int i;
-      
-      port_ptr->type = PORT_TYPE_LV2_FLOAT_PARAM;
-
-      /* port symbol */
-      port_ptr->symbol = strdup(symbol_str);
-      if (port_ptr->symbol == NULL)
-      {
-        LOG_ERROR("strdup() failed.");
-        goto fail_free_port;
-      }
-
-      /* port name */
-      name = slv2_port_get_name(info_ptr->slv2info, port);
-      if (name == NULL)
-      {
-        LOG_ERROR("slv2_port_get_name() failed.");
-        goto fail_free_symbol;
-      }
-
-      name_str = slv2_value_as_string_smart(name);
-      if (name_str == NULL)
-      {
-        LOG_ERROR("port symbol is not string.");
-        goto fail_free_symbol;
-      }
-
-      port_ptr->name = strdup(name_str);
-
-      slv2_value_free(name);
-
-      if (port_ptr->name == NULL)
-      {
-        LOG_ERROR("strdup() failed.");
-        goto fail_free_symbol;
-      }
-
-      if (is_control)
-      {
-        /* port range */
-        slv2_port_get_range(
-          info_ptr->slv2info,
-          port,
-          &default_value,
-          &min_value,
-          &max_value);
-
-        if (default_value != NULL)
-        {
-          port_ptr->data.parameter.value = slv2_value_as_float(default_value);
-          slv2_value_free(default_value);
-        }
-
-        if (min_value != NULL)
-        {
-          port_ptr->data.parameter.min = slv2_value_as_float(min_value);
-          slv2_value_free(min_value);
-        }
-
-        if (max_value != NULL)
-        {
-          port_ptr->data.parameter.max = slv2_value_as_float(max_value);
-          slv2_value_free(max_value);
-        }
-      }
-      else
-      {
-        SLV2Values defs = NULL;
-        SLV2Value defval = NULL;
-        const char *defval_str = NULL;
-        int len = 0;
-        /* string port - get default */
-        port_ptr->data.string = malloc(sizeof(LV2_String_Data));
-        defs = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_string_port_default);
-        if (defs && slv2_values_size(defs) == 1)
-        {
-          defval = slv2_values_get_at(defs, 0);
-          if (slv2_value_is_string(defval)) {
-            defval_str = slv2_value_as_string(defval);
-            len = strlen(defval_str);
-          }
-        }
-
-        port_ptr->data.string->storage = 256; /* TODO: get from slv2 (requiredSpace) */
-        if (len + 1 > 256)
-          port_ptr->data.string->storage = len + 1;
-        port_ptr->data.string->data = malloc(port_ptr->data.string->storage);
-        if (defval_str)
-          strcpy(port_ptr->data.string->data, defval_str);
-        else
-          *port_ptr->data.string->data = '\0';
-        port_ptr->data.string->len = len;
-        port_ptr->data.string->flags = LV2_STRING_DATA_CHANGED_FLAG;
-        port_ptr->data.string->pad = 0;
-        port_ptr->flags |= PORT_FLAGS_IS_STRING;
-      }
-      
-
-      contexts = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_port_context);
-      for (i = 0; i < slv2_values_size(contexts); i++)
-      {
-        if (slv2_value_equals(slv2_values_get_at(contexts, i), g_slv2uri_message_context))
-        {
-          port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
-          fprintf(stderr, "Port %d has message context\n", port_index);
-        }
-      }
-      
-      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
+      port_ptr->data.lv2float.value = slv2_value_as_float(default_value);
+      slv2_value_free(default_value);
     }
+
+    if (min_value != NULL)
+    {
+      port_ptr->data.lv2float.min = slv2_value_as_float(min_value);
+      slv2_value_free(min_value);
+    }
+
+    if (max_value != NULL)
+    {
+      port_ptr->data.lv2float.max = slv2_value_as_float(max_value);
+      slv2_value_free(max_value);
+    }
+
+    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
+
+    return true;
+  }
+
+  if (slv2_port_is_string(info_ptr->slv2info, port))
+  {
+    if (output_port)
+    {
+      /* TODO measure string ports are ignored for now */
+      return true;
+    }
+
+    port_ptr = new_lv2parameter_port(info_ptr, port, port_index, symbol_str, plugin_ptr);
+
+    port_ptr->type = PORT_TYPE_LV2_STRING;
+
+    /* TODO: get from slv2 (requiredSpace) */
+    port_ptr->data.lv2string.storage = 256;
+
+    defval_str = "\0";
+
+    /* get default */
+    defs = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_string_port_default);
+    if (defs && slv2_values_size(defs) == 1)
+    {
+      defval = slv2_values_get_at(defs, 0);
+      if (slv2_value_is_string(defval))
+      {
+        defval_str = slv2_value_as_string(defval);
+      }
+    }
+
+    defval_len = strlen(defval_str) + 1;
+
+    if (defval_len > port_ptr->data.lv2string.storage)
+    {
+      port_ptr->data.lv2string.storage = defval_len;
+    }
+
+    port_ptr->data.lv2string.data = malloc(port_ptr->data.lv2string.storage);
+    memcpy(port_ptr->data.lv2string.data, defval_str, defval_len);
+
+    port_ptr->data.lv2string.len = defval_len - 1;
+    port_ptr->data.lv2string.flags = LV2_STRING_DATA_CHANGED_FLAG;
+    port_ptr->data.lv2string.pad = 0;
+
+    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
 
     return true;
   }
@@ -926,7 +962,7 @@ zynjacku_plugin_repo_create_port_internal(
   else
   {
     LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
-    goto fail;
+    return false;
   }
 
   if (create_port(
@@ -939,15 +975,6 @@ zynjacku_plugin_repo_create_port_internal(
   }
 
   LOG_ERROR("Unmatched port '%s'. type is %u, index is %u", slv2_value_as_string_smart(symbol), (unsigned int)port_type, (unsigned int)port_index);
-  goto fail;
-
-fail_free_symbol:
-  free(port_ptr->symbol);
-
-fail_free_port:
-  free(port_ptr);
-
-fail:
   return false;
 }
 

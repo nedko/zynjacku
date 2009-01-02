@@ -87,32 +87,36 @@ struct zynjacku_plugin
 
 #define ZYNJACKU_PLUGIN_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_PLUGIN_TYPE, struct zynjacku_plugin))
 
+bool
+zynjacku_connect_plugin_ports(
+  struct zynjacku_plugin * plugin_ptr,
+  ZynjackuPlugin * plugin_obj_ptr,
+  GObject * engine_object_ptr,
+  struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr);
+
 void
 zynjacku_free_plugin_ports(
   struct zynjacku_plugin * plugin_ptr);
+
+void *
+zynjacku_plugin_prerun_rt(
+  struct zynjacku_plugin * plugin_ptr);
+
+void
+zynjacku_plugin_postrun_rt(
+  struct zynjacku_plugin * plugin_ptr,
+  void * old_data);
 
 void
 zynjacku_plugin_ui_run(
   struct zynjacku_plugin * plugin_ptr);
 
 void
-zynjacku_plugin_dynparam_parameter_created(
-  void * instance_context,
-  lv2dynparam_host_parameter parameter_handle,
-  unsigned int parameter_type,
-  const char * parameter_name,
-  void ** parameter_context_ptr);
-
-void
-zynjacku_plugin_dynparam_parameter_destroying(
-  void * instance_context,
-  void * parameter_context);
-
-void
-zynjacku_plugin_dynparam_parameter_value_change_context(
-  void * instance_context,
-  void * parameter_context,
-  void * value_change_context);
+zynjacku_plugin_ui_set_port_value(
+  struct zynjacku_plugin * plugin_ptr,
+  struct zynjacku_port * port_ptr,
+  const void * value_ptr,
+  size_t value_size);
 
 #endif /* LV2_H_INCLUDED defined */
 

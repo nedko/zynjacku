@@ -727,6 +727,7 @@ zynjacku_jackmidi_cc(
         midicc_ptr = list_entry(node_ptr, struct zynjacku_midicc, siblings);
 
         assert(ZYNJACKU_IS_MIDI_CC_MAP(midicc_ptr->map_obj_ptr));
+        assert(PORT_IS_INPUT(midicc_ptr->port_ptr));
 
         if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
         {
@@ -746,14 +747,8 @@ zynjacku_jackmidi_cc(
 
         switch (midicc_ptr->port_ptr->type)
         {
-        case PORT_TYPE_LV2_FLOAT_PARAM:
-          if ((midicc_ptr->port_ptr->flags & PORT_FLAGS_IS_STRING) != 0)
-          {
-            /* can we do something for string ports at all? */
-            break;
-          }
-
-          midicc_ptr->port_ptr->data.parameter.value = mapvalue;
+        case PORT_TYPE_LV2_FLOAT:
+          midicc_ptr->port_ptr->data.lv2float.value = mapvalue;
           break;
         case PORT_TYPE_DYNPARAM:
           switch (midicc_ptr->port_ptr->data.dynparam.type)
@@ -783,6 +778,7 @@ jack_process_cb(
   struct list_head * synth_node_ptr;
   struct list_head * temp_node_ptr;
   struct zynjacku_plugin * synth_ptr;
+  void * old_data;
 
   /* Copy MIDI input data to all LV2 midi in ports */
   if (zynjacku_jackmidi_to_lv2midi(
@@ -812,7 +808,6 @@ jack_process_cb(
   /* Iterate over plugins */
   list_for_each_safe(synth_node_ptr, temp_node_ptr, &engine_ptr->plugins_active)
   {
-    struct zynjacku_rt_plugin_command * cmd;
     synth_ptr = list_entry(synth_node_ptr, struct zynjacku_plugin, siblings_active);
     
     if (synth_ptr->recycle)
@@ -821,16 +816,8 @@ jack_process_cb(
       synth_ptr->recycle = false;
       continue;
     }
-    
-    cmd = synth_ptr->command;
 
-    /* Execute the command */
-    if (cmd)
-    {
-      assert(!synth_ptr->command_result);
-      assert(!(cmd->port->flags & PORT_FLAGS_MSGCONTEXT));
-      zynjacku_lv2_connect_port(synth_ptr->lv2plugin, cmd->port, cmd->data);
-    }
+    old_data = zynjacku_plugin_prerun_rt(synth_ptr);
 
     if (synth_ptr->dynparams)
     {
@@ -858,14 +845,7 @@ jack_process_cb(
     /* Run plugin for this cycle */
     zynjacku_lv2_run(synth_ptr->lv2plugin, nframes);
     
-    /* Acknowledge the command */
-    if (cmd)
-    {
-      if (cmd->port->flags & PORT_FLAGS_IS_STRING)
-        ((LV2_String_Data *)(cmd->data))->flags &= ~LV2_STRING_DATA_CHANGED_FLAG;
-      synth_ptr->command = NULL;
-      synth_ptr->command_result = cmd;
-    }
+    zynjacku_plugin_postrun_rt(synth_ptr, old_data);
   }
 
   return 0;
@@ -1303,8 +1283,6 @@ zynjacku_plugin_construct_synth(
   char * port_name;
   size_t size_name;
   size_t size_id;
-  struct list_head * node_ptr;
-  struct zynjacku_port * port_ptr;
   struct zynjacku_engine * engine_ptr;
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
@@ -1330,28 +1308,11 @@ zynjacku_plugin_construct_synth(
     goto fail;
   }
 
-  if (plugin_ptr->dynparams_supported)
+  /* connect parameter/measure ports */
+  if (!zynjacku_connect_plugin_ports(plugin_ptr, plugin_obj_ptr, engine_object_ptr, &engine_ptr->mempool_allocator))
   {
-    if (!lv2dynparam_host_attach(
-          zynjacku_lv2_get_descriptor(plugin_ptr->lv2plugin),
-          zynjacku_lv2_get_handle(plugin_ptr->lv2plugin),
-          &engine_ptr->mempool_allocator,
-          plugin_obj_ptr,
-          zynjacku_plugin_dynparam_parameter_created,
-          zynjacku_plugin_dynparam_parameter_destroying,
-          zynjacku_plugin_dynparam_parameter_value_change_context,
-          &plugin_ptr->dynparams))
-    {
-      LOG_ERROR("Failed to instantiate dynparams extension.");
-      goto fail_unload;
-    }
+    goto fail_unload;
   }
-  else
-  {
-    plugin_ptr->dynparams = NULL;
-  }
-
-  plugin_ptr->engine_object_ptr = engine_object_ptr;
 
   /* connect midi port */
   switch (synth_ptr->midi_in_port.type)
@@ -1369,20 +1330,7 @@ zynjacku_plugin_construct_synth(
 
   list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
 
-  /* connect parameter ports */
-  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
-  {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
-    LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.parameter);
-  }
-
-  /* connect measurement ports */
-  list_for_each(node_ptr, &plugin_ptr->measure_ports)
-  {
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-    zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.parameter);
-  }
+  /* setup audio ports (they are connected in jack process callback */
 
   size_name = strlen(plugin_ptr->name);
   port_name = malloc(size_name + 1024);
@@ -1392,7 +1340,6 @@ zynjacku_plugin_construct_synth(
     goto fail_free_ports;
   }
 
-  /* setup audio ports (they are connected in jack process callback */
   size_id = sprintf(port_name, "%u:", id);
   memcpy(port_name + size_id, plugin_ptr->name, size_name);
 

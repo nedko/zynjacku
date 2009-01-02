@@ -37,6 +37,7 @@
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
 #include "lv2_contexts.h"
+#include "lv2_string_port.h"
 
 #include "list.h"
 #include "lv2.h"

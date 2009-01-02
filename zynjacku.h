@@ -33,22 +33,26 @@
 #define PORT_TYPE_AUDIO            1 /* LV2 audio out port */
 #define PORT_TYPE_MIDI             2 /* LV2 midi in port */
 #define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
-#define PORT_TYPE_LV2_FLOAT_PARAM  4 /* LV2 control rate input port used for synth/effect parameters */
-#define PORT_TYPE_MEASURE          5 /* LV2 control rate output port used for plugin output (leds, meters, etc.) */
-#define PORT_TYPE_DYNPARAM         6
+#define PORT_TYPE_LV2_FLOAT        4 /* LV2 control rate float port used, if input for synth/effect parameters, if output for leds, meters, etc. */
+#define PORT_TYPE_LV2_STRING       5 /* LV2 string port */
+#define PORT_TYPE_DYNPARAM         6 /* dynamic parameter */
 
-#define PORT_FLAGS_MSGCONTEXT      1 /* uses LV2 message context */
-#define PORT_FLAGS_IS_STRING       2 /* is a string port*/
+#define PORT_FLAGS_OUTPUT          1 /* is an output (measure) port */
+#define PORT_FLAGS_MSGCONTEXT      2 /* uses LV2 message context */
+
+#define PORT_IS_INPUT(port_ptr)        (((port_ptr)->flags & PORT_FLAGS_OUTPUT) == 0)
+#define PORT_IS_OUTPUT(port_ptr)       (((port_ptr)->flags & PORT_FLAGS_OUTPUT) != 0)
+#define PORT_IS_MSGCONTEXT(port_ptr)   (((port_ptr)->flags & PORT_FLAGS_MSGCONTEXT) != 0)
 
 struct zynjacku_port
 {
   struct list_head plugin_siblings;
   struct list_head port_type_siblings;
   unsigned int type;            /* one of PORT_TYPE_XXX */
-  unsigned int flags;
-  uint32_t index;               /* LV2 port index within owning plugin */
-  char * symbol;                /* valid only when type is PORT_TYPE_LV2_FLOAT_PARAM */
-  char * name;                  /* valid only when type is PORT_TYPE_LV2_FLOAT_PARAM */
+  unsigned int flags;           /* bitmask of PORT_FLAGS_XXX */
+  uint32_t index;               /* LV2 port index within owning plugin, unused for dynparam ports */
+  char * symbol;                /* valid only when type is PORT_TYPE_LV2_XXX */
+  char * name;                  /* valid only when type is PORT_TYPE_LV2_XXX */
   union
   {
     struct
@@ -56,8 +60,8 @@ struct zynjacku_port
       float value;
       float min;
       float max;
-    } parameter;                /* for PORT_TYPE_LV2_FLOAT_PARAM */
-    struct _LV2_String_Data * string;
+    } lv2float;                /* for PORT_TYPE_LV2_FLOAT */
+    struct _LV2_String_Data lv2string; /* for PORT_TYPE_LV2_STRING */
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
     struct
     {
