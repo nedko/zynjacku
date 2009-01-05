@@ -42,9 +42,10 @@
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
 #include "lv2_string_port.h"
+#include "lv2_progress.h"
 
 #include "list.h"
-#define LOG_LEVEL LOG_LEVEL_ERROR
+//#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #include "plugin.h"
@@ -70,7 +71,7 @@
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
 
-#define ZYNJACKU_ENGINE_FEATURES 7
+#define ZYNJACKU_ENGINE_FEATURES 8
 
 struct zynjacku_midicc
 {
@@ -112,6 +113,7 @@ struct zynjacku_engine
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
   LV2_URI_Map_Feature uri_map;
   LV2_Event_Feature event;
+  struct lv2_progress progress;
 
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_uri_map;
@@ -120,6 +122,7 @@ struct zynjacku_engine
   LV2_Feature host_feature_contexts;
   LV2_Feature host_feature_msgcontext;
   LV2_Feature host_feature_stringport;
+  LV2_Feature host_feature_progress;
   const LV2_Feature * host_features[ZYNJACKU_ENGINE_FEATURES + 1];
 
   struct list_head midicc_ui;   /* accessed only from ui thread */
@@ -273,6 +276,30 @@ zynjacku_event_ref_func(
 	return 0;
 }
 
+static
+void
+zynjacku_progress(
+  void * context,
+  float progress,
+  const char * message)
+{
+  static const char * old_message;
+
+  if (message == NULL && old_message != NULL)
+  {
+    message = old_message;
+  }
+
+  if (message == NULL)
+  {
+    LOG_NOTICE("%3.1f% complete.", progress);
+  }
+  else
+  {
+    LOG_NOTICE("%3.1f% complete. %s", progress, message);
+  }
+}
+
 static void
 zynjacku_engine_init(
   GTypeInstance * instance,
@@ -310,6 +337,10 @@ zynjacku_engine_init(
   engine_ptr->event.lv2_event_ref = zynjacku_event_ref_func;
   engine_ptr->event.lv2_event_unref = zynjacku_event_ref_func;
 
+  /* initialize progress host feature */
+  engine_ptr->progress.progress = zynjacku_progress;
+  engine_ptr->progress.context = NULL;
+
   engine_ptr->host_feature_event_ref.URI = LV2_EVENT_URI;
   engine_ptr->host_feature_event_ref.data = &engine_ptr->event;
 
@@ -325,6 +356,9 @@ zynjacku_engine_init(
   engine_ptr->host_feature_stringport.URI = LV2_STRING_PORT_URI;
   engine_ptr->host_feature_stringport.data = NULL;
 
+  engine_ptr->host_feature_progress.URI = LV2_PROGRESS_URI;
+  engine_ptr->host_feature_progress.data = &engine_ptr->progress;
+
   /* initialize host features array */
   count = 0;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_rtmempool;
@@ -334,6 +368,7 @@ zynjacku_engine_init(
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_contexts;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_msgcontext;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_stringport;
+  engine_ptr->host_features[count++] = &engine_ptr->host_feature_progress;
   assert(ZYNJACKU_ENGINE_FEATURES == count);
   engine_ptr->host_features[count] = NULL;
   /* keep in mind to update the constant when adding things here */
