@@ -34,7 +34,7 @@
  * @par
  * Using this extension for reporting progress of other lengthy operations
  * is possible and encouraged but not subject of this extension alone.
- * Probably it is not good idea to call this extension from plugin created
+ * It is probably not good idea to call progress callback from plugin created
  * thread nor it is good idea to call it from a LV2 audio class function.
  * Any extension that wants to work in conjuction with progress extension
  * must define thread context semantics for calling the progress callback.
@@ -59,7 +59,7 @@ extern "C" {
 /** @brief host feature structure */
 struct lv2_progress
 {
-  /** to be supplied as first parameter of progres() callback  */
+  /** to be supplied as first parameter of progress() callback  */
   void * context;
 
   /**
