@@ -23,7 +23,7 @@
  * plugins doing intensive computations during load. Plugin should call
  * the host provided callback on regular basis during load. 1 second between
  * calls is good target. Everything between half second and two seconds
- * should provide enough motion so user does not get "the thing freezed"
+ * should provide enough motion so user does not get "the thing froze"
  * impression.
  *
  */
