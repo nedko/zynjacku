@@ -99,6 +99,7 @@ class lv2rack(zynjacku.host):
         else:
             for uri in uris:
                 self.load_plugin(uri)
+            self.progress_window.hide()
 
     def on_quit(self, window=None):
         #print "ZynjackuHostMulti::on_quit() called"
@@ -114,6 +115,14 @@ class lv2rack(zynjacku.host):
         self.store.clear()
 
         zynjacku.host.__del__(self)
+
+    def new_plugin(self, uri, parameters=[], maps={}):
+        self.progress_window.show(uri)
+        plugin = zynjacku.host.new_plugin(self, uri, parameters, maps)
+        return plugin
+
+    def on_plugin_progress(self, engine, name, progress, message):
+        self.progress_window.progress(name, progress, message)
 
     def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")

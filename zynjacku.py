@@ -1358,6 +1358,47 @@ class PluginUIUniversalParameterEnum(PluginUIUniversalParameter):
     def get_selection(self):
         return self.liststore.get(self.liststore.iter_nth_child(None, self.selected_value_index), 0)[0]
 
+class plugin_load_progress_window:
+    def __init__(self):
+        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        #self.window.set_size_request(600,300)
+
+        self.bar = gtk.ProgressBar()
+
+        box = gtk.VBox()
+        box.set_spacing(10)
+        self.label = gtk.Label("Loading plugin ...")
+        box.pack_start(self.label)
+        box.pack_start(self.bar)
+        align = gtk.Alignment(0.5, 0.5, 1.0, 1.0)
+        align.set_padding(10, 10, 10, 10)
+        align.add(box)
+        self.window.add(align)
+
+        while gtk.events_pending():
+            gtk.main_iteration()
+
+    def progress(self, name, progress, message):
+        #print "Loading plugin '%s', %5.1f%% complete. %s" % (name, progress, message)
+        self.bar.set_fraction(progress / 100.0)
+        self.label.set_text("Loading plugin '%s'" % name)
+        self.bar.set_text(message);
+        while gtk.events_pending():
+            gtk.main_iteration()
+
+        while gtk.events_pending():
+            gtk.main_iteration()
+
+    def show(self, uri):
+        title = "Loading plugin '%s'..." % uri
+        self.window.set_title(title)
+        self.bar.set_text(title);
+        self.label.set_text(title)
+        self.window.show_all()
+
+    def hide(self):
+        self.window.hide()
+
 class host:
     def __init__(self, engine, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "host constructor called."
@@ -1378,6 +1419,8 @@ class host:
 
         self.preset_extension = preset_extension
         self.preset_name = preset_name
+
+        self.progress_window = plugin_load_progress_window()
 
         if lash_client:
             # Send our client name to server
@@ -1530,6 +1573,7 @@ class host:
                 dialog.hide()
                 for path in plugin_repo_widget.get_selection().get_selected_rows()[1]:
                     self.load_plugin(store.get(store.get_iter(path), 1)[0])
+                self.progress_window.hide()
                 return
             elif ret == 1:
                 self.rescan_plugins(store, progressbar, True)
@@ -1615,6 +1659,7 @@ class host:
                         print "<%s> ?" % node.nodeName
 
             self.load_plugin(uri, parameters, maps)
+        self.progress_window.hide()
 
     def setup_file_dialog_filters(self, file_dialog):
         # Create and add the filter
@@ -1815,6 +1860,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         else:
             for uri in uris:
                 self.load_plugin(uri)
+            self.progress_window.hide()
 
     def on_quit(self, window=None):
         #print "ZynjackuHostMulti::on_quit() called"
@@ -1830,6 +1876,14 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.store.clear()
 
         ZynjackuHost.__del__(self)
+
+    def new_plugin(self, uri, parameters=[], maps={}):
+        self.progress_window.show(uri)
+        plugin = ZynjackuHost.new_plugin(self, uri, parameters, maps)
+        return plugin
+
+    def on_plugin_progress(self, engine, name, progress, message):
+        self.progress_window.progress(name, progress, message)
 
     def update_midi_led(self):
         self.midi_led.set(self.engine.get_midi_activity())
@@ -1938,6 +1992,15 @@ class ZynjackuHostOne(ZynjackuHost):
         if not ZynjackuHost.create_plugin_ui(self, self.plugin):
             print"Failed to create synth window"
             return
+
+    def new_plugin(self, uri, parameters=[], maps={}):
+        self.progress_window.show(uri)
+        plugin = ZynjackuHost.new_plugin(self, uri, parameters, maps)
+        self.progress_window.hide()
+        return plugin
+
+    def on_plugin_progress(self, engine, name, progress, message):
+        self.progress_window.progress(name, progress, message)
 
     def on_plugin_ui_window_destroyed(self, window, synth, row):
         gtk.main_quit()
