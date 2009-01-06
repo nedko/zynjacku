@@ -22,6 +22,7 @@
  *****************************************************************************/
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -39,6 +40,7 @@
 #include "lv2_event.h"
 #include "lv2_uri_map.h"
 #include "lv2_string_port.h"
+#include "lv2_progress.h"
 
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
@@ -58,7 +60,7 @@
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 
-#define ZYNJACKU_RACK_ENGINE_FEATURES 5
+#define ZYNJACKU_RACK_ENGINE_FEATURES 6
 
 struct lv2rack_engine
 {
@@ -78,20 +80,25 @@ struct lv2rack_engine
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
   LV2_URI_Map_Feature uri_map;
   LV2_Event_Feature event;
+  struct lv2_progress progress;
+  char * progress_plugin_name;
+  char * progress_last_message;
 
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_dynparams;
   LV2_Feature host_feature_contexts;
   LV2_Feature host_feature_msgcontext;
   LV2_Feature host_feature_stringport;
+  LV2_Feature host_feature_progress;
   const LV2_Feature * host_features[ZYNJACKU_RACK_ENGINE_FEATURES + 1];
 };
 
 #define ZYNJACKU_RACK_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_RACK_TYPE, struct lv2rack_engine))
 
-#define ZYNJACKU_RACK_SIGNAL_TICK    0 /* plugin iterated */
-#define ZYNJACKU_RACK_SIGNAL_TACK    1 /* "good" plugin found */
-#define ZYNJACKU_RACK_SIGNALS_COUNT  2
+#define ZYNJACKU_RACK_SIGNAL_TICK      0 /* plugin iterated */
+#define ZYNJACKU_RACK_SIGNAL_TACK      1 /* "good" plugin found */
+#define ZYNJACKU_RACK_SIGNAL_PROGRESS  2 /* plugin instantiation progress */
+#define ZYNJACKU_RACK_SIGNALS_COUNT    3
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
@@ -171,7 +178,7 @@ zynjacku_rack_class_init(
   g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TICK] =
     g_signal_new(
       "tick",                   /* signal_name */
-      ZYNJACKU_RACK_TYPE,     /* itype */
+      ZYNJACKU_RACK_TYPE,       /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -186,7 +193,7 @@ zynjacku_rack_class_init(
   g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TACK] =
     g_signal_new(
       "tack",                   /* signal_name */
-      ZYNJACKU_RACK_TYPE,     /* itype */
+      ZYNJACKU_RACK_TYPE,       /* itype */
       G_SIGNAL_RUN_LAST |
       G_SIGNAL_ACTION,          /* signal_flags */
       0,                        /* class_offset */
@@ -199,6 +206,80 @@ zynjacku_rack_class_init(
       G_TYPE_STRING,            /* plugin uri */
       G_TYPE_STRING,            /* plugin license */
       G_TYPE_STRING);           /* plugin author */
+
+  g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_PROGRESS] =
+    g_signal_new(
+      "progress",               /* signal_name */
+      ZYNJACKU_RACK_TYPE,       /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      3,                        /* n_params */
+      G_TYPE_STRING,            /* plugin name */
+      G_TYPE_FLOAT,             /* progress 0 .. 100 */
+      G_TYPE_STRING);           /* progress message */
+}
+
+static
+void
+zynjacku_progress(
+  void * context,
+  float progress,
+  const char * message)
+{
+  struct lv2rack_engine * rack_ptr;
+  char * old_message;
+
+  LOG_DEBUG("zynjacku_progress(%p, %f, '%s') called.", context, progress, message);
+
+  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(context);
+
+  old_message = rack_ptr->progress_last_message;
+  if (message != NULL)
+  {
+    message = strdup(message);
+  }
+
+  if (old_message != NULL)
+  {
+    if (message == NULL)
+    {
+      message = old_message;
+    }
+  }
+  else
+  {
+    free(old_message);
+  }
+
+  rack_ptr->progress_last_message = (char *)message;
+
+  if (message == NULL)
+  {
+    LOG_DEBUG("%5.1f%% complete.", progress);
+  }
+  else
+  {
+    LOG_DEBUG("%5.1f%% complete. %s", progress, message);
+  }
+
+  /* make NULL message pointer signal friendly */
+  if (message == NULL)
+  {
+    message = "";
+  }
+
+  g_signal_emit(
+    context,
+    g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_PROGRESS],
+    0,
+    rack_ptr->progress_plugin_name,
+    (gfloat)progress,
+    message);
 }
 
 static void
@@ -220,6 +301,12 @@ zynjacku_rack_init(
   /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&rack_ptr->mempool_allocator);
 
+  /* initialize progress host feature */
+  rack_ptr->progress.progress = zynjacku_progress;
+  rack_ptr->progress.context = NULL;
+  rack_ptr->progress_plugin_name = NULL;
+  rack_ptr->progress_last_message = NULL;
+
   rack_ptr->host_feature_rtmempool.URI = LV2_RTSAFE_MEMORY_POOL_URI;
   rack_ptr->host_feature_rtmempool.data = &rack_ptr->mempool_allocator;
 
@@ -235,6 +322,9 @@ zynjacku_rack_init(
   rack_ptr->host_feature_stringport.URI = LV2_STRING_PORT_URI;
   rack_ptr->host_feature_stringport.data = NULL;
 
+  rack_ptr->host_feature_progress.URI = LV2_PROGRESS_URI;
+  rack_ptr->host_feature_progress.data = &rack_ptr->progress;
+
   /* initialize host features array */
   count = 0;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_rtmempool;
@@ -242,6 +332,7 @@ zynjacku_rack_init(
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_contexts;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_msgcontext;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_stringport;
+  rack_ptr->host_features[count++] = &rack_ptr->host_feature_progress;
   assert(ZYNJACKU_RACK_ENGINE_FEATURES == count);
   rack_ptr->host_features[count] = NULL;
 
@@ -738,10 +829,23 @@ zynjacku_plugin_construct_effect(
     goto fail;
   }
 
+  rack_ptr->progress.context = rack_object_ptr;
+  rack_ptr->progress_last_message = NULL;
+  rack_ptr->progress_plugin_name = plugin_ptr->name;
+
   plugin_ptr->lv2plugin = zynjacku_lv2_load(
     plugin_ptr->uri,
     zynjacku_rack_get_sample_rate(ZYNJACKU_RACK(rack_object_ptr)),
     rack_ptr->host_features);
+
+  rack_ptr->progress.context = NULL;
+  if (rack_ptr->progress_last_message != NULL)
+  {
+    free(rack_ptr->progress_last_message);
+    rack_ptr->progress_last_message = NULL;
+  }
+  rack_ptr->progress_plugin_name = NULL;
+
   if (plugin_ptr->lv2plugin == NULL)
   {
     LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);

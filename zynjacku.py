@@ -1366,6 +1366,7 @@ class host:
         self.layout_type = PluginUIUniversal.layout_type_horizontal
 
         self.engine = engine
+        self.progress_connect_id = self.engine.connect("progress", self.on_plugin_progress)
 
         self.plugins = []
 
@@ -1462,6 +1463,9 @@ class host:
         plugin.ui_win = None
         self.plugins.append(plugin)
         return plugin
+
+    def on_plugin_progress(self, engine, name, progress, message):
+        print "Loading plugin '%s', %5.1f%% complete. %s" % (name, progress, message)
 
     def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
         if progress == 1.0:
@@ -1719,6 +1723,7 @@ class host:
 
     def run(self):
         ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
+
         gtk.main()
         gobject.source_remove(ui_run_callback_id)
         if self.lash_client:
@@ -1729,6 +1734,8 @@ class host:
         for plugin in self.plugins:
             if plugin.ui_win:
                 plugin.ui_win.disconnect(plugin.ui_win.destroy_connect_id) # signal connection holds reference to plugin object...
+
+        self.engine.disconnect(self.progress_connect_id)
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
@@ -1919,23 +1926,18 @@ class ZynjackuHostOne(ZynjackuHost):
         #print "ZynjackuHostOne constructor called."
         ZynjackuHost.__init__(self, client_name)
 
-        self.plugin = zynjacku.Plugin(uri=uri)
-        if not self.plugin.construct(self.engine):
+        self.plugin = self.new_plugin(uri)
+        if not self.plugin:
             print"Failed to construct %s" % uri
-            del(self.plugin)
-            self.plugin = None
-        else:
-            if not ZynjackuHost.plugin_ui_available(self, self.plugin):
-                print"Synth window not available"
-                self.plugin.destruct()
-                del(self.plugin)
-                self.plugin = None
-            else:
-                if not ZynjackuHost.create_plugin_ui(self, self.plugin):
-                    print"Failed to create synth window"
-                    self.plugin.destruct()
-                    del(self.plugin)
-                    self.plugin = None
+            return
+
+        if not ZynjackuHost.plugin_ui_available(self, self.plugin):
+            print"Synth window not available"
+            return
+
+        if not ZynjackuHost.create_plugin_ui(self, self.plugin):
+            print"Failed to create synth window"
+            return
 
     def on_plugin_ui_window_destroyed(self, window, synth, row):
         gtk.main_quit()
@@ -1949,9 +1951,6 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def __del__(self):
         #print "ZynjackuHostOne destructor called."
-
-        if self.plugin:
-            self.plugin.destruct()
 
         ZynjackuHost.__del__(self)
 

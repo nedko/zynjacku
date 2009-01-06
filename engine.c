@@ -45,7 +45,7 @@
 #include "lv2_progress.h"
 
 #include "list.h"
-//#define LOG_LEVEL LOG_LEVEL_ERROR
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
 
 #include "plugin.h"
@@ -64,9 +64,10 @@
 #include "midi_cc_map.h"
 #include "midi_cc_map_internal.h"
 
-#define ZYNJACKU_ENGINE_SIGNAL_TICK    0 /* plugin iterated */
-#define ZYNJACKU_ENGINE_SIGNAL_TACK    1 /* "good" plugin found */
-#define ZYNJACKU_ENGINE_SIGNALS_COUNT  2
+#define ZYNJACKU_ENGINE_SIGNAL_TICK      0 /* plugin iterated */
+#define ZYNJACKU_ENGINE_SIGNAL_TACK      1 /* "good" plugin found */
+#define ZYNJACKU_ENGINE_SIGNAL_PROGRESS  2 /* plugin instantiation progress */
+#define ZYNJACKU_ENGINE_SIGNALS_COUNT    3
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
@@ -114,6 +115,8 @@ struct zynjacku_engine
   LV2_URI_Map_Feature uri_map;
   LV2_Event_Feature event;
   struct lv2_progress progress;
+  char * progress_plugin_name;
+  char * progress_last_message;
 
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_uri_map;
@@ -244,6 +247,22 @@ zynjacku_engine_class_init(
       G_TYPE_STRING,            /* plugin uri */
       G_TYPE_STRING,            /* plugin license */
       G_TYPE_STRING);           /* plugin author */
+
+  g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_PROGRESS] =
+    g_signal_new(
+      "progress",               /* signal_name */
+      ZYNJACKU_ENGINE_TYPE,     /* itype */
+      G_SIGNAL_RUN_LAST |
+      G_SIGNAL_ACTION,          /* signal_flags */
+      0,                        /* class_offset */
+      NULL,                     /* accumulator */
+      NULL,                     /* accu_data */
+      NULL,                     /* c_marshaller */
+      G_TYPE_NONE,              /* return type */
+      3,                        /* n_params */
+      G_TYPE_STRING,            /* plugin name */
+      G_TYPE_FLOAT,             /* progress 0 .. 100 */
+      G_TYPE_STRING);           /* progress message */
 }
 
 static
@@ -283,21 +302,55 @@ zynjacku_progress(
   float progress,
   const char * message)
 {
-  static const char * old_message;
+  struct zynjacku_engine * engine_ptr;
+  char * old_message;
 
-  if (message == NULL && old_message != NULL)
+  LOG_DEBUG("zynjacku_progress(%p, %f, '%s') called.", context, progress, message);
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(context);
+
+  old_message = engine_ptr->progress_last_message;
+  if (message != NULL)
   {
-    message = old_message;
+    message = strdup(message);
   }
 
-  if (message == NULL)
+  if (old_message != NULL)
   {
-    LOG_NOTICE("%5.1f%% complete.", progress);
+    if (message == NULL)
+    {
+      message = old_message;
+    }
   }
   else
   {
-    LOG_NOTICE("%5.1f%% complete. %s", progress, message);
+    free(old_message);
   }
+
+  engine_ptr->progress_last_message = (char *)message;
+
+  if (message == NULL)
+  {
+    LOG_DEBUG("%5.1f%% complete.", progress);
+  }
+  else
+  {
+    LOG_DEBUG("%5.1f%% complete. %s", progress, message);
+  }
+
+  /* make NULL message pointer signal friendly */
+  if (message == NULL)
+  {
+    message = "";
+  }
+
+  g_signal_emit(
+    context,
+    g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_PROGRESS],
+    0,
+    engine_ptr->progress_plugin_name,
+    (gfloat)progress,
+    message);
 }
 
 static void
@@ -340,6 +393,8 @@ zynjacku_engine_init(
   /* initialize progress host feature */
   engine_ptr->progress.progress = zynjacku_progress;
   engine_ptr->progress.context = NULL;
+  engine_ptr->progress_plugin_name = NULL;
+  engine_ptr->progress_last_message = NULL;
 
   engine_ptr->host_feature_event_ref.URI = LV2_EVENT_URI;
   engine_ptr->host_feature_event_ref.data = &engine_ptr->event;
@@ -1333,10 +1388,23 @@ zynjacku_plugin_construct_synth(
     goto fail;
   }
 
+  engine_ptr->progress.context = engine_object_ptr;
+  engine_ptr->progress_last_message = NULL;
+  engine_ptr->progress_plugin_name = plugin_ptr->name;
+
   plugin_ptr->lv2plugin = zynjacku_lv2_load(
     plugin_ptr->uri,
     zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr)),
     engine_ptr->host_features);
+
+  engine_ptr->progress.context = NULL;
+  if (engine_ptr->progress_last_message != NULL)
+  {
+    free(engine_ptr->progress_last_message);
+    engine_ptr->progress_last_message = NULL;
+  }
+  engine_ptr->progress_plugin_name = NULL;
+
   if (plugin_ptr->lv2plugin == NULL)
   {
     LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
