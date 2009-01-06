@@ -292,11 +292,11 @@ zynjacku_progress(
 
   if (message == NULL)
   {
-    LOG_NOTICE("%3.1f% complete.", progress);
+    LOG_NOTICE("%5.1f%% complete.", progress);
   }
   else
   {
-    LOG_NOTICE("%3.1f% complete. %s", progress, message);
+    LOG_NOTICE("%5.1f%% complete. %s", progress, message);
   }
 }
 
