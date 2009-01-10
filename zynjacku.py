@@ -1342,6 +1342,7 @@ class midiccmap:
             if int(row[0]) == int(adj.value):
                 self.cc_value_new_button.set_sensitive(False)
                 self.cc_value_change_button.set_sensitive(False)
+                self.set_value_adjustment(row[2])
                 return
         self.cc_value_new_button.set_sensitive(True)
         self.cc_value_change_button.set_sensitive(not self.current_immutable)
