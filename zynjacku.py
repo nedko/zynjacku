@@ -219,7 +219,7 @@ class Knob(gtk.VBox):
         self.legend_hls = None
         self.dragging = False
         self.start = 0.0
-        self.digits = 0
+        self.digits = 2
         self.segments = 13
         self.label = ''
         self.marker = MARKER_LINE
@@ -234,12 +234,24 @@ class Knob(gtk.VBox):
         self.connect('expose-event', self.on_expose)
         self.set_border_width(6)
         self.set_size_request(50, 50)
+        self.tooltip_enabled = False
+        self.adj = None
+
+    def set_adjustment(self, adj):
+        self.min_value = adj.lower
+        self.max_value = adj.upper
+        self.value = adj.value
+        if self.adj:
+            self.adj.disconnect(self.adj_id)
+        self.adj = adj
+        self.adj_id = adj.connect("value-changed", self.on_adj_value_changed)
 
     def format_value(self, value):
         return ("%%.%if" % self.digits) % value
 
     def show_tooltip(self):
-        get_knob_tooltip().show_tooltip(self)
+        if self.tooltip_enabled:
+            get_knob_tooltip().show_tooltip(self)
         
     def on_realize(self, widget):
         self.root = self.get_toplevel()
@@ -283,11 +295,18 @@ class Knob(gtk.VBox):
         scaler = 10**self.digits
         value = int((value*scaler)+0.5) / float(scaler)
         return value
-        
+
+    def on_adj_value_changed(self, adj):
+        if self.value != adj.value:
+            self.value = adj.value
+            self.refresh()
+
     def set_value(self, value):
         oldval = self.value
         self.value = min(max(self.quantize_value(value), self.min_value), self.max_value)
         if self.value != oldval:
+            if self.adj:
+                self.adj.set_value(value)
             self.refresh()
         
     def get_value(self):
@@ -1316,8 +1335,8 @@ class midiccmap:
         #    print "point adjustment"
 
         self.value_adj = adj
-        #if self.value_knob:
-        #    self.value_knob.set_adjustment(adj)
+        if self.value_knob:
+            self.value_knob.set_adjustment(adj)
         self.value_spin.set_adjustment(adj)
         self.value_spin.set_value(adj.value)
 
@@ -1839,7 +1858,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         hbox = gtk.HBox()
         self.knob = Knob()
-        #self.knob.set_adjustment(adjustment)
+        self.knob.set_adjustment(adjustment)
         #self.knob.set_size_request(200,-1)
         #align = gtk.Alignment(0.5, 0.5)
         #align.add(self.knob)
@@ -1863,14 +1882,13 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
 
         self.cid = adjustment.connect("value-changed", self.on_value_changed)
 
-        #self.knob.connect("button-press-event", self.on_clicked)
+        self.knob.connect("button-press-event", self.on_clicked)
 
         self.automation = False
 
         #print "Float \"%s\" created: %s" % (name, repr(self))
 
     def on_clicked(self, widget, event):
-        print "on_clicked"
         if event.type != gtk.gdk._2BUTTON_PRESS:
             return False
 
@@ -1916,7 +1934,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
         self.automation = False
 
     def set_sensitive(self, sensitive):
-        #self.knob.set_sensitive(sensitive)
+        self.knob.set_sensitive(sensitive)
         self.spin.set_sensitive(sensitive)
 
     def set(self, name, value, min, max):
@@ -1924,7 +1942,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
         self.label.set_text(name)
         self.adjustment = gtk.Adjustment(value, min, max, 1, 19)
         self.spin.set_adjustment(self.adjustment)
-        #self.knob.set_adjustment(self.adjustment)
+        self.knob.set_adjustment(self.adjustment)
         self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
 
 class PluginUIUniversalParameterInt(PluginUIUniversalParameter):
@@ -1965,7 +1983,7 @@ class PluginUIUniversalParameterInt(PluginUIUniversalParameter):
         self.window.plugin.int_set(self.context, int(adjustment.get_value()))
 
     def set_sensitive(self, sensitive):
-        #self.knob.set_sensitive(sensitive)
+        self.knob.set_sensitive(sensitive)
         self.spin.set_sensitive(sensitive)
 
     def set(self, name, value, min, max):
@@ -1973,7 +1991,7 @@ class PluginUIUniversalParameterInt(PluginUIUniversalParameter):
         self.label.set_text(name)
         self.adjustment = gtk.Adjustment(value, min, max, 1, 19)
         self.spin.set_adjustment(self.adjustment)
-        #self.knob.set_adjustment(self.adjustment)
+        self.knob.set_adjustment(self.adjustment)
         self.cid = self.adjustment.connect("value-changed", self.on_value_changed)
 
 class PluginUIUniversalParameterBool(PluginUIUniversalParameter):
