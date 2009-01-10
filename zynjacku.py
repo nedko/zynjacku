@@ -234,7 +234,7 @@ class Knob(gtk.VBox):
         self.connect('expose-event', self.on_expose)
         self.set_border_width(6)
         self.set_size_request(50, 50)
-        
+
     def format_value(self, value):
         return ("%%.%if" % self.digits) % value
 
@@ -335,32 +335,32 @@ class Knob(gtk.VBox):
         return self.legend
         
     def on_left_down(self, widget, event):
-        print "on_left_down"
+        #print "on_left_down"
         if not sum(self.get_allocation().intersect((int(event.x), int(event.y), 1, 1))):
-            return True
+            return False
         if event.button == 1:
-            print "start draggin"
+            #print "start draggin"
             self.startvalue = self.value
             self.start = event.y
             self.dragging = True
-            #self.show_tooltip()
-            #self.grab_add()
+            self.show_tooltip()
+            self.grab_add()
             return True
-        return True
+        return False
 
     def on_left_up(self, widget, event):
-        print "on_left_up"
+        #print "on_left_up"
         if not self.dragging:
             return False
         if event.button == 1:
-            print "stop draggin"
+            #print "stop draggin"
             self.dragging = False
-            #self.grab_remove()
+            self.grab_remove()
             return True
         return False
 
     def on_motion(self, widget, event):
-        print "on_motion"
+        #print "on_motion"
         if self.dragging:
             x,y,state = self.window.get_pointer()
             rc = self.get_allocation()
@@ -1645,7 +1645,10 @@ class PluginUIUniversalGroupGeneric(PluginUIUniversalGroup):
             self.scrolled_window = gtk.ScrolledWindow()
             self.scrolled_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
-            self.scrolled_window.add_with_viewport(self.box_top)
+            vp = gtk.Viewport()
+            vp.add_events(gtk.gdk.ALL_EVENTS_MASK) # pass all events so Knob is working
+            vp.add(self.box_top)
+            self.scrolled_window.add(vp)
 
             self.window.statusbar = gtk.Statusbar()
 
