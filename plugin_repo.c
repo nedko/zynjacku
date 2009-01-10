@@ -803,7 +803,7 @@ new_lv2parameter_port(
     if (slv2_value_equals(slv2_values_get_at(contexts, i), g_slv2uri_message_context))
     {
       port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
-      LOG_DEBUG("Port %d has message context", port_index);
+      LOG_DEBUG("Port %d has message context", index);
       break;
     }
   }
