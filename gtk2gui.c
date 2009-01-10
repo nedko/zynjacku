@@ -200,7 +200,6 @@ zynjacku_gtk2gui_create(
   ui_ptr->window_ptr = NULL;
 
   free(ui_uri);
-  free(ui_bundle_path);
 
   return ui_ptr;
 
@@ -288,6 +287,7 @@ zynjacku_gtk2gui_destroy(
   LOG_DEBUG("zynjacku_on_gtk2gui_destroy() called");
   dlclose(ui_ptr->dlhandle);
   free(ui_ptr->ports);
+  free(ui_ptr->bundle_path);
   free(ui_ptr);
 }
 
