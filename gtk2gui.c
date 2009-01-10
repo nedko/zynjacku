@@ -99,7 +99,7 @@ zynjacku_gtk2gui_create(
 
   if (!zynjacku_plugin_repo_get_ui_info(uri, LV2_UI_GTK_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
   {
-    LOG_ERROR("zynjacku_plugin_repo_get_ui_info() failed for '%s' and GtkGUI", uri);
+    LOG_DEBUG("zynjacku_plugin_repo_get_ui_info() failed for '%s' and GtkGUI", uri);
     goto fail;
   }
 

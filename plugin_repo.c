@@ -350,7 +350,14 @@ zynjacku_plugin_repo_get_plugin_author(
   const char * author_const;
 
   slv2_value = slv2_plugin_get_author_name(plugin);
-  author_const = slv2_value_as_string_smart(slv2_value);
+  if (slv2_value != NULL)
+  {
+    author_const = slv2_value_as_string_smart(slv2_value);
+  }
+  else
+  {
+    author_const = NULL;
+  }
 
   if (author_const != NULL)
   {
@@ -1001,6 +1008,8 @@ zynjacku_plugin_repo_load_plugin(
 
   ret = false;
 
+  LOG_DEBUG("zynjacku_plugin_repo_load_plugin() called.");
+
   synth_ptr->dynparams_supported = FALSE;
 
   if (!g_fullscanned)
@@ -1136,6 +1145,8 @@ zynjacku_plugin_repo_get_ui_info(
   const char * ui_bundle_path;
   bool ret;
 
+  LOG_DEBUG("zynjacku_plugin_repo_get_ui_info() called.");
+
   ret = false;
 
   ui_type = slv2_value_new_uri(g_world, ui_type_uri);
@@ -1156,7 +1167,7 @@ zynjacku_plugin_repo_get_ui_info(
 
   if (slv2_uis_size(slv2uis) == 0)
   {
-    LOG_ERROR("Plugin '%s' has no UIs", plugin_uri);
+    LOG_DEBUG("Plugin '%s' has no UIs", plugin_uri);
     goto fail_free_uis;
   }
 
