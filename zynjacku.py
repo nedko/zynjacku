@@ -448,7 +448,7 @@ class Knob(gtk.VBox):
         if not self.knobshape:
             self.update_knobshape()
         startangle = pi*1.5 - self.angle*0.5
-        angle = (self.value/(self.max_value - self.min_value))*self.angle + startangle
+        angle = ((self.value - self.min_value) / (self.max_value - self.min_value)) * self.angle + startangle
         rc = self.get_allocation()
         size = min(rc.width, rc.height)
 
