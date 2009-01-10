@@ -1854,7 +1854,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
         align.add(self.label)
         self.box.pack_start(align, False, False)
 
-        adjustment = gtk.Adjustment(value, min, max, 1, 19)
+        adjustment = gtk.Adjustment(value, min, max, (max - min) / 100, (max - min) / 5)
 
         hbox = gtk.HBox()
         self.knob = Knob()
