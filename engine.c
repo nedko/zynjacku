@@ -132,7 +132,7 @@ struct zynjacku_engine
   struct list_head midicc_pending_activation; /* protected using rt_lock */
   struct list_head midicc_pending_deactivation; /* protected using rt_lock */
 
-  struct list_head midicc_rt[MIDICC_COUNT]; /* accessed only from rt thread */
+  struct list_head midicc_rt[MIDICC_NO_COUNT]; /* accessed only from rt thread */
   struct list_head midicc_pending_cc_value_change; /* accessed only from rt thread */
 
   struct list_head midicc_pending_cc_no_change; /* protected using rt_lock */
@@ -479,7 +479,7 @@ zynjacku_engine_start_jack(
   INIT_LIST_HEAD(&engine_ptr->midicc_pending_activation);
   INIT_LIST_HEAD(&engine_ptr->midicc_pending_deactivation);
 
-  for (i = 0; i < MIDICC_COUNT; i++)
+  for (i = 0; i < MIDICC_NO_COUNT; i++)
   {
     INIT_LIST_HEAD(&engine_ptr->midicc_rt[i]);
   }
@@ -700,6 +700,7 @@ zynjacku_jackmidi_cc(
   guint cc_value;
   gfloat mapvalue;
   union lv2dynparam_host_parameter_value dynvalue;
+  uint8_t status;
 
   if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
   {
@@ -790,10 +791,22 @@ zynjacku_jackmidi_cc(
     /* retrieve JACK MIDI event */
     jack_midi_event_get(&input_event, input_buf, i);
 
-    if ((input_event.size == 3) && ((input_event.buffer[0] & 0xF0) == 0xB0))
+    /* status byte minus channel */
+    status = input_event.buffer[0] & 0xF0;
+
+    if (input_event.size == 3 && (status == 0xB0 || status == 0xE0))
     {
-      //LOG_DEBUG("CC %u, value %u, channel %u", input_event.buffer[1], input_event.buffer[2], (input_event.buffer[0] & 0x0F));
-      cc_no = input_event.buffer[1] & 0x7F;
+      LOG_DEBUG("CC %u, value %u, channel %u", input_event.buffer[1], input_event.buffer[2], (input_event.buffer[0] & 0x0F));
+
+      if (status == 0xB0)
+      {
+        cc_no = input_event.buffer[1] & 0x7F;
+      }
+      else                      /* pitch wheel */
+      {
+        cc_no = 144;            /* fake */
+      }
+
       cc_value = input_event.buffer[2] & 0x7F;
 
       /* assign all unassigned midicc maps */

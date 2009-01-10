@@ -76,8 +76,8 @@ struct zynjacku_midi_cc_map
 
   gboolean points_need_ui_update;
   gboolean points_need_rt_update;
-  struct point_and_func points_rt[MIDICC_COUNT];
-  struct point_and_func points_ui[MIDICC_COUNT];
+  struct point_and_func points_rt[MIDICC_VALUE_COUNT];
+  struct point_and_func points_ui[MIDICC_VALUE_COUNT];
 };
 
 #define ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_MIDI_CC_MAP_TYPE, struct zynjacku_midi_cc_map))
@@ -370,7 +370,7 @@ zynjacku_midiccmap_point_create(
   struct zynjacku_midi_cc_map * map_ptr;
   struct point * point_ptr;
 
-  LOG_DEBUG("zynjacku_midiccmap_point_create() called.");
+  LOG_DEBUG("zynjacku_midiccmap_point_create(%u, %f) called.", cc_value, parameter_value);
 
   map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
 
@@ -524,12 +524,12 @@ zynjacku_midiccmap_ui_run(
   struct zynjacku_midi_cc_map * map_ptr;
   struct list_head * node_ptr;
   struct point * point_ptr;
-  struct point * points_map[MIDICC_COUNT];
+  struct point * points_map[MIDICC_VALUE_COUNT];
   int index;
   int prev;
   gfloat x1, x2, y1, y2;
 
-  LOG_DEBUG("zynjacku_midiccmap_ui_run() called.");
+  //LOG_DEBUG("zynjacku_midiccmap_ui_run() called.");
 
   map_ptr = ZYNJACKU_MIDI_CC_MAP_GET_PRIVATE(map_obj_ptr);
 
@@ -571,11 +571,11 @@ zynjacku_midiccmap_ui_run(
   list_for_each(node_ptr, &map_ptr->points)
   {
     point_ptr = list_entry(node_ptr, struct point, siblings);
-    assert(point_ptr->cc_value < MIDICC_COUNT);
+    assert(point_ptr->cc_value < MIDICC_VALUE_COUNT);
     points_map[point_ptr->cc_value] = point_ptr;
   }
 
-  if (points_map[0] == NULL || points_map[MIDICC_COUNT - 1] == NULL)
+  if (points_map[0] == NULL || points_map[MIDICC_VALUE_COUNT - 1] == NULL)
   {
     /* if we dont have the extreme points then map is not complete
        and thus it cannot be used for mapping */
@@ -584,7 +584,7 @@ zynjacku_midiccmap_ui_run(
   }
 
   prev = -1;
-  for (index = 0; index < MIDICC_COUNT; index++)
+  for (index = 0; index < MIDICC_VALUE_COUNT; index++)
   {
     map_ptr->points_ui[index].next_cc_value = G_MAXUINT;
 
@@ -694,7 +694,7 @@ zynjacku_midiccmap_map_cc_rt(
     return 0.0;
   }
 
-  assert(cc_value < MIDICC_COUNT);
+  assert(cc_value < MIDICC_VALUE_COUNT);
   index = cc_value;
 
   while (map_ptr->points_rt[index].next_cc_value == G_MAXUINT)

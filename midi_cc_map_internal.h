@@ -44,7 +44,8 @@ zynjacku_midiccmap_map_cc_rt(
   void * internal_ptr,
   guint cc_value);
 
-#define MIDICC_COUNT 128
+#define MIDICC_NO_COUNT    256
+#define MIDICC_VALUE_COUNT 128
 
 G_END_DECLS
 
