@@ -246,6 +246,9 @@ class Knob(gtk.VBox):
         self.adj = adj
         self.adj_id = adj.connect("value-changed", self.on_adj_value_changed)
 
+    def is_sensitive(self):
+        return self.get_property("sensitive")
+
     def format_value(self, value):
         return ("%%.%if" % self.digits) % value
 
@@ -355,6 +358,11 @@ class Knob(gtk.VBox):
         
     def on_left_down(self, widget, event):
         #print "on_left_down"
+
+        # dont drag insensitive widgets
+        if not self.is_sensitive():
+            return False
+
         if not sum(self.get_allocation().intersect((int(event.x), int(event.y), 1, 1))):
             return False
         if event.button == 1:
@@ -380,6 +388,11 @@ class Knob(gtk.VBox):
 
     def on_motion(self, widget, event):
         #print "on_motion"
+
+        # dont drag insensitive widgets
+        if not self.is_sensitive():
+            return False
+
         if self.dragging:
             x,y,state = self.window.get_pointer()
             rc = self.get_allocation()
@@ -398,6 +411,11 @@ class Knob(gtk.VBox):
         return False
             
     def on_mousewheel(self, widget, event):
+
+        # dont move insensitive widgets
+        if not self.is_sensitive():
+            return False
+
         if not sum(self.get_allocation().intersect((int(event.x), int(event.y), 1, 1))):
             return
         range = self.max_value - self.min_value
@@ -433,7 +451,9 @@ class Knob(gtk.VBox):
         angle = (self.value/(self.max_value - self.min_value))*self.angle + startangle
         rc = self.get_allocation()
         size = min(rc.width, rc.height)
+
         kh = self.get_border_width() # knob height
+
         ps = 1.0/size # pixel size
         ps2 = 1.0 / (size-(2*kh)-1) # pixel size inside knob
         ss = ps * kh # shadow size
@@ -491,7 +511,9 @@ class Knob(gtk.VBox):
                 ctx.set_line_width(lsize)
                 ctx.arc(0.0, 0.0, 0.5+ps2+n, startangle, startangle+self.angle)
                 ctx.stroke()
-        if kh:
+
+        # draw shadow only for sensitive widgets that have height
+        if self.is_sensitive() and kh:
             ctx.save()
             ctx.translate(ss, ss)
             ctx.rotate(angle)
@@ -500,6 +522,7 @@ class Knob(gtk.VBox):
             ctx.restore()
             ctx.set_source_rgba(0,0,0,0.3)
             ctx.fill()
+
         if self.legend in (LEGEND_LED_SCALE, LEGEND_LED_DOTS):
             ch,cl,cs = self.legend_hls
             n = ps2*(kh-1)
@@ -557,7 +580,11 @@ class Knob(gtk.VBox):
         ctx.arc(0.0, 0.0, 0.5-self.gd-(2*ps), 0.0, pi*2.0)
         ctx.set_source_rgb(*hls_to_rgb(*self.fg_hls))
         ctx.fill()
-        
+
+        # dont draw cap for insensitive widgets
+        if not self.is_sensitive():
+            return
+
         #~ ctx.set_line_cap(cairo.LINE_CAP_ROUND)
         #~ ctx.move_to(0.5-0.3-self.gd-ps, 0.0)
         #~ ctx.line_to(0.5-self.gd-ps*5, 0.0)
