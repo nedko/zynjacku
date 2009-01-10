@@ -42,7 +42,7 @@ zynjacku_midiccmap_get_internal_ptr(
 gfloat
 zynjacku_midiccmap_map_cc_rt(
   void * internal_ptr,
-  guint cc_value);
+  gfloat cc_value);
 
 #define MIDICC_NO_COUNT    256
 #define MIDICC_VALUE_COUNT 128

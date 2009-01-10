@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 #include <glib-object.h>
 
 #include "midi_cc_map.h"
@@ -601,8 +602,8 @@ zynjacku_midiccmap_ui_run(
 
     map_ptr->points_ui[prev].next_cc_value = index;
 
-    x1 = (gfloat)prev;
-    x2 = (gfloat)index;
+    x1 = (gfloat)prev / (gfloat)(MIDICC_VALUE_COUNT - 1);
+    x2 = (gfloat)index / (gfloat)(MIDICC_VALUE_COUNT - 1);
     y1 = points_map[prev]->parameter_value;
     y2 = points_map[index]->parameter_value;
 
@@ -681,11 +682,11 @@ zynjacku_midiccmap_get_internal_ptr(
 gfloat
 zynjacku_midiccmap_map_cc_rt(
   void * internal_ptr,
-  guint cc_value)
+  gfloat cc_value)
 {
   int index;
 
-  LOG_DEBUG("zynjacku_midiccmap_map_cc_rt(%p, %u)", map_ptr, cc_value);
+  LOG_DEBUG("zynjacku_midiccmap_map_cc_rt(%p, %f)", map_ptr, cc_value);
 
   if (map_ptr->points_rt[0].next_cc_value == G_MAXUINT)
   {
@@ -694,8 +695,8 @@ zynjacku_midiccmap_map_cc_rt(
     return 0.0;
   }
 
-  assert(cc_value < MIDICC_VALUE_COUNT);
-  index = cc_value;
+  index = roundf(cc_value * (MIDICC_VALUE_COUNT - 1));
+  assert(index < MIDICC_VALUE_COUNT);
 
   while (map_ptr->points_rt[index].next_cc_value == G_MAXUINT)
   {
@@ -705,7 +706,7 @@ zynjacku_midiccmap_map_cc_rt(
 
   LOG_DEBUG("%u -> %u has slope of %f and y-intercept of %f", index, map_ptr->points_rt[index].next_cc_value, map_ptr->points_rt[index].slope, map_ptr->points_rt[index].y_intercept);
 
-  return map_ptr->points_rt[index].slope * (gfloat)cc_value + map_ptr->points_rt[index].y_intercept;
+  return map_ptr->points_rt[index].slope * cc_value + map_ptr->points_rt[index].y_intercept;
 }
 
 #undef map_ptr

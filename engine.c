@@ -698,6 +698,8 @@ zynjacku_jackmidi_cc(
   jack_nframes_t i;
   guint cc_no;
   guint cc_value;
+  float cc_fvalue;
+  gint pitch;
   gfloat mapvalue;
   union lv2dynparam_host_parameter_value dynvalue;
   uint8_t status;
@@ -796,18 +798,36 @@ zynjacku_jackmidi_cc(
 
     if (input_event.size == 3 && (status == 0xB0 || status == 0xE0))
     {
-      LOG_DEBUG("CC %u, value %u, channel %u", input_event.buffer[1], input_event.buffer[2], (input_event.buffer[0] & 0x0F));
-
       if (status == 0xB0)
       {
         cc_no = input_event.buffer[1] & 0x7F;
+        cc_value = input_event.buffer[2] & 0x7F;
+        cc_fvalue = (float)cc_value / 127.0;
+        LOG_DEBUG("CC %u, value %u (%f), channel %u", cc_no, cc_value, cc_fvalue, (input_event.buffer[0] & 0x0F));
       }
       else                      /* pitch wheel */
       {
         cc_no = 144;            /* fake */
-      }
+        pitch = input_event.buffer[1] & 0x7F;
+        pitch |= (input_event.buffer[2] & 0x7F) << 7;
+        cc_value = pitch >> 7;
+        pitch -= 0x2000;
 
-      cc_value = input_event.buffer[2] & 0x7F;
+        if (pitch < 0)
+        {
+          cc_fvalue = (float)pitch / 0x2000;
+        }
+        else
+        {
+          cc_fvalue = (float)pitch / (0x2000 - 1);
+        }
+
+        /* -1..1 -> 0..1 */
+        cc_fvalue += 1.0;
+        cc_fvalue /= 2;
+
+        LOG_DEBUG("Pitch %d, value %f, channel %u", pitch, cc_fvalue, (input_event.buffer[0] & 0x0F));
+      }
 
       /* assign all unassigned midicc maps */
       while (!list_empty(&engine_ptr->unassigned_midicc_rt))
@@ -845,8 +865,8 @@ zynjacku_jackmidi_cc(
           list_add_tail(&midicc_ptr->siblings_pending_cc_value_change, &engine_ptr->midicc_pending_cc_value_change);
         }
 
-        mapvalue = zynjacku_midiccmap_map_cc_rt(midicc_ptr->map_internal_ptr, cc_value);
-        LOG_DEBUG("%u mapped to %f", (unsigned int)cc_value, (float)mapvalue);
+        mapvalue = zynjacku_midiccmap_map_cc_rt(midicc_ptr->map_internal_ptr, cc_fvalue);
+        LOG_DEBUG("%u (%f) mapped to %f", cc_value, cc_fvalue, (float)mapvalue);
 
         switch (midicc_ptr->port_ptr->type)
         {
