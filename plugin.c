@@ -843,7 +843,7 @@ zynjacku_connect_plugin_ports(
 
     if (PORT_IS_MSGCONTEXT(port_ptr))
     {
-      /* TODO: ask drobilla whether msgcontext [prts they should be connceted on instantiation */
+      /* TODO: ask drobilla whether msgcontext ports should be connected on instantiation */
     }
     else
     {
@@ -869,7 +869,7 @@ zynjacku_connect_plugin_ports(
 
     if (PORT_IS_MSGCONTEXT(port_ptr))
     {
-      /* TODO: ask drobilla whether msgcontext [prts they should be connceted on instantiation */
+      /* TODO: ask drobilla whether msgcontext ports should be connected on instantiation */
     }
     else
     {
