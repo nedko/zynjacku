@@ -102,6 +102,13 @@ zynjacku_plugin_dynparam_parameter_value_change_context(
   void * parameter_context,
   void * value_change_context);
 
+static
+void
+send_message(
+  struct zynjacku_plugin * plugin_ptr,
+  struct zynjacku_port * port_ptr,
+  const void *dest);
+  
 /* UGLY: We convert dynparam context poitners to string to pass them
    as opaque types through Python. Silly, but codegen fails to create
    marshaling code for gpointer arguments. If possible at all, it is a
@@ -841,11 +848,7 @@ zynjacku_connect_plugin_ports(
   {
     port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
 
-    if (PORT_IS_MSGCONTEXT(port_ptr))
-    {
-      /* TODO: ask drobilla whether msgcontext ports should be connected on instantiation */
-    }
-    else
+    if (!PORT_IS_MSGCONTEXT(port_ptr))
     {
       switch (port_ptr->type)
       {
@@ -880,6 +883,25 @@ zynjacku_connect_plugin_ports(
         break;
       case PORT_TYPE_LV2_STRING:
         /* TODO measure string ports are broken for now */
+        break;
+      }
+    }
+  }
+
+  list_for_each(node_ptr, &plugin_ptr->parameter_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    /* TODO: check port stickiness too */
+    if (PORT_IS_MSGCONTEXT(port_ptr))
+    {
+      switch (port_ptr->type)
+      {
+      case PORT_TYPE_LV2_FLOAT:
+        send_message(plugin_ptr, port_ptr, &port_ptr->data.lv2float);
+        break;
+      case PORT_TYPE_LV2_STRING:
+        send_message(plugin_ptr, port_ptr, &port_ptr->data.lv2string);
         break;
       }
     }
