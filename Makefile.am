@@ -19,7 +19,7 @@
 
 DEFAULT_INCLUDES =
 
-zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g -std=c99
+zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
 
 if DEV_VERSION
 zynjacku_c_CFLAGS += -Werror
