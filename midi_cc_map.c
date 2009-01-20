@@ -20,12 +20,12 @@
  *
  *****************************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #if !defined(_ISOC99_SOURCE)
 #define _ISOC99_SOURCE          /* roundf from math.h */
 #endif
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include <math.h>
 #include <glib-object.h>
 
