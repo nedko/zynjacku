@@ -21,6 +21,8 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
@@ -38,9 +40,11 @@
 #include "list.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#endif
 
 #include "plugin.h"
 #include "engine.h"
@@ -83,6 +87,7 @@
 
 static guint g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNALS_COUNT];
 
+#if HAVE_DYNPARAMS
 void
 zynjacku_plugin_dynparam_parameter_created(
   void * instance_context,
@@ -101,6 +106,7 @@ zynjacku_plugin_dynparam_parameter_value_change_context(
   void * instance_context,
   void * parameter_context,
   void * value_change_context);
+#endif
 
 static
 void
@@ -530,7 +536,9 @@ zynjacku_plugin_init(
   plugin_ptr->dispose_has_run = FALSE;
   INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
   INIT_LIST_HEAD(&plugin_ptr->measure_ports);
+#if HAVE_DYNPARAMS
   INIT_LIST_HEAD(&plugin_ptr->dynparam_ports);
+#endif
 
   plugin_ptr->type = PLUGIN_TYPE_UNKNOWN;
 
@@ -741,11 +749,13 @@ zynjacku_plugin_ui_on(
     return zynjacku_gtk2gui_ui_on(plugin_ptr->gtk2gui);
   }
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams)
   {
     lv2dynparam_host_ui_on(plugin_ptr->dynparams);
   }
   else
+#endif
   {
     zynjacku_plugin_generic_lv2_ui_on(plugin_obj_ptr);
   }
@@ -758,10 +768,12 @@ zynjacku_plugin_ui_run(
   struct zynjacku_plugin * plugin_ptr)
 {
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     lv2dynparam_host_ui_run(plugin_ptr->dynparams);
   }
+#endif
 
   if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
@@ -783,10 +795,12 @@ zynjacku_plugin_ui_off(
   {
     zynjacku_gtk2gui_ui_off(plugin_ptr->gtk2gui);
   }
+#if HAVE_DYNPARAMS
   else if (plugin_ptr->dynparams)
   {
     lv2dynparam_host_ui_off(plugin_ptr->dynparams);
   }
+#endif
   else
   {
     zynjacku_plugin_generic_lv2_ui_off(plugin_obj_ptr);
@@ -814,14 +828,18 @@ bool
 zynjacku_connect_plugin_ports(
   struct zynjacku_plugin * plugin_ptr,
   ZynjackuPlugin * plugin_obj_ptr,
-  GObject * engine_object_ptr,
-  struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr)
+  GObject * engine_object_ptr
+#if HAVE_DYNPARAMS
+  , struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr
+#endif
+  )
 {
   struct list_head * node_ptr;
   struct zynjacku_port * port_ptr;
 
   plugin_ptr->engine_object_ptr = engine_object_ptr;
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams_supported)
   {
     if (!lv2dynparam_host_attach(
@@ -842,6 +860,7 @@ zynjacku_connect_plugin_ports(
   }
 
   plugin_ptr->dynparams = NULL;
+#endif
 
   /* connect parameter ports */
   list_for_each(node_ptr, &plugin_ptr->parameter_ports)
@@ -958,6 +977,7 @@ zynjacku_free_plugin_ports(
     zynjacku_free_port(port_ptr);
   }
 
+#if HAVE_DYNPARAMS
   while (!list_empty(&plugin_ptr->dynparam_ports))
   {
     node_ptr = plugin_ptr->dynparam_ports.next;
@@ -969,6 +989,7 @@ zynjacku_free_plugin_ports(
 
     free(port_ptr);
   }
+#endif
 }
 
 gboolean
@@ -1026,11 +1047,13 @@ zynjacku_plugin_destruct(
 
   plugin_ptr->free_ports(G_OBJECT(plugin_obj_ptr));
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     lv2dynparam_host_detach(plugin_ptr->dynparams);
     plugin_ptr->dynparams = NULL;
   }
+#endif
 
   g_object_unref(plugin_ptr->engine_object_ptr);
 
@@ -1041,6 +1064,7 @@ zynjacku_plugin_destruct(
   plugin_ptr->id = NULL;
 }
 
+#if HAVE_DYNPARAMS
 void
 dynparam_ui_group_appeared(
   lv2dynparam_host_group group_handle,
@@ -1135,6 +1159,7 @@ zynjacku_plugin_dynparam_parameter_created(
   LOG_DEBUG("dynparam port %p created", port_ptr);
   *parameter_context_ptr = port_ptr;
 }
+#endif
 
 static
 gboolean
@@ -1179,6 +1204,8 @@ zynjacku_plugin_set_midi_cc_map_internal(
 
   return true;
 }
+
+#if HAVE_DYNPARAMS
 
 #define port_ptr ((struct zynjacku_port *)parameter_context)
 
@@ -1420,12 +1447,15 @@ dynparam_ui_parameter_value_changed(
 
 #undef port_ptr
 
+#endif
+
 void
 zynjacku_plugin_bool_set(
   ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   gboolean value)
 {
+#if HAVE_DYNPARAMS
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
@@ -1443,6 +1473,7 @@ zynjacku_plugin_bool_set(
     plugin_ptr->dynparams,
     port_ptr->data.dynparam.handle,
     dynparam_value);
+#endif
 }
 
 void
@@ -1453,7 +1484,9 @@ zynjacku_plugin_float_set(
 {
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
+#if HAVE_DYNPARAMS
   union lv2dynparam_host_parameter_value dynparam_value;
+#endif
   float fvalue;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
@@ -1462,6 +1495,7 @@ zynjacku_plugin_float_set(
 
   LOG_DEBUG("zynjacku_plugin_float_set() called, context %p", port_ptr);
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     assert(port_ptr->type == PORT_TYPE_DYNPARAM);
@@ -1472,6 +1506,7 @@ zynjacku_plugin_float_set(
       dynparam_value);
   }
   else
+#endif
   {
     assert(port_ptr->type == PORT_TYPE_LV2_FLOAT);
     fvalue = value;
@@ -1485,6 +1520,7 @@ zynjacku_plugin_enum_set(
   gchar * string_context,
   guint value)
 {
+#if HAVE_DYNPARAMS
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
@@ -1502,6 +1538,7 @@ zynjacku_plugin_enum_set(
     plugin_ptr->dynparams,
     port_ptr->data.dynparam.handle,
     dynparam_value);
+#endif
 }
 
 void
@@ -1510,6 +1547,7 @@ zynjacku_plugin_int_set(
   gchar * string_context,
   gint value)
 {
+#if HAVE_DYNPARAMS
   struct zynjacku_plugin * plugin_ptr;
   struct zynjacku_port * port_ptr;
   union lv2dynparam_host_parameter_value dynparam_value;
@@ -1525,6 +1563,7 @@ zynjacku_plugin_int_set(
     plugin_ptr->dynparams,
     port_ptr->data.dynparam.handle,
     dynparam_value);
+#endif
 }
 
 #define plugin_obj_ptr ((ZynjackuPlugin *)context)
@@ -1565,11 +1604,13 @@ zynjacku_plugin_get_parameters(
 
   LOG_DEBUG("zynjacku_plugin_get_parameters() called.");
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     lv2dynparam_get_parameters(plugin_ptr->dynparams, zynjacku_plugin_dynparameter_get_callback, plugin_obj_ptr);
   }
   else
+#endif
   {
     locale = strdup(setlocale(LC_NUMERIC, NULL));
 
@@ -1618,6 +1659,7 @@ zynjacku_plugin_set_parameter(
 
   LOG_DEBUG("zynjacku_plugin_set_parameter('%s', '%s', %p) called.", parameter, value, midi_cc_map_obj_ptr);
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     if (midi_cc_map_obj_ptr != NULL)
@@ -1628,6 +1670,7 @@ zynjacku_plugin_set_parameter(
     lv2dynparam_set_parameter(plugin_ptr->dynparams, parameter, value, midi_cc_map_obj_ptr);
   }
   else
+#endif
   {
     list_for_each(node_ptr, &plugin_ptr->parameter_ports)
     {

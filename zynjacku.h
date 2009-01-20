@@ -35,7 +35,9 @@
 #define PORT_TYPE_EVENT_MIDI       3 /* LV2 midi in event port */
 #define PORT_TYPE_LV2_FLOAT        4 /* LV2 control rate float port used, if input for synth/effect parameters, if output for leds, meters, etc. */
 #define PORT_TYPE_LV2_STRING       5 /* LV2 string port */
+#if HAVE_DYNPARAMS
 #define PORT_TYPE_DYNPARAM         6 /* dynamic parameter */
+#endif
 
 #define PORT_FLAGS_OUTPUT          1 /* is an output (measure) port */
 #define PORT_FLAGS_MSGCONTEXT      2 /* uses LV2 message context */
@@ -63,11 +65,13 @@ struct zynjacku_port
     } lv2float;                /* for PORT_TYPE_LV2_FLOAT */
     struct _LV2_String_Data lv2string; /* for PORT_TYPE_LV2_STRING */
     jack_port_t * audio;        /* for PORT_TYPE_AUDIO */
+#if HAVE_DYNPARAMS
     struct
     {
       unsigned int type;
       lv2dynparam_host_parameter handle;
     } dynparam; /* for PORT_TYPE_DYNPARAM */
+#endif
   } data;
 
   GObject * ui_context;

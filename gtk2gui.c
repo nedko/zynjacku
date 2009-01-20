@@ -20,6 +20,8 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
@@ -27,9 +29,11 @@
 #include <dlfcn.h>
 #include <assert.h>
 #include <lv2.h>
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#endif
 #include <slv2/lv2_ui.h>
 #include <gtk/gtk.h>
 #include <jack/jack.h>

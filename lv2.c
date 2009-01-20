@@ -20,6 +20,8 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
@@ -29,9 +31,11 @@
 #include <jack/jack.h>
 #include <glib-object.h>
 #include <lv2.h>
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#endif
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"

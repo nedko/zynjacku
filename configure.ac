@@ -42,7 +42,12 @@ PKG_CHECK_MODULES(LV2, lv2core >= 1)
 PKG_CHECK_MODULES(GTK, gtk+-2.0)
 PKG_CHECK_MODULES(PYGTK, pygtk-2.0)
 PKG_CHECK_MODULES(JACK, jack)
-PKG_CHECK_MODULES(LV2DYNPARAMHOST, lv2dynparamhost1 = 2)
+PKG_CHECK_MODULES(LV2DYNPARAMHOST1, lv2dynparamhost1 = 2, HAVE_DYNPARAMS="yes", HAVE_DYNPARAMS="no"; AC_MSG_WARN([$LV2DYNPARAMHOST1_PKG_ERRORS]))
+if test "$HAVE_DYNPARAMS" = "yes"
+then
+  AC_DEFINE([HAVE_DYNPARAMS], 1, [Defined if dynparam1 is present.])
+fi
+AM_CONDITIONAL(HAVE_DYNPARAMS, test "$HAVE_DYNPARAMS" = "yes")
 PKG_CHECK_MODULES(SLV2, slv2 >= 0.6.1)
 
 # JACK MIDI
@@ -81,7 +86,8 @@ AC_OUTPUT
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([========================])
-AC_MSG_RESULT([Prefix                 : $prefix])
-AC_MSG_RESULT([Python dir             : $PYTHON_INCLUDES])
-AC_MSG_RESULT([Dev version            : $dev_version])
+AC_MSG_RESULT([Prefix                    : $prefix])
+AC_MSG_RESULT([Dynparam1 plugins support : $HAVE_DYNPARAMS])
+AC_MSG_RESULT([Python dir                : $PYTHON_INCLUDES])
+AC_MSG_RESULT([Dev version               : $dev_version])
 AC_MSG_RESULT([])

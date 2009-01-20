@@ -21,6 +21,8 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,11 +32,11 @@
 #include <lv2.h>
 #include <jack/jack.h>
 #include <glib-object.h>
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
-
-#include "config.h"
+#endif
 
 #include "lv2_contexts.h"
 #include "lv2_event.h"
@@ -56,11 +58,17 @@
 
 #include "jack_compat.c"
 
+#if HAVE_DYNPARAMS
 #include "rtmempool.h"
+#endif
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 
+#if HAVE_DYNPARAMS
 #define ZYNJACKU_RACK_ENGINE_FEATURES 6
+#else
+#define ZYNJACKU_RACK_ENGINE_FEATURES 4
+#endif
 
 struct lv2rack_engine
 {
@@ -77,15 +85,19 @@ struct lv2rack_engine
   jack_port_t * audio_in_left;
   jack_port_t * audio_in_right;
 
+#if HAVE_DYNPARAMS
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
+#endif
   LV2_URI_Map_Feature uri_map;
   LV2_Event_Feature event;
   struct lv2_progress progress;
   char * progress_plugin_name;
   char * progress_last_message;
 
+#if HAVE_DYNPARAMS
   LV2_Feature host_feature_rtmempool;
   LV2_Feature host_feature_dynparams;
+#endif
   LV2_Feature host_feature_contexts;
   LV2_Feature host_feature_msgcontext;
   LV2_Feature host_feature_stringport;
@@ -298,8 +310,10 @@ zynjacku_rack_init(
 
   rack_ptr->jack_client = NULL;
 
+#if HAVE_DYNPARAMS
   /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&rack_ptr->mempool_allocator);
+#endif
 
   /* initialize progress host feature */
   rack_ptr->progress.progress = zynjacku_progress;
@@ -307,11 +321,13 @@ zynjacku_rack_init(
   rack_ptr->progress_plugin_name = NULL;
   rack_ptr->progress_last_message = NULL;
 
+#if HAVE_DYNPARAMS
   rack_ptr->host_feature_rtmempool.URI = LV2_RTSAFE_MEMORY_POOL_URI;
   rack_ptr->host_feature_rtmempool.data = &rack_ptr->mempool_allocator;
 
   rack_ptr->host_feature_dynparams.URI = LV2DYNPARAM_URI;
   rack_ptr->host_feature_dynparams.data = NULL;
+#endif
 
   rack_ptr->host_feature_contexts.URI = LV2_CONTEXTS_URI;
   rack_ptr->host_feature_contexts.data = NULL;
@@ -327,8 +343,10 @@ zynjacku_rack_init(
 
   /* initialize host features array */
   count = 0;
+#if HAVE_DYNPARAMS
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_rtmempool;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_dynparams;
+#endif
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_contexts;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_msgcontext;
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_stringport;
@@ -503,10 +521,12 @@ jack_process_cb(
 
     old_data = zynjacku_plugin_prerun_rt(effect_ptr);
 
+#if HAVE_DYNPARAMS
     if (effect_ptr->dynparams)
     {
       lv2dynparam_host_realtime_run(effect_ptr->dynparams);
     }
+#endif
 
     /* Connect plugin LV2 input audio ports */
     zynjacku_lv2_connect_port(
@@ -854,7 +874,14 @@ zynjacku_plugin_construct_effect(
 
   /* connect parameter/measure ports */
 
-  if (!zynjacku_connect_plugin_ports(plugin_ptr, plugin_obj_ptr, rack_object_ptr, &rack_ptr->mempool_allocator))
+  if (!zynjacku_connect_plugin_ports(
+        plugin_ptr,
+        plugin_obj_ptr,
+        rack_object_ptr
+#if HAVE_DYNPARAMS
+        , &rack_ptr->mempool_allocator
+#endif
+        ))
   {
     goto fail_unload;
   }
@@ -925,11 +952,13 @@ fail_free_ports:
   zynjacku_free_effect_ports(G_OBJECT(plugin_obj_ptr));
   plugin_ptr->engine_object_ptr = NULL;
 
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     lv2dynparam_host_detach(plugin_ptr->dynparams);
     plugin_ptr->dynparams = NULL;
   }
+#endif
 
 fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);

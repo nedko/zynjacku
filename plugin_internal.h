@@ -46,11 +46,15 @@ struct zynjacku_plugin
   struct list_head siblings_all;
   struct list_head siblings_active;
   zynjacku_lv2_handle lv2plugin;
+#if HAVE_DYNPARAMS
   bool dynparams_supported;
+#endif
   struct list_head parameter_ports;
   struct list_head measure_ports;
+#if HAVE_DYNPARAMS
   struct list_head dynparam_ports;
   lv2dynparam_host_instance dynparams;
+#endif
   zynjacku_gtk2gui_handle gtk2gui;
   char * id;
   char * name;
@@ -91,8 +95,11 @@ bool
 zynjacku_connect_plugin_ports(
   struct zynjacku_plugin * plugin_ptr,
   ZynjackuPlugin * plugin_obj_ptr,
-  GObject * engine_object_ptr,
-  struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr);
+  GObject * engine_object_ptr
+#if HAVE_DYNPARAMS
+  ,struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr
+#endif
+  );
 
 void
 zynjacku_free_plugin_ports(

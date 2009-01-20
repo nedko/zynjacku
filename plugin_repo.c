@@ -20,14 +20,18 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <slv2/slv2.h>
 #include <glib-object.h>
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#endif
 #include <jack/jack.h>
 
 #include "lv2-miditype.h"
@@ -1010,7 +1014,9 @@ zynjacku_plugin_repo_load_plugin(
 
   LOG_DEBUG("zynjacku_plugin_repo_load_plugin() called.");
 
+#if HAVE_DYNPARAMS
   synth_ptr->dynparams_supported = FALSE;
+#endif
 
   if (!g_fullscanned)
   {
@@ -1081,10 +1087,12 @@ zynjacku_plugin_repo_load_plugin(
 
     LOG_DEBUG("%s", uri);
 
+#if HAVE_DYNPARAMS
     if (strcmp(LV2DYNPARAM_URI, uri) == 0)
     {
       synth_ptr->dynparams_supported = TRUE;
     }
+#endif
   }
 
   ports_count  = slv2_plugin_get_num_ports(info_ptr->slv2info);

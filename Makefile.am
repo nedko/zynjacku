@@ -29,7 +29,7 @@ zynjacku_c_CFLAGS += @GTK_CFLAGS@
 zynjacku_c_CFLAGS += @PYGTK_CFLAGS@
 zynjacku_c_CFLAGS += @SLV2_CFLAGS@
 zynjacku_c_CFLAGS += @JACK_CFLAGS@
-zynjacku_c_CFLAGS += @LV2DYNPARAMHOST_CFLAGS@
+zynjacku_c_CFLAGS += @LV2DYNPARAMHOST1_CFLAGS@
 
 INCLUDES = $(PYTHON_INCLUDES) $(zynjacku_c_CFLAGS)
 
@@ -41,7 +41,7 @@ ZYNJACKU_LDFLAGS = @GTK_LIBS@
 ZYNJACKU_LDFLAGS += @PYGTK_LIBS@
 ZYNJACKU_LDFLAGS += @SLV2_LIBS@
 ZYNJACKU_LDFLAGS += @JACK_LIBS@
-ZYNJACKU_LDFLAGS += @LV2DYNPARAMHOST_LIBS@
+ZYNJACKU_LDFLAGS += @LV2DYNPARAMHOST1_LIBS@
 
 zynjacku_c_la_LDFLAGS = -module -avoid-version $(ZYNJACKU_LDFLAGS)
 zynjacku_c_la_LIBADD = $(ZYNJACKU_LIBS)
@@ -77,8 +77,10 @@ zynjacku_c_la_SOURCES += lv2_data_access.h
 zynjacku_c_la_SOURCES += lv2_event.h
 zynjacku_c_la_SOURCES += lv2_event_helpers.h
 zynjacku_c_la_SOURCES += lv2_uri_map.h
+if HAVE_DYNPARAMS
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
+endif
 zynjacku_c_la_SOURCES += midi_cc_map.c
 zynjacku_c_la_SOURCES += midi_cc_map.h
 

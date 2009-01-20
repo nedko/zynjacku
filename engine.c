@@ -21,6 +21,8 @@
  *
  *****************************************************************************/
 
+#include "config.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,12 +32,12 @@
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>
+#if HAVE_DYNPARAMS
 #include <lv2dynparam/lv2dynparam.h>
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
+#endif
 #include <slv2/lv2_ui.h>
-
-#include "config.h"
 
 #include "lv2_contexts.h"
 #include "lv2-miditype.h"
@@ -58,7 +60,9 @@
 
 #include "jack_compat.c"
 
+#if HAVE_DYNPARAMS
 #include "rtmempool.h"
+#endif
 #include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 #include "midi_cc_map.h"
@@ -72,7 +76,11 @@
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
 
+#if HAVE_DYNPARAMS
 #define ZYNJACKU_ENGINE_FEATURES 8
+#else
+#define ZYNJACKU_ENGINE_FEATURES 6
+#endif
 
 struct zynjacku_midicc
 {
@@ -111,17 +119,23 @@ struct zynjacku_engine
   LV2_Event_Buffer lv2_midi_event_buffer;
   gboolean midi_activity;
 
+#if HAVE_DYNPARAMS
   struct lv2_rtsafe_memory_pool_provider mempool_allocator;
+#endif
   LV2_URI_Map_Feature uri_map;
   LV2_Event_Feature event;
   struct lv2_progress progress;
   char * progress_plugin_name;
   char * progress_last_message;
 
+#if HAVE_DYNPARAMS
   LV2_Feature host_feature_rtmempool;
+#endif
   LV2_Feature host_feature_uri_map;
   LV2_Feature host_feature_event_ref;
+#if HAVE_DYNPARAMS
   LV2_Feature host_feature_dynparams;
+#endif
   LV2_Feature host_feature_contexts;
   LV2_Feature host_feature_msgcontext;
   LV2_Feature host_feature_stringport;
@@ -371,11 +385,13 @@ zynjacku_engine_init(
 
   pthread_mutex_init(&engine_ptr->rt_lock, NULL);
 
+#if HAVE_DYNPARAMS
   /* initialize rtsafe mempool host feature */
   rtmempool_allocator_init(&engine_ptr->mempool_allocator);
 
   engine_ptr->host_feature_rtmempool.URI = LV2_RTSAFE_MEMORY_POOL_URI;
   engine_ptr->host_feature_rtmempool.data = &engine_ptr->mempool_allocator;
+#endif
 
   /* initialize uri map host feature */
   engine_ptr->uri_map.callback_data = engine_ptr;
@@ -399,8 +415,10 @@ zynjacku_engine_init(
   engine_ptr->host_feature_event_ref.URI = LV2_EVENT_URI;
   engine_ptr->host_feature_event_ref.data = &engine_ptr->event;
 
+#if HAVE_DYNPARAMS
   engine_ptr->host_feature_dynparams.URI = LV2DYNPARAM_URI;
   engine_ptr->host_feature_dynparams.data = NULL;
+#endif
 
   engine_ptr->host_feature_contexts.URI = LV2_CONTEXTS_URI;
   engine_ptr->host_feature_contexts.data = NULL;
@@ -416,10 +434,14 @@ zynjacku_engine_init(
 
   /* initialize host features array */
   count = 0;
+#if HAVE_DYNPARAMS
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_rtmempool;
+#endif
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_uri_map;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_event_ref;
+#if HAVE_DYNPARAMS
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_dynparams;
+#endif
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_contexts;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_msgcontext;
   engine_ptr->host_features[count++] = &engine_ptr->host_feature_stringport;
@@ -701,7 +723,9 @@ zynjacku_jackmidi_cc(
   float cc_fvalue;
   gint pitch;
   gfloat mapvalue;
+#if HAVE_DYNPARAMS
   union lv2dynparam_host_parameter_value dynvalue;
+#endif
   uint8_t status;
 
   if (pthread_mutex_trylock(&engine_ptr->rt_lock) == 0)
@@ -873,6 +897,7 @@ zynjacku_jackmidi_cc(
         case PORT_TYPE_LV2_FLOAT:
           midicc_ptr->port_ptr->data.lv2float.value = mapvalue;
           break;
+#if HAVE_DYNPARAMS
         case PORT_TYPE_DYNPARAM:
           switch (midicc_ptr->port_ptr->data.dynparam.type)
           {
@@ -883,6 +908,7 @@ zynjacku_jackmidi_cc(
           }
 
           break;
+#endif
         }
       }
     }
@@ -942,10 +968,12 @@ jack_process_cb(
 
     old_data = zynjacku_plugin_prerun_rt(synth_ptr);
 
+#if HAVE_DYNPARAMS
     if (synth_ptr->dynparams)
     {
       lv2dynparam_host_realtime_run(synth_ptr->dynparams);
     }
+#endif
 
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
     if (synth_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO)
@@ -1445,7 +1473,14 @@ zynjacku_plugin_construct_synth(
   }
 
   /* connect parameter/measure ports */
-  if (!zynjacku_connect_plugin_ports(plugin_ptr, plugin_obj_ptr, engine_object_ptr, &engine_ptr->mempool_allocator))
+  if (!zynjacku_connect_plugin_ports(
+        plugin_ptr,
+        plugin_obj_ptr,
+        engine_object_ptr
+#if HAVE_DYNPARAMS
+        , &engine_ptr->mempool_allocator
+#endif
+        ))
   {
     goto fail_unload;
   }
@@ -1534,11 +1569,13 @@ fail_free_ports:
   plugin_ptr->engine_object_ptr = NULL;
 
 fail_detach_dynparams:
+#if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
   {
     lv2dynparam_host_detach(plugin_ptr->dynparams);
     plugin_ptr->dynparams = NULL;
   }
+#endif
 
 fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);
