@@ -19,6 +19,9 @@
 
 DEFAULT_INCLUDES =
 
+# we need this in order to include config.h with build dir != src dir
+CPPFLAGS = -I$(top_builddir)
+
 zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
 
 if DEV_VERSION
@@ -54,6 +57,7 @@ zynjacku_c_la_SOURCES += rack.h
 zynjacku_c_la_SOURCES += jack_compat.c
 zynjacku_c_la_SOURCES += plugin.c
 zynjacku_c_la_SOURCES += plugin.h
+zynjacku_c_la_SOURCES += plugin_internal.h
 zynjacku_c_la_SOURCES += synth.h
 zynjacku_c_la_SOURCES += effect.h
 zynjacku_c_la_SOURCES += lv2.c
@@ -77,12 +81,15 @@ zynjacku_c_la_SOURCES += lv2_data_access.h
 zynjacku_c_la_SOURCES += lv2_event.h
 zynjacku_c_la_SOURCES += lv2_event_helpers.h
 zynjacku_c_la_SOURCES += lv2_uri_map.h
+zynjacku_c_la_SOURCES += lv2_string_port.h
+zynjacku_c_la_SOURCES += lv2_progress.h
 if HAVE_DYNPARAMS
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
 endif
 zynjacku_c_la_SOURCES += midi_cc_map.c
 zynjacku_c_la_SOURCES += midi_cc_map.h
+zynjacku_c_la_SOURCES += midi_cc_map_internal.h
 
 #nodist_zynjacku_la_SOURCES = 
 
