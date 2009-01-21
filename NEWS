@@ -1,0 +1,21 @@
+= Version 3 on 2009-01-21 =
+ * Plugin presets (save/restore)
+ * Support for Calf plugins (various extensions needed by development
+   version)
+ * MIDI CC/Pitchwheel automation. Not yet available for custom
+   UIs. Works for float parameters only.
+ * Replace PHAT fansliders with bundled knobs. PyPhat is no longer
+   required.
+ * lv2dynparam host library is now optional. To enable support for
+   dynparam plugins (lv2zynadd) lv2dynparam1 version 2 is needed.
+
+= Version 2 on 2008-11-30 =
+ * zynjacku codebase updated to the latest state of LV2 art. Especially,
+   event MIDI port synths are now supported.
+ * The tarball now contains lv2rack - a host for LV2 effect plugins.
+ * Saving/restoring of presets. Does not work for dynparam plugins yet.
+ * LASH support (autodetected at runtime).
+ * Lot of general fixes that should make zynjacku more usable.
+
+= Version 1 on 2008-01-09 =
+ * Initial release
