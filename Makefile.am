@@ -20,7 +20,9 @@
 DEFAULT_INCLUDES =
 
 # we need this in order to include config.h with build dir != src dir
-CPPFLAGS = -I$(top_builddir)
+if NOT_TOP_BUILD
+CPPFLAGS += -I$(top_builddir)
+endif
 
 zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
 

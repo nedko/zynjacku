@@ -25,6 +25,8 @@ AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADER([config.h])
 
+AM_CONDITIONAL(NOT_TOP_BUILD, test "$srcdir" != ".")
+
 if test -d $srcdir/.git ; then dev_version="yes" ; else dev_version="no"; fi
 AM_CONDITIONAL(DEV_VERSION, test "$dev_version" = "yes")
 
