@@ -139,7 +139,15 @@ zynjacku_lv2_load(
     LOG_ERROR("Instantiation of %s failed.", uri);
     goto fail_dlclose;
   }
-  plugin_ptr->lv2msg = plugin_ptr->lv2->extension_data("http://lv2plug.in/ns/dev/contexts#MessageContext");
+
+  if (plugin_ptr->lv2->extension_data != NULL)
+  {
+    plugin_ptr->lv2msg = plugin_ptr->lv2->extension_data("http://lv2plug.in/ns/dev/contexts#MessageContext");
+  }
+  else
+  {
+    plugin_ptr->lv2msg = NULL;
+  }
 
   return (zynjacku_lv2_handle)plugin_ptr;
 
