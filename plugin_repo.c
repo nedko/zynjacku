@@ -1188,7 +1188,7 @@ zynjacku_plugin_repo_get_ui_info(
 
   if (!slv2_ui_is_a(slv2ui, ui_type))
   {
-    LOG_ERROR("First UI of '%s' is not '%s'", plugin_uri, ui_type_uri);
+    LOG_DEBUG("First UI of '%s' is not '%s'", plugin_uri, ui_type_uri);
     goto fail_free_uis;
   }
 

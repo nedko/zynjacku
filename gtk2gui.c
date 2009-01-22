@@ -43,6 +43,7 @@
 #include "lv2_uri_map.h"
 #include "lv2_data_access.h"
 #include "lv2_string_port.h"
+#include "lv2_external_ui.h"
 
 #include "list.h"
 #include "lv2.h"
@@ -57,6 +58,9 @@
 
 #define LV2_UI_URI "http://lv2plug.in/ns/extensions/ui"
 #define LV2_UI_GTK_URI LV2_UI_URI "#GtkUI"
+
+#define UI_TYPE_GTK       1
+#define UI_TYPE_EXTERNAL  2
 
 struct zynjacku_gtk2gui
 {
@@ -78,6 +82,8 @@ struct zynjacku_gtk2gui
   LV2_Extension_Data_Feature data_access;
   LV2_Feature gui_feature_instance_access;
   LV2_Feature gui_feature_data_access;
+  unsigned int type;
+  struct lv2_ui_external * external_ui_control;
 };
 
 zynjacku_gtk2gui_handle
@@ -100,10 +106,21 @@ zynjacku_gtk2gui_create(
   char * ui_uri;
   char * ui_binary_path;
   char * ui_bundle_path;
+  unsigned int type;
 
-  if (!zynjacku_plugin_repo_get_ui_info(uri, LV2_UI_GTK_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
+  if (zynjacku_plugin_repo_get_ui_info(uri, LV2_UI_GTK_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
   {
-    LOG_DEBUG("zynjacku_plugin_repo_get_ui_info() failed for '%s' and GtkGUI", uri);
+    LOG_NOTICE("GtkUI for '%s'", uri);
+    type = UI_TYPE_GTK;
+  }
+  else if (zynjacku_plugin_repo_get_ui_info(uri, LV2_EXTERNAL_UI_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
+  {
+    LOG_NOTICE("External UI for '%s'", uri);
+    type = UI_TYPE_EXTERNAL;
+  }
+  else
+  {
+    LOG_DEBUG("zynjacku_plugin_repo_get_ui_info() failed for '%s'", uri);
     goto fail;
   }
 
@@ -113,6 +130,8 @@ zynjacku_gtk2gui_create(
     LOG_ERROR("malloc() failed.");
     goto fail_free_ui_strings;
   }
+
+  ui_ptr->type = type;
 
   ui_ptr->plugin_uri = uri;
   ui_ptr->plugin = plugin;
@@ -202,6 +221,7 @@ zynjacku_gtk2gui_create(
   ui_ptr->ui_handle = NULL;
   ui_ptr->widget_ptr = NULL;
   ui_ptr->window_ptr = NULL;
+  ui_ptr->external_ui_control = NULL;
 
   free(ui_uri);
 
@@ -349,11 +369,20 @@ zynjacku_gtk2gui_ui_on(
       return false;
     }
 
-    ui_ptr->widget_ptr = widget;
+    LOG_DEBUG("widget: %p", widget);
 
-    LOG_DEBUG("widget: %p", ui_ptr->widget_ptr);
-
-    assert(GTK_IS_WIDGET(ui_ptr->widget_ptr));
+    switch (ui_ptr->type)
+    {
+    case UI_TYPE_GTK:
+      ui_ptr->widget_ptr = widget;
+      assert(GTK_IS_WIDGET(ui_ptr->widget_ptr));
+      break;
+    case UI_TYPE_EXTERNAL:
+      ui_ptr->external_ui_control = widget;
+      break;
+    default:
+      assert(false);
+    }
 
     /* Set parameter values */
     if (ui_ptr->lv2ui->port_event != NULL)
@@ -371,25 +400,34 @@ zynjacku_gtk2gui_ui_on(
     }
   }
 
-  if (ui_ptr->window_ptr == NULL)
+  switch (ui_ptr->type)
   {
-    ui_ptr->window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  case UI_TYPE_GTK:
+    if (ui_ptr->window_ptr == NULL)
+    {
+      ui_ptr->window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-    gtk_window_set_title(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->synth_id);
+      gtk_window_set_title(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->synth_id);
 
-    gtk_window_set_resizable(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->resizable);
+      gtk_window_set_resizable(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->resizable);
 
-    gtk_container_add(GTK_CONTAINER(ui_ptr->window_ptr), ui_ptr->widget_ptr);
+      gtk_container_add(GTK_CONTAINER(ui_ptr->window_ptr), ui_ptr->widget_ptr);
 
-    g_signal_connect(
-      G_OBJECT(ui_ptr->window_ptr),
-      "destroy",
-      G_CALLBACK(zynjacku_on_gtk2gui_window_destroy_internal),
-      ui_ptr);
+      g_signal_connect(
+        G_OBJECT(ui_ptr->window_ptr),
+        "destroy",
+        G_CALLBACK(zynjacku_on_gtk2gui_window_destroy_internal),
+        ui_ptr);
+    }
+
+    /* Show the widgets */
+    gtk_widget_show_all(ui_ptr->window_ptr);
+
+    break;
+  case UI_TYPE_EXTERNAL:
+    LV2_UI_EXTERNAL_SHOW(ui_ptr->external_ui_control);
+    break;
   }
-
-  /* Show the widgets */
-  gtk_widget_show_all(ui_ptr->window_ptr);
 
   return true;
 }
@@ -405,6 +443,11 @@ zynjacku_gtk2gui_push_measure_ports(
   if (ui_ptr->ui_handle == NULL)
   {
     return;
+  }
+
+  if (ui_ptr->type == UI_TYPE_EXTERNAL)
+  {
+    LV2_UI_EXTERNAL_RUN(ui_ptr->external_ui_control);
   }
 
   if (ui_ptr->lv2ui->port_event == NULL)
@@ -430,6 +473,14 @@ zynjacku_gtk2gui_ui_off(
     return;
   }
 
-  /* Hide the widgets */
-  gtk_widget_hide_all(ui_ptr->window_ptr);
+  switch (ui_ptr->type)
+  {
+  case UI_TYPE_GTK:
+    /* Hide the widgets */
+    gtk_widget_hide_all(ui_ptr->window_ptr);
+    break;
+  case UI_TYPE_EXTERNAL:
+    LV2_UI_EXTERNAL_HIDE(ui_ptr->external_ui_control);
+    break;
+  }
 }
