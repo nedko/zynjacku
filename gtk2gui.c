@@ -80,11 +80,26 @@ struct zynjacku_gtk2gui
   GtkWidget * window_ptr;
   zynjacku_lv2_handle lv2plugin;
   LV2_Extension_Data_Feature data_access;
+  struct lv2_external_ui_host external_ui;
   LV2_Feature gui_feature_instance_access;
   LV2_Feature gui_feature_data_access;
+  LV2_Feature gui_feature_external_ui;
   unsigned int type;
-  struct lv2_ui_external * external_ui_control;
+  struct lv2_external_ui * external_ui_control;
 };
+
+#define ui_ptr ((struct zynjacku_gtk2gui *)controller)
+
+void
+zynjacku_plugin_ui_closed(
+  LV2UI_Controller controller)
+{
+  zynjacku_gtk2gui_on_ui_destroyed(ui_ptr->context_ptr);
+  ui_ptr->lv2ui->cleanup(ui_ptr->ui_handle);
+  ui_ptr->ui_handle = NULL;
+}
+
+#undef ui_ptr
 
 zynjacku_gtk2gui_handle
 zynjacku_gtk2gui_create(
@@ -140,11 +155,15 @@ zynjacku_gtk2gui_create(
   ui_ptr->resizable = true;
   ui_ptr->lv2plugin = plugin_handle;
   ui_ptr->data_access.data_access = zynjacku_lv2_get_descriptor(plugin_handle)->extension_data;
+  ui_ptr->external_ui.ui_closed = zynjacku_plugin_ui_closed;
+  ui_ptr->external_ui.plugin_human_id = synth_id;
 
   ui_ptr->gui_feature_instance_access.URI = "http://lv2plug.in/ns/ext/instance-access";
   ui_ptr->gui_feature_instance_access.data = zynjacku_lv2_get_handle(ui_ptr->lv2plugin);
   ui_ptr->gui_feature_data_access.URI = LV2_DATA_ACCESS_URI;
   ui_ptr->gui_feature_data_access.data = &ui_ptr->data_access;
+  ui_ptr->gui_feature_external_ui.URI = LV2_EXTERNAL_UI_URI;
+  ui_ptr->gui_feature_external_ui.data = &ui_ptr->external_ui;
 
   ports_count = 0;
 
@@ -176,7 +195,7 @@ zynjacku_gtk2gui_create(
 
   assert(host_features[host_feature_count] == NULL);
   
-  ui_ptr->host_features = malloc((host_feature_count + 3) * sizeof(struct LV2_Feature *));
+  ui_ptr->host_features = malloc((host_feature_count + 4) * sizeof(struct LV2_Feature *));
   if (ui_ptr->host_features == NULL)
   {
     LOG_WARNING("malloc() failed");
@@ -185,6 +204,7 @@ zynjacku_gtk2gui_create(
   memcpy(ui_ptr->host_features, host_features, host_feature_count * sizeof(struct LV2_Feature *));
   ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_data_access;
   ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_instance_access;
+  ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_external_ui;
   ui_ptr->host_features[host_feature_count++] = NULL;
 
   ui_ptr->bundle_path = ui_bundle_path;
@@ -339,7 +359,6 @@ bool
 zynjacku_gtk2gui_ui_on(
   zynjacku_gtk2gui_handle ui_handle)
 {
-  LV2_Feature * features[1];
   struct zynjacku_port * port_ptr;
   unsigned int port_index;
   LV2UI_Widget widget;
@@ -349,8 +368,6 @@ zynjacku_gtk2gui_ui_on(
   if (ui_ptr->ui_handle == NULL)
   {
     LOG_DEBUG("Instantiating UI...");
-
-    features[0] = NULL;
 
     ui_ptr->ui_handle = ui_ptr->lv2ui->instantiate(
       ui_ptr->lv2ui,
@@ -425,7 +442,7 @@ zynjacku_gtk2gui_ui_on(
 
     break;
   case UI_TYPE_EXTERNAL:
-    LV2_UI_EXTERNAL_SHOW(ui_ptr->external_ui_control);
+    LV2_EXTERNAL_UI_SHOW(ui_ptr->external_ui_control);
     break;
   }
 
@@ -447,7 +464,7 @@ zynjacku_gtk2gui_push_measure_ports(
 
   if (ui_ptr->type == UI_TYPE_EXTERNAL)
   {
-    LV2_UI_EXTERNAL_RUN(ui_ptr->external_ui_control);
+    LV2_EXTERNAL_UI_RUN(ui_ptr->external_ui_control);
   }
 
   if (ui_ptr->lv2ui->port_event == NULL)
@@ -480,7 +497,7 @@ zynjacku_gtk2gui_ui_off(
     gtk_widget_hide_all(ui_ptr->window_ptr);
     break;
   case UI_TYPE_EXTERNAL:
-    LV2_UI_EXTERNAL_HIDE(ui_ptr->external_ui_control);
+    LV2_EXTERNAL_UI_HIDE(ui_ptr->external_ui_control);
     break;
   }
 }
