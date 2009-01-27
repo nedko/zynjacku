@@ -1,3 +1,12 @@
+= Version 4 on 2009-01-28 =
+ * lv2rack does no longer require PHAT (it was not really using it even
+   in zynjacku-3 release)
+ * Support for out of process plugin UIs (the upcomming nekobee release
+   should use it)
+ * Don't crash when trying to load non-existing plugin (specified by
+   supplying plugin URI at commandline)
+ * Don't crash with some plugins (NULL extension_data)
+
 = Version 3 on 2009-01-21 =
  * Plugin presets (save/restore)
  * Support for Calf plugins (various extensions needed by development
