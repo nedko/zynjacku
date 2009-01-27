@@ -85,6 +85,7 @@ zynjacku_c_la_SOURCES += lv2_event_helpers.h
 zynjacku_c_la_SOURCES += lv2_uri_map.h
 zynjacku_c_la_SOURCES += lv2_string_port.h
 zynjacku_c_la_SOURCES += lv2_progress.h
+zynjacku_c_la_SOURCES += lv2_external_ui.h
 if HAVE_DYNPARAMS
 zynjacku_c_la_SOURCES += rtmempool.c
 zynjacku_c_la_SOURCES += rtmempool.h
