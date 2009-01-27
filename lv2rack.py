@@ -22,7 +22,6 @@ import sys
 import gtk
 import gtk.glade
 import gobject
-import phat
 import re
 import time
 
