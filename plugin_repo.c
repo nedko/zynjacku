@@ -1039,6 +1039,13 @@ zynjacku_plugin_repo_load_plugin(
     uri_value = slv2_value_new_uri(g_world, synth_ptr->uri);
 
     slv2plugin = slv2_plugins_get_by_uri(slv2plugins, uri_value);
+    if (slv2plugin == NULL)
+    {
+      slv2_value_free(uri_value);
+      slv2_plugins_free(g_world, slv2plugins);
+      LOG_ERROR("Plugin '%s' not found", synth_ptr->uri);
+      goto exit;
+    }
 
     ret = zynjacku_plugin_repo_check_and_maybe_init_plugin(slv2plugin);
 
