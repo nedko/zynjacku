@@ -1396,6 +1396,7 @@ class PluginUI(gobject.GObject):
 
     def show(self):
         '''Show synth window'''
+        return False
 
     def hide(self):
         '''Hide synth window'''
@@ -1536,6 +1537,7 @@ class PluginUIUniversal(PluginUI):
                 child.parent_group.child_param_add(child)
 
         self.window.show_all()
+        return True
 
     def hide(self):
         '''Hide synth window'''
