@@ -2664,7 +2664,7 @@ class ZynjackuHostMulti(ZynjackuHost):
             if model[path][4].ui_win.show():
                 model[path][0] = True
             else:
-                self.statusbar.push(statusbar_context_id, "Failed to construct show synth UI")
+                self.statusbar.push(statusbar_context_id, "Failed to show synth UI")
 
     def on_about(self, widget):
         about = gtk.AboutDialog()
