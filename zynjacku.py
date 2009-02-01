@@ -2180,6 +2180,8 @@ class host:
             self.lv2features_supported.append(feature)
             index += 1
 
+        self.available_plugins = []
+
     def lash_check_events(self):
         while lash.lash_get_pending_event_count(self.lash_client):
             event = lash.lash_get_event(self.lash_client)
@@ -2261,48 +2263,59 @@ class host:
 
         progressbar.show()
 
-        progressbar.set_text("Searching for LV2 plugins...");
-        progressbar.set_fraction(0.0)
+        if self.available_plugins and not force:
+            for plugin in self.available_plugins:
+                store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
+        else:
+            self.available_plugins = []
 
-        db = lv2.LV2DB()
-        plugins = db.getPluginList()
+            progressbar.set_text("Searching for LV2 plugins...");
+            progressbar.set_fraction(0.0)
 
-        step = 1.0 / len(plugins)
-        progress = 0.0
+            db = lv2.LV2DB()
+            plugins = db.getPluginList()
 
-        for uri in plugins:
-            progressbar.set_fraction(progress)
-            progressbar.set_text("Checking %s" % uri);
-            plugin = db.getPluginInfo(uri)
-            if plugin == None:
-                continue
+            step = 1.0 / len(plugins)
+            progress = 0.0
 
-            while gtk.events_pending():
-                gtk.main_iteration()
+            for uri in plugins:
+                progressbar.set_fraction(progress)
+                progressbar.set_text("Checking %s" % uri);
+                plugin = db.getPluginInfo(uri)
+                if plugin == None:
+                    continue
 
-            features_met = True
-            for feature in plugin.requiredFeatures:
-                if not feature in self.lv2features_supported:
-                    features_met = False
-                    break
+                while gtk.events_pending():
+                    gtk.main_iteration()
 
-            if features_met and self.check_plugin(plugin):
-                maintainers = ""
-                for maintainer in plugin.maintainers:
-                    if maintainers:
-                        maintainers += "; "
-                    maintainers += maintainer['name']
-                license_map = {
-                    "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
-                    "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
-                    }
-                if license_map.has_key(plugin.license):
-                    license = license_map[plugin.license]
-                else:
-                    license = plugin.license
-                store.append([plugin.name, uri, license, maintainers])
+                features_met = True
+                for feature in plugin.requiredFeatures:
+                    if not feature in self.lv2features_supported:
+                        features_met = False
+                        break
 
-            progress += step
+                if features_met and self.check_plugin(plugin):
+                    plugin.maintainers_string = ""
+                    for maintainer in plugin.maintainers:
+                        if plugin.maintainers_string:
+                            plugin.maintainers_string += "; "
+                        plugin.maintainers_string += maintainer['name']
+                    if not plugin.maintainers_string:
+                        plugin.maintainers_string = "unknown"
+
+                    license_map = {
+                        "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
+                        "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
+                        }
+                    if license_map.has_key(plugin.license):
+                        plugin.license_decoded = license_map[plugin.license]
+                    else:
+                        plugin.license_decoded = plugin.license
+
+                    self.available_plugins.append(plugin)
+                    store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
+
+                progress += step
 
         progressbar.hide()
 
