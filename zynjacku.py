@@ -2273,30 +2273,31 @@ class host:
 
         dialog.set_title(title)
 
-        plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        if not plugin_repo_widget.get_model():
+            plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
-        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        text_renderer = gtk.CellRendererText()
+            store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+            text_renderer = gtk.CellRendererText()
 
-        column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
-        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
-        column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
-        column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
+            column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
+            column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
+            column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+            column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
 
-        column_name.set_sort_column_id(0)
-        column_uri.set_sort_column_id(1)
-        column_license.set_sort_column_id(2)
-        column_author.set_sort_column_id(3)
+            column_name.set_sort_column_id(0)
+            column_uri.set_sort_column_id(1)
+            column_license.set_sort_column_id(2)
+            column_author.set_sort_column_id(3)
 
-        plugin_repo_widget.append_column(column_name)
-        plugin_repo_widget.append_column(column_uri)
-        plugin_repo_widget.append_column(column_license)
-        plugin_repo_widget.append_column(column_author)
+            plugin_repo_widget.append_column(column_name)
+            plugin_repo_widget.append_column(column_uri)
+            plugin_repo_widget.append_column(column_license)
+            plugin_repo_widget.append_column(column_author)
 
-        plugin_repo_widget.set_model(store)
-        def on_row_activated(widget, path, column):
-            dialog.response(0)
-        plugin_repo_widget.connect("row-activated", on_row_activated)
+            plugin_repo_widget.set_model(store)
+            def on_row_activated(widget, path, column):
+                dialog.response(0)
+            plugin_repo_widget.connect("row-activated", on_row_activated)
 
         dialog.show()
         self.rescan_plugins(store, progressbar, False)
