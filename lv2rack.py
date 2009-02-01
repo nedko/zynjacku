@@ -123,6 +123,43 @@ class lv2rack(zynjacku.host):
     def on_plugin_progress(self, engine, name, progress, message):
         self.progress_window.progress(name, progress, message)
 
+    def check_plugin(self, plugin):
+        audio_in_ports_count = 0
+        audio_out_ports_count = 0
+
+        for port in plugin.ports:
+            if port.__dict__["isAudio"]:
+                if port.__dict__["isInput"]:
+                    audio_in_ports_count += 1
+                    continue
+                if port.__dict__["isOutput"]:
+                    audio_out_ports_count += 1
+                    continue
+                continue
+
+            if audio_in_ports_count == 0 or audio_out_ports_count == 0:
+#                 print "Skipping %s (%s), [effect] plugin with unsupported port configuration" % (plugin.name, plugin.uri)
+#                 #print "  midi input ports: %d" % midi_in_ports_count
+#                 #print "  control ports: %d" % control_ports_count
+#                 #print "  string ports: %d" % string_ports_count
+#                 #print "  event ports: %d" % event_ports_count
+#                 #print "  event midi input ports: %d" % midi_event_in_ports_count
+#                 print "  audio input ports: %d" % audio_in_ports_count
+#                 print "  audio output ports: %d" % audio_out_ports_count
+#                 #print "  total ports %d" % ports_count
+                return False;
+
+#             print "Found effect plugin '%s' %s", (plugin.name, plugin.uri)
+#             #print "  midi input ports: %d" % midi_in_ports_count
+#             #print "  control ports: %d" % control_ports_count
+#             #print "  string ports: %d" % string_ports_count
+#             #print "  event ports: %d" % event_ports_count
+#             #print "  event midi input ports: %d" % midi_event_in_ports_count
+#             print "  audio input ports: %d" % audio_in_ports_count
+#             print "  audio output ports: %d" % audio_out_ports_count
+#             #print "  total ports %d" % ports_count
+            return True;
+
     def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
@@ -205,7 +242,7 @@ class lv2rack(zynjacku.host):
 
         progressbar.show()
         progressbar.set_fraction(progress)
-        progressbar.set_text("Checking %s" % uri);
+        progressbar.set_text("Checking %s" % uri)
         while gtk.events_pending():
             gtk.main_iteration()
 
@@ -213,7 +250,7 @@ class lv2rack(zynjacku.host):
         self.plugins_load("LV2 effect plugins")
 
     def on_effect_clear(self, widget):
-        self.store.clear();
+        self.store.clear()
         self.clear_plugins()
 
 def main():

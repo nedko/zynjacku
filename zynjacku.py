@@ -33,6 +33,7 @@ from colorsys import hls_to_rgb, rgb_to_hls
 old_path = sys.path
 sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
 import zynjacku_c as zynjacku
+import lv2
 sys.path = old_path
 
 try:
@@ -2243,28 +2244,53 @@ class host:
     def on_plugin_progress(self, engine, name, progress, message):
         print "Loading plugin '%s', %5.1f%% complete. %s" % (name, progress, message)
 
-    def on_plugin_repo_tick(self, repo, progress, uri, progressbar):
-        if progress == 1.0:
-            progressbar.hide()
-            return
-
-        progressbar.show()
-        progressbar.set_fraction(progress)
-        progressbar.set_text("Checking %s" % uri);
-        while gtk.events_pending():
-            gtk.main_iteration()
-
-    def on_plugin_repo_tack(self, repo, name, uri, plugin_license, author, store):
-        #print "tack: %s %s %s" % (name, uri, plugin_license)
-        store.append([name, uri, plugin_license, author])
+    def check_plugin(self, plugin):
+        return False
 
     def rescan_plugins(self, store, progressbar, force):
         store.clear()
-        tick = self.engine.connect("tick", self.on_plugin_repo_tick, progressbar)
-        tack = self.engine.connect("tack", self.on_plugin_repo_tack, store)
-        self.engine.iterate_plugins(force)
-        self.engine.disconnect(tack)
-        self.engine.disconnect(tick)
+
+        progressbar.show()
+
+        progressbar.set_text("Searching for LV2 plugins...");
+        progressbar.set_fraction(0.0)
+
+        db = lv2.LV2DB()
+        plugins = db.getPluginList()
+
+        step = 1.0 / len(plugins)
+        progress = 0.0
+
+        for uri in plugins:
+            plugin = db.getPluginInfo(uri)
+            if plugin == None:
+                continue
+
+            progressbar.set_fraction(progress)
+            progressbar.set_text("Checking %s" % uri);
+            while gtk.events_pending():
+                gtk.main_iteration()
+
+            if self.check_plugin(plugin):
+                maintainers = ""
+                for maintainer in plugin.maintainers:
+                    if maintainers:
+                        maintainers += "; "
+                    maintainers += maintainer['name']
+                license_map = {
+                    "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
+                    "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
+                    }
+                if license_map.has_key(plugin.license):
+                    license = license_map[plugin.license]
+                else:
+                    license = plugin.license
+                store.append([plugin.name, uri, license, maintainers])
+
+            progress += step
+
+        progressbar.hide()
+
 
     def plugins_load(self, title="LV2 plugins"):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
@@ -2622,6 +2648,66 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.midi_led.set(self.engine.get_midi_activity())
         return True
 
+    def check_plugin(self, plugin):
+        ports_count = len(plugin.ports)
+        audio_in_ports_count = 0
+        audio_out_ports_count = 0
+        midi_in_ports_count = 0
+        control_ports_count = 0
+        string_ports_count = 0
+        event_ports_count = 0
+        midi_event_in_ports_count = 0
+
+        #types = ["Audio", "Control", "Event", "Input", "Output", "LarslMidi"]
+        for port in plugin.ports:
+            if port.__dict__["isAudio"]:
+                if port.__dict__["isInput"]:
+                    audio_in_ports_count += 1
+                    continue
+                if port.__dict__["isOutput"]:
+                    audio_out_ports_count += 1
+                    continue
+                continue
+            if port.__dict__["isLarslMidi"]:
+                if port.__dict__["isInput"]:
+                    midi_in_ports_count += 1
+                    continue
+                continue
+            if port.__dict__["isEvent"]:
+                event_ports_count += 1
+                if port.__dict__["isInput"]:
+                    midi_event_in_ports_count += 1
+                    continue
+                continue
+            if port.__dict__["isControl"]:
+                control_ports_count += 1
+                continue
+
+        # TODO: we must be smarter and check for "optional connect" proeprty
+        if (midi_in_ports_count + control_ports_count + string_ports_count + event_ports_count + audio_out_ports_count != ports_count) or \
+               (midi_in_ports_count + midi_event_in_ports_count != 1) or \
+               (audio_out_ports_count == 0):
+            #print "Skipping %s (%s), [synth] plugin with unsupported port configuration" % (plugin.name, plugin.uri)
+            #print "  midi input ports: %d" % midi_in_ports_count
+            #print "  control ports: %d" % control_ports_count
+            #print "  string ports: %d" % string_ports_count
+            #print "  event ports: %d" % event_ports_count
+            #print "  event midi input ports: %d" % midi_event_in_ports_count
+            #print "  audio input ports: %d" % audio_in_ports_count
+            #print "  audio output ports: %d" % audio_out_ports_count
+            #print "  total ports %d" % ports_count
+            return False
+
+        print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
+        print "  midi input ports: %d" % midi_in_ports_count
+        print "  control ports: %d" % control_ports_count
+        print "  event ports: %d" % event_ports_count
+        print "  event midi input ports: %d" % midi_event_in_ports_count
+        print "  audio input ports: %d" % audio_in_ports_count
+        print "  audio output ports: %d" % audio_out_ports_count
+        print "  total ports %d" % ports_count
+        return True
+
     def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
         statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
@@ -2705,7 +2791,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.plugins_load("LV2 synth plugins")
 
     def on_synth_clear(self, widget):
-        self.store.clear();
+        self.store.clear()
         self.clear_plugins()
 
 class ZynjackuHostOne(ZynjackuHost):
