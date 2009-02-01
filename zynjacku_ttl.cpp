@@ -41,5 +41,5 @@ static PyMethodDef module_methods[] = {
 
 PyMODINIT_FUNC initzynjacku_ttl()
 {
-  PyObject *mod = Py_InitModule3("zynjacku_ttl", module_methods, "Flex Turtle parser");
+  Py_InitModule3("zynjacku_ttl", module_methods, "Flex Turtle parser");
 }

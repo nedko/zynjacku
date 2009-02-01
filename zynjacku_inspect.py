@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
-#import fakeserv
 import lv2
-#import client
-
-#fakeserv.start()
 
 db = lv2.LV2DB()
 plugins = db.getPluginList()
