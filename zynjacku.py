@@ -2171,6 +2171,15 @@ class host:
 
         self.lash_client = lash_client
 
+        self.lv2features_supported = []
+        index = 0
+        while True:
+            feature = engine.get_supported_feature(index)
+            if not feature:
+                break
+            self.lv2features_supported.append(feature)
+            index += 1
+
     def lash_check_events(self):
         while lash.lash_get_pending_event_count(self.lash_client):
             event = lash.lash_get_event(self.lash_client)
@@ -2262,16 +2271,22 @@ class host:
         progress = 0.0
 
         for uri in plugins:
+            progressbar.set_fraction(progress)
+            progressbar.set_text("Checking %s" % uri);
             plugin = db.getPluginInfo(uri)
             if plugin == None:
                 continue
 
-            progressbar.set_fraction(progress)
-            progressbar.set_text("Checking %s" % uri);
             while gtk.events_pending():
                 gtk.main_iteration()
 
-            if self.check_plugin(plugin):
+            features_met = True
+            for feature in plugin.requiredFeatures:
+                if not feature in self.lv2features_supported:
+                    features_met = False
+                    break
+
+            if features_met and self.check_plugin(plugin):
                 maintainers = ""
                 for maintainer in plugin.maintainers:
                     if maintainers:
@@ -2698,14 +2713,14 @@ class ZynjackuHostMulti(ZynjackuHost):
             #print "  total ports %d" % ports_count
             return False
 
-        print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
-        print "  midi input ports: %d" % midi_in_ports_count
-        print "  control ports: %d" % control_ports_count
-        print "  event ports: %d" % event_ports_count
-        print "  event midi input ports: %d" % midi_event_in_ports_count
-        print "  audio input ports: %d" % audio_in_ports_count
-        print "  audio output ports: %d" % audio_out_ports_count
-        print "  total ports %d" % ports_count
+#         print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
+#         print "  midi input ports: %d" % midi_in_ports_count
+#         print "  control ports: %d" % control_ports_count
+#         print "  event ports: %d" % event_ports_count
+#         print "  event midi input ports: %d" % midi_event_in_ports_count
+#         print "  audio input ports: %d" % audio_in_ports_count
+#         print "  audio output ports: %d" % audio_out_ports_count
+#         print "  total ports %d" % ports_count
         return True
 
     def load_plugin(self, uri, parameters=[], maps={}):
