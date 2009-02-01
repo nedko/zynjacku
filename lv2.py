@@ -135,7 +135,7 @@ def parseTTL(uri, content, model, debug):
                 spo[item] = uri + "#" + prnot[1]
             else:
                 if prnot[0] not in prefixes:
-                    raise Exception, "Prefix %s not defined" % prnot[0]
+                    print 'WARNING %s: Prefix %s not defined. Ignoring %s:%s' % (uri, prnot[0], prnot[0], prnot[1])
                 else:
                     spo[item] = prefixes[prnot[0]] + prnot[1]
             item += 1
