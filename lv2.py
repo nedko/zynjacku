@@ -11,6 +11,8 @@ rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 epi = "http://lv2plug.in/ns/dev/extportinfo#"
 rdf_type = rdf + "type"
 tinyname_uri = "http://lv2plug.in/ns/dev/tiny-name"
+foaf = "http://xmlns.com/foaf/0.1/"
+doap = "http://usefulinc.com/ns/doap#"
 
 class DumpRDFModel:
     def addTriple(self, s, p, o):
@@ -259,8 +261,8 @@ class LV2DB:
         info = self.plugin_info[uri]
         dest = LV2Plugin()
         dest.uri = uri
-        dest.name = info.bySubject[uri]['http://usefulinc.com/ns/doap#name'][0]
-        dest.license = info.bySubject[uri]['http://usefulinc.com/ns/doap#license'][0]
+        dest.name = info.bySubject[uri][doap + 'name'][0]
+        dest.license = info.bySubject[uri][doap + 'license'][0]
         dest.classes = info.bySubject[uri]["a"]
         dest.requiredFeatures = info.getProperty(uri, lv2 + "requiredFeature", optional = True)
         dest.optionalFeatures = info.getProperty(uri, lv2 + "optionalFeature", optional = True)
@@ -269,6 +271,20 @@ class LV2DB:
             dest.microname = dest.microname[0]
         else:
             dest.microname = None
+        dest.maintainers = []
+        if info.bySubject[uri].has_key(doap + "maintainer"):
+            for maintainer in info.bySubject[uri][doap + "maintainer"]:
+                maintainersubj = info.bySubject[maintainer]
+                maintainerdict = {}
+                maintainerdict['name'] = info.getProperty(maintainersubj, foaf + "name")[0]
+                homepages = info.getProperty(maintainersubj, foaf + "homepage")
+                if homepages:
+                    maintainerdict['homepage'] = homepages[0]
+                mboxes = info.getProperty(maintainersubj, foaf + "mbox")
+                if mboxes:
+                    maintainerdict['mbox'] = mboxes[0]
+                dest.maintainers.append(maintainerdict)
+
         ports = []
         portDict = {}
         porttypes = {
@@ -277,6 +293,7 @@ class LV2DB:
             "isEvent" : lv2evt + "EventPort",
             "isInput" : lv2 + "InputPort",
             "isOutput" : lv2 + "OutputPort",
+            "isLarslMidi" : "http://ll-plugins.nongnu.org/lv2/ext/MidiPort",
         }
         
         for port in info.bySubject[uri][lv2 + "port"]:
