@@ -1,0 +1,20 @@
+# -*- Mode: Makefile -*-
+
+zynjacku_ttl.so: zynjacku_ttl.o flex_ttl.o
+	g++ -shared -o zynjacku_ttl.so zynjacku_ttl.o flex_ttl.o
+
+zynjacku_ttl.o: zynjacku_ttl.cpp flex_ttl.h ttl_lexer.h
+	g++ -I /usr/include/python2.5 -c zynjacku_ttl.cpp
+
+flex_ttl.o: flex_ttl.cpp flex_ttl.h
+	g++ -I /usr/include/python2.5 -c flex_ttl.cpp
+
+flex_ttl.cpp flex_ttl.h: ttl_lexer.h ttl.l
+	flex --batch --nodefault --c++ -o flex_ttl.cpp --header-file=flex_ttl.h ttl.l
+
+clean:
+	@rm -vf flex_ttl.cpp flex_ttl.h flex_ttl.o zynjacku_ttl.o zynjacku_ttl.so
+
+test: zynjacku_ttl.so
+	@python -c "import zynjacku_ttl; help(zynjacku_ttl)" | cat
+	@python -c "import zynjacku_ttl; print zynjacku_ttl.scan_file('/usr/lib/lv2/zynadd.lv2/zynadd.ttl')"
