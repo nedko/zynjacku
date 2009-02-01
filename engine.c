@@ -1096,6 +1096,23 @@ zynjacku_get_version()
   return VERSION;
 }
 
+const gchar *
+zynjacku_engine_get_supported_feature(
+  ZynjackuEngine * engine_obj_ptr,
+  guint index)
+{
+  struct zynjacku_engine * engine_ptr;
+
+  if (index >= ZYNJACKU_ENGINE_FEATURES)
+  {
+    return NULL;
+  }
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  return engine_ptr->host_features[index]->URI;
+}
+
 #define engine_obj_ptr ((ZynjackuEngine *)context)
 
 bool

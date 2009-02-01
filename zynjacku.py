@@ -2171,6 +2171,17 @@ class host:
 
         self.lash_client = lash_client
 
+        self.lv2features_supported = []
+        index = 0
+        while True:
+            feature = engine.get_supported_feature(index)
+            if not feature:
+                break
+            self.lv2features_supported.append(feature)
+            index += 1
+
+        self.available_plugins = []
+
     def lash_check_events(self):
         while lash.lash_get_pending_event_count(self.lash_client):
             event = lash.lash_get_event(self.lash_client)
@@ -2252,42 +2263,59 @@ class host:
 
         progressbar.show()
 
-        progressbar.set_text("Searching for LV2 plugins...");
-        progressbar.set_fraction(0.0)
+        if self.available_plugins and not force:
+            for plugin in self.available_plugins:
+                store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
+        else:
+            self.available_plugins = []
 
-        db = lv2.LV2DB()
-        plugins = db.getPluginList()
+            progressbar.set_text("Searching for LV2 plugins...");
+            progressbar.set_fraction(0.0)
 
-        step = 1.0 / len(plugins)
-        progress = 0.0
+            db = lv2.LV2DB()
+            plugins = db.getPluginList()
 
-        for uri in plugins:
-            plugin = db.getPluginInfo(uri)
-            if plugin == None:
-                continue
+            step = 1.0 / len(plugins)
+            progress = 0.0
 
-            progressbar.set_fraction(progress)
-            progressbar.set_text("Checking %s" % uri);
-            while gtk.events_pending():
-                gtk.main_iteration()
+            for uri in plugins:
+                progressbar.set_fraction(progress)
+                progressbar.set_text("Checking %s" % uri);
+                plugin = db.getPluginInfo(uri)
+                if plugin == None:
+                    continue
 
-            if self.check_plugin(plugin):
-                maintainers = ""
-                for maintainer in plugin.maintainers:
-                    if maintainers:
-                        maintainers += "; "
-                    maintainers += maintainer['name']
-                license_map = {
-                    "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
-                    "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
-                    }
-                if license_map.has_key(plugin.license):
-                    license = license_map[plugin.license]
-                else:
-                    license = plugin.license
-                store.append([plugin.name, uri, license, maintainers])
+                while gtk.events_pending():
+                    gtk.main_iteration()
 
-            progress += step
+                features_met = True
+                for feature in plugin.requiredFeatures:
+                    if not feature in self.lv2features_supported:
+                        features_met = False
+                        break
+
+                if features_met and self.check_plugin(plugin):
+                    plugin.maintainers_string = ""
+                    for maintainer in plugin.maintainers:
+                        if plugin.maintainers_string:
+                            plugin.maintainers_string += "; "
+                        plugin.maintainers_string += maintainer['name']
+                    if not plugin.maintainers_string:
+                        plugin.maintainers_string = "unknown"
+
+                    license_map = {
+                        "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
+                        "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
+                        }
+                    if license_map.has_key(plugin.license):
+                        plugin.license_decoded = license_map[plugin.license]
+                    else:
+                        plugin.license_decoded = plugin.license
+
+                    self.available_plugins.append(plugin)
+                    store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
+
+                progress += step
 
         progressbar.hide()
 
@@ -2299,30 +2327,31 @@ class host:
 
         dialog.set_title(title)
 
-        plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        if not plugin_repo_widget.get_model():
+            plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
-        store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        text_renderer = gtk.CellRendererText()
+            store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
+            text_renderer = gtk.CellRendererText()
 
-        column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
-        column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
-        column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
-        column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
+            column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
+            column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
+            column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
+            column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
 
-        column_name.set_sort_column_id(0)
-        column_uri.set_sort_column_id(1)
-        column_license.set_sort_column_id(2)
-        column_author.set_sort_column_id(3)
+            column_name.set_sort_column_id(0)
+            column_uri.set_sort_column_id(1)
+            column_license.set_sort_column_id(2)
+            column_author.set_sort_column_id(3)
 
-        plugin_repo_widget.append_column(column_name)
-        plugin_repo_widget.append_column(column_uri)
-        plugin_repo_widget.append_column(column_license)
-        plugin_repo_widget.append_column(column_author)
+            plugin_repo_widget.append_column(column_name)
+            plugin_repo_widget.append_column(column_uri)
+            plugin_repo_widget.append_column(column_license)
+            plugin_repo_widget.append_column(column_author)
 
-        plugin_repo_widget.set_model(store)
-        def on_row_activated(widget, path, column):
-            dialog.response(0)
-        plugin_repo_widget.connect("row-activated", on_row_activated)
+            plugin_repo_widget.set_model(store)
+            def on_row_activated(widget, path, column):
+                dialog.response(0)
+            plugin_repo_widget.connect("row-activated", on_row_activated)
 
         dialog.show()
         self.rescan_plugins(store, progressbar, False)
@@ -2698,14 +2727,14 @@ class ZynjackuHostMulti(ZynjackuHost):
             #print "  total ports %d" % ports_count
             return False
 
-        print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
-        print "  midi input ports: %d" % midi_in_ports_count
-        print "  control ports: %d" % control_ports_count
-        print "  event ports: %d" % event_ports_count
-        print "  event midi input ports: %d" % midi_event_in_ports_count
-        print "  audio input ports: %d" % audio_in_ports_count
-        print "  audio output ports: %d" % audio_out_ports_count
-        print "  total ports %d" % ports_count
+#         print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
+#         print "  midi input ports: %d" % midi_in_ports_count
+#         print "  control ports: %d" % control_ports_count
+#         print "  event ports: %d" % event_ports_count
+#         print "  event midi input ports: %d" % midi_event_in_ports_count
+#         print "  audio input ports: %d" % audio_in_ports_count
+#         print "  audio output ports: %d" % audio_out_ports_count
+#         print "  total ports %d" % ports_count
         return True
 
     def load_plugin(self, uri, parameters=[], maps={}):

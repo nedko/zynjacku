@@ -79,6 +79,11 @@ zynjacku_engine_iterate_plugins(
   ZynjackuEngine * engine_obj_ptr,
   gboolean force);
 
+const gchar *
+zynjacku_engine_get_supported_feature(
+  ZynjackuEngine * engine_obj_ptr,
+  guint index);
+
 G_END_DECLS
 
 #endif /* #ifndef ENGINE_H__512BF192_2626_4759_839B_47B7780A971B__INCLUDED */

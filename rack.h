@@ -75,6 +75,11 @@ zynjacku_rack_iterate_plugins(
   ZynjackuRack * rack_obj_ptr,
   gboolean force);
 
+const gchar *
+zynjacku_rack_get_supported_feature(
+  ZynjackuRack * rack_obj_ptr,
+  guint index);
+
 G_END_DECLS
 
 #endif /* #ifndef RACK_H__512BF192_2626_4759_839B_47B7780A971B__INCLUDED */

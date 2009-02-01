@@ -634,6 +634,23 @@ zynjacku_rack_get_version()
   return VERSION;
 }
 
+const gchar *
+zynjacku_rack_get_supported_feature(
+  ZynjackuRack * rack_obj_ptr,
+  guint index)
+{
+  struct lv2rack_engine * rack_ptr;
+
+  if (index >= ZYNJACKU_RACK_ENGINE_FEATURES)
+  {
+    return NULL;
+  }
+
+  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_obj_ptr);
+
+  return rack_ptr->host_features[index]->URI;
+}
+
 #define rack_obj_ptr ((ZynjackuRack *)context)
 
 bool
