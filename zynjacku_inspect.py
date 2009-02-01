@@ -11,6 +11,7 @@ for uri in plugins:
     if plugin == None:
         continue
     print "Plugin: %s" % plugin.name
+    print "URI: %s" % uri
     if plugin.microname != None: print "Tiny name: %s" % plugin.microname
     print "License: %s" % plugin.license
     print "Classes: %s" % plugin.classes
