@@ -21,7 +21,7 @@ for uri in plugins:
     print "Required features: %s" % list(plugin.requiredFeatures)
     print "Optional features: %s" % list(plugin.optionalFeatures)
     print "Ports:"
-    types = ["Audio", "Control", "Event", "Input", "Output", "LarslMidi"]
+    types = ["Audio", "Control", "Event", "Input", "Output", "String", "LarslMidi"]
     for port in plugin.ports:
         extra = []
         for type in types:
@@ -30,6 +30,14 @@ for uri in plugins:
         for sp in ["defaultValue", "minimum", "maximum", "microname"]:
             if port.__dict__[sp] != None:
                 extra.append("%s=%s" % (sp, repr(port.__dict__[sp])))
+        if len(port.events):
+            s = list()
+            for evt in port.events:
+                if evt in lv2.event_type_names:
+                    s.append(lv2.event_type_names[evt])
+                else:
+                    s.append(evt)
+            extra.append("events=%s" % ",".join(s))
         print "%4s %-20s %-40s %s" % (port.index, port.symbol, port.name, ", ".join(extra))
         splist = port.scalePoints
         splist.sort(lambda x, y: cmp(x[1], y[1]))
