@@ -750,6 +750,7 @@ zynjacku_plugin_ui_on(
   }
 
 #if HAVE_DYNPARAMS
+  LOG_DEBUG("dynparams is %s by plugin.", plugin_ptr->dynparams ? "supported" : "unsupported");
   if (plugin_ptr->dynparams)
   {
     lv2dynparam_host_ui_on(plugin_ptr->dynparams);
