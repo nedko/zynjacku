@@ -12,13 +12,16 @@ for uri in plugins:
         continue
     print "Plugin: %s" % plugin.name
     print "URI: %s" % uri
-    if plugin.microname != None: print "Tiny name: %s" % plugin.microname
+    if plugin.microname != None:
+        print "Tiny name: %s" % plugin.microname
+    if plugin.maintainers:
+        print "Maintainers: %s" % plugin.maintainers
     print "License: %s" % plugin.license
     print "Classes: %s" % plugin.classes
     print "Required features: %s" % list(plugin.requiredFeatures)
     print "Optional features: %s" % list(plugin.optionalFeatures)
     print "Ports:"
-    types = ["Audio", "Control", "Event", "Input", "Output"]
+    types = ["Audio", "Control", "Event", "Input", "Output", "LarslMidi"]
     for port in plugin.ports:
         extra = []
         for type in types:
