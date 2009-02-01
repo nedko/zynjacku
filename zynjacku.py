@@ -2711,6 +2711,9 @@ class ZynjackuHostMulti(ZynjackuHost):
             if port.__dict__["isControl"]:
                 control_ports_count += 1
                 continue
+            if port.__dict__["isString"]:
+                string_ports_count += 1
+                continue
 
         # TODO: we must be smarter and check for "optional connect" proeprty
         if (midi_in_ports_count + control_ports_count + string_ports_count + event_ports_count + audio_out_ports_count != ports_count) or \
