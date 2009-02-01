@@ -2689,33 +2689,33 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         #types = ["Audio", "Control", "Event", "Input", "Output", "LarslMidi"]
         for port in plugin.ports:
-            if port.__dict__["isAudio"]:
-                if port.__dict__["isInput"]:
+            if port.isAudio:
+                if port.isInput:
                     audio_in_ports_count += 1
                     continue
-                if port.__dict__["isOutput"]:
+                if port.isOutput:
                     audio_out_ports_count += 1
                     continue
                 continue
-            if port.__dict__["isLarslMidi"]:
-                if port.__dict__["isInput"]:
+            if port.isLarslMidi:
+                if port.isInput:
                     midi_in_ports_count += 1
                     continue
                 continue
-            if port.__dict__["isEvent"]:
+            if port.isEvent:
                 event_ports_count += 1
-                if port.__dict__["isInput"]:
+                if port.isInput and "http://lv2plug.in/ns/ext/midi#MidiEvent" in port.events:
                     midi_event_in_ports_count += 1
                     continue
                 continue
-            if port.__dict__["isControl"]:
+            if port.isControl:
                 control_ports_count += 1
                 continue
-            if port.__dict__["isString"]:
+            if port.isString:
                 string_ports_count += 1
                 continue
 
-        # TODO: we must be smarter and check for "optional connect" proeprty
+        # TODO: we must be smarter and check for "optional connect" property
         if (midi_in_ports_count + control_ports_count + string_ports_count + event_ports_count + audio_out_ports_count != ports_count) or \
                (midi_in_ports_count + midi_event_in_ports_count != 1) or \
                (audio_out_ports_count == 0):
