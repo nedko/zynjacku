@@ -49,7 +49,6 @@
 struct zynjacku_port
 {
   struct list_head plugin_siblings;
-  struct list_head port_type_siblings;
   unsigned int type;            /* one of PORT_TYPE_XXX */
   unsigned int flags;           /* bitmask of PORT_FLAGS_XXX */
   uint32_t index;               /* LV2 port index within owning plugin, unused for dynparam ports */

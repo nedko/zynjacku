@@ -112,8 +112,6 @@ struct zynjacku_engine
   pthread_mutex_t rt_lock;
   struct list_head plugins_pending_activation; /* protected using rt_lock */
 
-  struct list_head midi_ports;  /* PORT_TYPE_MIDI "struct zynjacku_port"s linked by port_type_siblings */
-  struct list_head audio_ports; /* PORT_TYPE_AUDIO "struct zynjacku_port"s linked by port_type_siblings */
   jack_port_t * jack_midi_in;
   LV2_MIDI lv2_midi_buffer;
   LV2_Event_Buffer lv2_midi_event_buffer;
@@ -494,8 +492,6 @@ zynjacku_engine_start_jack(
   INIT_LIST_HEAD(&engine_ptr->plugins_all);
   INIT_LIST_HEAD(&engine_ptr->plugins_active);
   INIT_LIST_HEAD(&engine_ptr->plugins_pending_activation);
-  INIT_LIST_HEAD(&engine_ptr->midi_ports);
-  INIT_LIST_HEAD(&engine_ptr->audio_ports);
 
   INIT_LIST_HEAD(&engine_ptr->midicc_ui);
   INIT_LIST_HEAD(&engine_ptr->midicc_pending_activation);
@@ -574,9 +570,6 @@ fail_close_jack_client:
   engine_ptr->jack_client = NULL;
 
 fail:
-  assert(list_empty(&engine_ptr->audio_ports));
-  assert(list_empty(&engine_ptr->midi_ports));
-
   return FALSE;
 }
 
@@ -615,9 +608,6 @@ zynjacku_engine_stop_jack(
   jack_client_close(engine_ptr->jack_client);
 
   engine_ptr->jack_client = NULL;
-
-  assert(list_empty(&engine_ptr->audio_ports));
-  assert(list_empty(&engine_ptr->midi_ports));
 }
 
 /* Translate from a JACK MIDI buffer to an LV2 MIDI buffers (both old midi port and new midi event port). */
@@ -1213,20 +1203,12 @@ zynjacku_free_synth_ports(
     if (plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO)
     {
       jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_left_port.data.audio);
-      list_del(&plugin_ptr->subtype.synth.audio_out_left_port.port_type_siblings);
     }
 
     if (plugin_ptr->subtype.synth.audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
     {
       assert(plugin_ptr->subtype.synth.audio_out_left_port.type == PORT_TYPE_AUDIO);
       jack_port_unregister(engine_ptr->jack_client, plugin_ptr->subtype.synth.audio_out_right_port.data.audio);
-      list_del(&plugin_ptr->subtype.synth.audio_out_right_port.port_type_siblings);
-    }
-
-    if (plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_MIDI ||
-        plugin_ptr->subtype.synth.midi_in_port.type == PORT_TYPE_EVENT_MIDI)
-    {
-      list_del(&plugin_ptr->subtype.synth.midi_in_port.port_type_siblings);
     }
   }
 }
@@ -1499,8 +1481,6 @@ zynjacku_plugin_construct_synth(
     goto fail_detach_dynparams;
   }
 
-  list_add_tail(&synth_ptr->midi_in_port.port_type_siblings, &engine_ptr->midi_ports);
-
   /* setup audio ports (they are connected in jack process callback */
 
   size_name = strlen(plugin_ptr->name);
@@ -1519,18 +1499,15 @@ zynjacku_plugin_construct_synth(
   {
     strcpy(port_name + size_id + size_name, " L");
     synth_ptr->audio_out_left_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    list_add_tail(&synth_ptr->audio_out_left_port.port_type_siblings, &engine_ptr->audio_ports);
 
     strcpy(port_name + size_id + size_name, " R");
     synth_ptr->audio_out_right_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    list_add_tail(&synth_ptr->audio_out_right_port.port_type_siblings, &engine_ptr->audio_ports);
   }
   else if (synth_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
            synth_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
   {
     port_name[size_id + size_name] = 0;
     synth_ptr->audio_out_left_port.data.audio = jack_port_register(engine_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    list_add_tail(&synth_ptr->audio_out_left_port.port_type_siblings, &engine_ptr->audio_ports);
   }
 
   port_name[size_id + size_name] = 0;
