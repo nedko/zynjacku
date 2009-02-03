@@ -49,6 +49,7 @@
 #include "zynjacku.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
+#include "plugin.h"
 #include "plugin_repo.h"
 
 struct zynjacku_lv2_plugin

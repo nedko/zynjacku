@@ -49,6 +49,8 @@ struct zynjacku_plugin
 #if HAVE_DYNPARAMS
   bool dynparams_supported;
 #endif
+  struct list_head midi_ports;
+  struct list_head audio_ports;
   struct list_head parameter_ports;
   struct list_head measure_ports;
 #if HAVE_DYNPARAMS
@@ -67,16 +69,16 @@ struct zynjacku_plugin
   {
     struct
     {
-      struct zynjacku_port midi_in_port;
-      struct zynjacku_port audio_out_left_port;
-      struct zynjacku_port audio_out_right_port;
+      struct zynjacku_port * midi_in_port_ptr;
+      struct zynjacku_port * audio_out_left_port_ptr;
+      struct zynjacku_port * audio_out_right_port_ptr;
     } synth;
     struct
     {
-      struct zynjacku_port audio_in_left_port;
-      struct zynjacku_port audio_in_right_port;
-      struct zynjacku_port audio_out_left_port;
-      struct zynjacku_port audio_out_right_port;
+      struct zynjacku_port * audio_in_left_port_ptr;
+      struct zynjacku_port * audio_in_right_port_ptr;
+      struct zynjacku_port * audio_out_left_port_ptr;
+      struct zynjacku_port * audio_out_right_port_ptr;
     } effect;
   } subtype;
   
@@ -84,7 +86,7 @@ struct zynjacku_plugin
   struct zynjacku_rt_plugin_command * volatile command_result; /* command that has been executed */
 
   void (* deactivate)(GObject * synth_obj_ptr);
-  void (* free_ports)(GObject * synth_obj_ptr);
+  void (* unregister_port)(GObject * engine_obj_ptr, struct zynjacku_port * port_ptr);
   bool (* set_midi_cc_map)(GObject * engine_obj_ptr, struct zynjacku_port * port_ptr, GObject * midi_cc_map_obj_ptr);
   bool (* midi_cc_map_cc_no_assign)(GObject * engine_obj_ptr, GObject * midi_cc_map_obj_ptr, guint cc_no);
 };
@@ -100,10 +102,6 @@ zynjacku_connect_plugin_ports(
   ,struct lv2_rtsafe_memory_pool_provider * mempool_allocator_ptr
 #endif
   );
-
-void
-zynjacku_free_plugin_ports(
-  struct zynjacku_plugin * plugin_ptr);
 
 void *
 zynjacku_plugin_prerun_rt(
