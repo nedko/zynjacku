@@ -125,7 +125,7 @@ zynjacku_ttl_la_SOURCES += flex_ttl.h
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
 EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py
 
-bin_SCRIPTS = zynjacku.py lv2rack.py zynjacku_inspect.py
+bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
 
 zynjackudir = $(pkgdatadir)
 dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
@@ -133,7 +133,7 @@ dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
 install-exec-hook:
 	ln -vfs zynjacku.py $(DESTDIR)$(bindir)/zynjacku
 	ln -vfs lv2rack.py $(DESTDIR)$(bindir)/lv2rack
-	ln -vfs zynjacku_inspect.py $(DESTDIR)$(bindir)/zynjacku_inspect
+	ln -vfs zynspect.py $(DESTDIR)$(bindir)/zynspect
 
 uninstall-hook:
 	rm -vf $(DESTDIR)$(bindir)/zynjacku
