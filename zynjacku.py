@@ -2500,11 +2500,7 @@ class host:
         self.engine.ui_run()
         return True
 
-    def run(self):
-        ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
-
-        gtk.main()
-        gobject.source_remove(ui_run_callback_id)
+    def run_done(self):
         if self.lash_client:
             #print "removing lash handler, host object refcount is %u" % sys.getrefcount(self)
             gobject.source_remove(self.lash_check_events_callback_id)
@@ -2515,6 +2511,12 @@ class host:
                 plugin.ui_win.disconnect(plugin.ui_win.destroy_connect_id) # signal connection holds reference to plugin object...
 
         self.engine.disconnect(self.progress_connect_id)
+
+    def run(self):
+        ui_run_callback_id = gobject.timeout_add(40, self.ui_run)
+        gtk.main()
+        gobject.source_remove(ui_run_callback_id)
+        self.run_done()
 
     def on_test(self, obj1, obj2):
         print "on_test() called !!!!!!!!!!!!!!!!!!"
@@ -2741,6 +2743,7 @@ class ZynjackuHostOne(ZynjackuHost):
 
     def run(self):
         if not self.plugin:
+            self.run_done()
             return
 
         self.plugin.ui_win.show()
