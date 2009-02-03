@@ -742,86 +742,24 @@ zynjacku_plugin_repo_get_bundle_path(
 }
 
 static
-struct zynjacku_port *
-new_lv2parameter_port(
+bool
+port_is_msgcontext(
   struct zynjacku_plugin_info * info_ptr,
-  SLV2Port port,
-  uint32_t index,
-  const char * symbol_str,
-  struct zynjacku_plugin * plugin_ptr)
+  SLV2Port port)
 {
-  struct zynjacku_port * port_ptr;
-  SLV2Value name;
-  const char * name_str;
   SLV2Values contexts;
   int i;
-
-  port_ptr = malloc(sizeof(struct zynjacku_port));
-  if (port_ptr == NULL)
-  {
-    LOG_ERROR("malloc() failed to allocate memory for struct zynjacku_port.");
-    goto fail;
-  }
-
-  port_ptr->index = index;
-  port_ptr->flags = 0;
-  port_ptr->ui_context = NULL;
-  port_ptr->plugin_ptr = plugin_ptr;
-  port_ptr->midi_cc_map_obj_ptr = NULL;
-
-  port_ptr->symbol = strdup(symbol_str);
-  if (port_ptr->symbol == NULL)
-  {
-    LOG_ERROR("strdup() failed.");
-    goto fail_free_port;
-  }
-
-  /* port name */
-  name = slv2_port_get_name(info_ptr->slv2info, port);
-  if (name == NULL)
-  {
-    LOG_ERROR("slv2_port_get_name() failed.");
-    goto fail_free_symbol;
-  }
-
-  name_str = slv2_value_as_string_smart(name);
-  if (name_str == NULL)
-  {
-    LOG_ERROR("port symbol is not string.");
-    goto fail_free_symbol;
-  }
-
-  port_ptr->name = strdup(name_str);
-
-  slv2_value_free(name);
-
-  if (port_ptr->name == NULL)
-  {
-    LOG_ERROR("strdup() failed.");
-    goto fail_free_symbol;
-  }
 
   contexts = slv2_port_get_value(info_ptr->slv2info, port, g_slv2uri_port_context);
   for (i = 0; i < slv2_values_size(contexts); i++)
   {
     if (slv2_value_equals(slv2_values_get_at(contexts, i), g_slv2uri_message_context))
     {
-      port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
-      LOG_DEBUG("Port %d has message context", index);
-      break;
+      return true;
     }
   }
 
-  return port_ptr;
-      
-fail_free_symbol:
-  free(port_ptr->symbol);
-
-fail_free_port:
-  free(port_ptr);
-
-fail:
-  return NULL;
+  return false;
 }
 
 static
@@ -829,23 +767,22 @@ bool
 zynjacku_plugin_repo_create_port_internal(
   struct zynjacku_plugin_info * info_ptr,
   uint32_t port_index,
-  struct zynjacku_plugin * plugin_ptr,
-  void * context,
-  zynjacku_plugin_repo_create_port create_port)
+  ZynjackuPlugin * plugin_obj_ptr)
 {
-  struct zynjacku_port * port_ptr;
   SLV2Port port;
   SLV2Value symbol;
   const char * symbol_str;
+  SLV2Value name;
+  const char * name_str;
   SLV2Value default_value;
   SLV2Value min_value;
   SLV2Value max_value;
-  unsigned int port_type;
   bool output_port;
   SLV2Values defs;
   SLV2Value defval;
   const char * defval_str;
   size_t defval_len;
+  size_t maxlen;
 
   port = slv2_plugin_get_port_by_index(info_ptr->slv2info, port_index);
 
@@ -866,17 +803,30 @@ zynjacku_plugin_repo_create_port_internal(
     return false;
   }
 
+  /* port name */
+  name = slv2_port_get_name(info_ptr->slv2info, port);
+  if (name == NULL)
+  {
+    LOG_ERROR("slv2_port_get_name() failed.");
+    return false;
+  }
+
+  name_str = slv2_value_as_string_smart(name);
+  if (name_str == NULL)
+  {
+    LOG_ERROR("port name is not string.");
+    return false;
+  }
+
   if (slv2_port_is_control(info_ptr->slv2info, port))
   {
-    port_ptr = new_lv2parameter_port(info_ptr, port, port_index, symbol_str, plugin_ptr);
-
-    port_ptr->type = PORT_TYPE_LV2_FLOAT;
-
     if (output_port)
     {
-      port_ptr->flags |= PORT_FLAGS_OUTPUT;
-      list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->measure_ports);
-      return true;
+      return zynjacku_plugin_create_float_measure_port(
+        plugin_obj_ptr,
+        port_index,
+        symbol_str,
+        port_is_msgcontext(info_ptr, port));
     }
 
     /* port range */
@@ -887,27 +837,18 @@ zynjacku_plugin_repo_create_port_internal(
       &min_value,
       &max_value);
 
-    if (default_value != NULL)
-    {
-      port_ptr->data.lv2float.value = slv2_value_as_float(default_value);
-      slv2_value_free(default_value);
-    }
-
-    if (min_value != NULL)
-    {
-      port_ptr->data.lv2float.min = slv2_value_as_float(min_value);
-      slv2_value_free(min_value);
-    }
-
-    if (max_value != NULL)
-    {
-      port_ptr->data.lv2float.max = slv2_value_as_float(max_value);
-      slv2_value_free(max_value);
-    }
-
-    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
-
-    return true;
+    return zynjacku_plugin_create_float_parameter_port(
+      plugin_obj_ptr,
+      port_index,
+      symbol_str,
+      name_str,
+      port_is_msgcontext(info_ptr, port),
+      default_value != NULL,
+      default_value != NULL ? slv2_value_as_float(default_value) : 0.0,
+      min_value != NULL,
+      min_value != NULL ? slv2_value_as_float(min_value) : 0.0,
+      max_value != NULL,
+      max_value != NULL ? slv2_value_as_float(max_value) : 0.0);
   }
 
   if (slv2_port_is_string(info_ptr->slv2info, port))
@@ -918,12 +859,8 @@ zynjacku_plugin_repo_create_port_internal(
       return true;
     }
 
-    port_ptr = new_lv2parameter_port(info_ptr, port, port_index, symbol_str, plugin_ptr);
-
-    port_ptr->type = PORT_TYPE_LV2_STRING;
-
     /* TODO: get from slv2 (requiredSpace) */
-    port_ptr->data.lv2string.storage = 256;
+    maxlen = 256;
 
     defval_str = "\0";
 
@@ -940,62 +877,60 @@ zynjacku_plugin_repo_create_port_internal(
 
     defval_len = strlen(defval_str) + 1;
 
-    if (defval_len > port_ptr->data.lv2string.storage)
+    if (defval_len > maxlen)
     {
-      port_ptr->data.lv2string.storage = defval_len;
+      maxlen = defval_len;
     }
 
-    port_ptr->data.lv2string.data = malloc(port_ptr->data.lv2string.storage);
-    memcpy(port_ptr->data.lv2string.data, defval_str, defval_len);
-
-    port_ptr->data.lv2string.len = defval_len - 1;
-    port_ptr->data.lv2string.flags = LV2_STRING_DATA_CHANGED_FLAG;
-    port_ptr->data.lv2string.pad = 0;
-
-    list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
-
-    return true;
+    return zynjacku_plugin_create_string_parameter_port(
+      plugin_obj_ptr,
+      port_index,
+      symbol_str,
+      name_str,
+      port_is_msgcontext(info_ptr, port),
+      defval_str,
+      maxlen);
   }
 
   if (slv2_port_is_audio(info_ptr->slv2info, port))
   {
-    port_type = PORT_TYPE_AUDIO;
+    return zynjacku_plugin_create_audio_port(
+      plugin_obj_ptr,
+      port_index,
+      symbol_str,
+      !output_port);
   }
   else if (slv2_port_is_midi(info_ptr->slv2info, port))
   {
-    port_type = PORT_TYPE_MIDI;
+    return zynjacku_plugin_create_oldmidi_input_port(
+      plugin_obj_ptr,
+      port_index,
+      symbol_str);
   }
   else if (slv2_port_is_event(info_ptr->slv2info, port) &&
            slv2_port_is_midi_event(info_ptr->slv2info, port))
   {
-    port_type = PORT_TYPE_EVENT_MIDI;
-  }
-  else
-  {
-    LOG_ERROR("Unrecognized port '%s' type (index is %u)", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
-    return false;
+    return zynjacku_plugin_create_eventmidi_input_port(
+      plugin_obj_ptr,
+      port_index,
+      symbol_str);
   }
 
-  if (create_port(
-        context,
-        port_type,
-        output_port,
-        port_index))
-  {
-    return true;
-  }
-
-  LOG_ERROR("Unmatched port '%s'. type is %u, index is %u", slv2_value_as_string_smart(symbol), (unsigned int)port_type, (unsigned int)port_index);
+  LOG_ERROR("Unmatched port '%s'. index is %u", slv2_value_as_string_smart(symbol), (unsigned int)port_index);
   return false;
 }
 
 bool
-zynjacku_plugin_repo_load_plugin(
-  struct zynjacku_plugin * synth_ptr,
+zynjacku_plugin_repo_get_plugin_info(
+  const char * plugin_uri,
   void * context,
-  zynjacku_plugin_repo_create_port create_port,
   zynjacku_plugin_repo_check_plugin check_plugin,
-  const LV2_Feature * const * supported_features)
+  const LV2_Feature * const * host_features,
+  char ** plugin_name_ptr
+#if HAVE_DYNPARAMS
+  , bool * is_dynparam_plugin_ptr
+#endif
+  )
 {
   struct zynjacku_plugin_info * info_ptr;
   SLV2Values slv2features;
@@ -1003,20 +938,16 @@ zynjacku_plugin_repo_load_plugin(
   unsigned int features_count;
   unsigned int feature_index;
   bool ret;
-  const char *uri;
-  uint32_t ports_count;
-  uint32_t i;
+  const char * uri;
   SLV2Plugins slv2plugins;
   SLV2Plugin slv2plugin;
   SLV2Value uri_value;
-
-  ret = false;
+#if HAVE_DYNPARAMS
+  bool is_dynparam_plugin;
+#endif
+  char * plugin_name;
 
   LOG_DEBUG("zynjacku_plugin_repo_load_plugin() called.");
-
-#if HAVE_DYNPARAMS
-  synth_ptr->dynparams_supported = FALSE;
-#endif
 
   if (!g_fullscanned)
   {
@@ -1026,7 +957,7 @@ zynjacku_plugin_repo_load_plugin(
       g_loaded = true;
     }
 
-    g_iterate_context.supported_features = supported_features;
+    g_iterate_context.supported_features = host_features;
     g_iterate_context.context = context;
     g_iterate_context.check_plugin = check_plugin;
     g_iterate_context.progress_step = 0.0;
@@ -1036,14 +967,15 @@ zynjacku_plugin_repo_load_plugin(
 
     slv2plugins = slv2_world_get_all_plugins(g_world);
 
-    uri_value = slv2_value_new_uri(g_world, synth_ptr->uri);
+    uri_value = slv2_value_new_uri(g_world, plugin_uri);
 
     slv2plugin = slv2_plugins_get_by_uri(slv2plugins, uri_value);
     if (slv2plugin == NULL)
     {
       slv2_value_free(uri_value);
       slv2_plugins_free(g_world, slv2plugins);
-      LOG_ERROR("Plugin '%s' not found", synth_ptr->uri);
+      LOG_ERROR("Plugin '%s' not found", plugin_uri);
+      ret = false;
       goto exit;
     }
 
@@ -1055,7 +987,7 @@ zynjacku_plugin_repo_load_plugin(
 
     if (!ret)
     {
-      LOG_ERROR("plugin '%s' failed to match synth constraints", synth_ptr->uri);
+      LOG_ERROR("plugin '%s' failed to match synth constraints", plugin_uri);
       goto exit;
     }
 
@@ -1063,19 +995,25 @@ zynjacku_plugin_repo_load_plugin(
        so we dont lookup it in next line, by calling zynjacku_plugin_repo_lookup_by_uri() */
   }
 
-  info_ptr = zynjacku_plugin_repo_lookup_by_uri(synth_ptr->uri);
+  info_ptr = zynjacku_plugin_repo_lookup_by_uri(plugin_uri);
   if (info_ptr == NULL)
   {
-    LOG_ERROR("Failed to find plugin %s", synth_ptr->uri);
+    LOG_ERROR("Failed to find plugin %s", plugin_uri);
+    ret = false;
     goto exit;
   }
 
-  synth_ptr->name = strdup(info_ptr->name);
-  if (synth_ptr->name == NULL)
+  plugin_name = strdup(info_ptr->name);
+  if (plugin_name == NULL)
   {
     LOG_ERROR("Failed to strdup('%s')", info_ptr->name);
+    ret = false;
     goto exit;
   }
+
+#if HAVE_DYNPARAMS
+  is_dynparam_plugin = false;
+#endif
 
   slv2features = slv2_plugin_get_optional_features(info_ptr->slv2info);
 
@@ -1089,6 +1027,7 @@ zynjacku_plugin_repo_load_plugin(
     if (uri == NULL)
     {
       LOG_ERROR("slv2_value_as_uri_smart() failed for plugin name value.");
+      ret = false;
       goto free_features;
     }
 
@@ -1097,20 +1036,9 @@ zynjacku_plugin_repo_load_plugin(
 #if HAVE_DYNPARAMS
     if (strcmp(LV2DYNPARAM_URI, uri) == 0)
     {
-      synth_ptr->dynparams_supported = TRUE;
+      is_dynparam_plugin = true;
     }
 #endif
-  }
-
-  ports_count  = slv2_plugin_get_num_ports(info_ptr->slv2info);
-
-  for (i = 0 ; i < ports_count ; i++)
-  {
-    if (!zynjacku_plugin_repo_create_port_internal(info_ptr, i, synth_ptr, context, create_port))
-    {
-      LOG_ERROR("Failed to create plugin port");
-      goto free_features;
-    }
   }
 
   ret = true;
@@ -1118,8 +1046,50 @@ zynjacku_plugin_repo_load_plugin(
 free_features:
   slv2_values_free(slv2features);
 
+  if (!ret)
+  {
+    free(plugin_name);
+  }
+  else
+  {
+    *plugin_name_ptr = plugin_name;
+#if HAVE_DYNPARAMS
+    *is_dynparam_plugin_ptr = is_dynparam_plugin;
+#endif
+  }
+
 exit:
   return ret;
+}
+
+bool
+zynjacku_plugin_repo_create_plugin_ports(
+  const char * plugin_uri,
+  ZynjackuPlugin * plugin_obj_ptr)
+{
+  struct zynjacku_plugin_info * info_ptr;
+  uint32_t ports_count;
+  uint32_t i;
+
+  info_ptr = zynjacku_plugin_repo_lookup_by_uri(plugin_uri);
+  if (info_ptr == NULL)
+  {
+    LOG_ERROR("Failed to find plugin %s", plugin_uri);
+    return false;
+  }
+
+  ports_count  = slv2_plugin_get_num_ports(info_ptr->slv2info);
+
+  for (i = 0 ; i < ports_count ; i++)
+  {
+    if (!zynjacku_plugin_repo_create_port_internal(info_ptr, i, plugin_obj_ptr))
+    {
+      LOG_ERROR("Failed to create plugin port");
+      return false;
+    }
+  }
+
+  return true;
 }
 
 static

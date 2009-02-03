@@ -58,8 +58,11 @@ struct zynjacku_port
   {
     struct
     {
+      gboolean default_value_provided;
       float value;
+      bool min_provided;
       float min;
+      bool max_provided;
       float max;
     } lv2float;                /* for PORT_TYPE_LV2_FLOAT */
     struct _LV2_String_Data lv2string; /* for PORT_TYPE_LV2_STRING */

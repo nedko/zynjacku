@@ -531,31 +531,31 @@ jack_process_cb(
     /* Connect plugin LV2 input audio ports */
     zynjacku_lv2_connect_port(
       effect_ptr->lv2plugin,
-      &effect_ptr->subtype.effect.audio_in_left_port,
+      effect_ptr->subtype.effect.audio_in_left_port_ptr,
       left);
 
-    if (effect_ptr->subtype.effect.audio_in_right_port.type == PORT_TYPE_AUDIO)
+    if (effect_ptr->subtype.effect.audio_in_right_port_ptr != NULL)
     {
       zynjacku_lv2_connect_port(
         effect_ptr->lv2plugin,
-        &effect_ptr->subtype.effect.audio_in_right_port,
+        effect_ptr->subtype.effect.audio_in_right_port_ptr,
         mono ? left : right);
     }
 
     /* Connect plugin LV2 output audio ports directly to JACK buffers */
-    left = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_left_port.data.audio, nframes);
+    left = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_left_port_ptr->data.audio, nframes);
     zynjacku_lv2_connect_port(
       effect_ptr->lv2plugin,
-      &effect_ptr->subtype.effect.audio_out_left_port,
+      effect_ptr->subtype.effect.audio_out_left_port_ptr,
       left);
 
-    mono = effect_ptr->subtype.effect.audio_out_right_port.type != PORT_TYPE_AUDIO;
+    mono = effect_ptr->subtype.effect.audio_out_right_port_ptr == NULL;
     if (!mono)
     {
-      right = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_right_port.data.audio, nframes);
+      right = jack_port_get_buffer(effect_ptr->subtype.effect.audio_out_right_port_ptr->data.audio, nframes);
       zynjacku_lv2_connect_port(
         effect_ptr->lv2plugin,
-        &effect_ptr->subtype.effect.audio_out_right_port,
+        effect_ptr->subtype.effect.audio_out_right_port_ptr,
         right);
     }
 
@@ -589,6 +589,21 @@ zynjacku_rack_deactivate_effect(
   list_del(&effect_ptr->siblings_all); /* remove from rack_ptr->plugins_all */
 
   zynjacku_lv2_deactivate(effect_ptr->lv2plugin);
+}
+
+void
+zynjacku_rack_unregister_port(
+  GObject * rack_obj_ptr,
+  struct zynjacku_port * port_ptr)
+{
+  struct lv2rack_engine * rack_ptr;
+
+  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_obj_ptr);
+
+  if (port_ptr->data.audio != NULL)
+  {
+    jack_port_unregister(rack_ptr->jack_client, port_ptr->data.audio);
+  }
 }
 
 void
@@ -733,94 +748,6 @@ zynjacku_rack_iterate_plugins(
     zynjacku_rack_tack);
 }
 
-void
-zynjacku_free_effect_ports(
-  GObject * plugin_object_ptr)
-{
-  struct lv2rack_engine * rack_ptr;
-  struct zynjacku_plugin * plugin_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
-  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(plugin_ptr->engine_object_ptr);
-
-  LOG_DEBUG("zynjacku_free_effect_ports() called");
-
-  zynjacku_free_plugin_ports(plugin_ptr);
-
-  if (plugin_ptr->type == PLUGIN_TYPE_EFFECT)
-  {
-    if (plugin_ptr->subtype.effect.audio_out_left_port.type == PORT_TYPE_AUDIO)
-    {
-      jack_port_unregister(rack_ptr->jack_client, plugin_ptr->subtype.effect.audio_out_left_port.data.audio);
-    }
-
-    if (plugin_ptr->subtype.effect.audio_out_right_port.type == PORT_TYPE_AUDIO) /* stereo? */
-    {
-      assert(plugin_ptr->subtype.effect.audio_out_left_port.type == PORT_TYPE_AUDIO);
-      jack_port_unregister(rack_ptr->jack_client, plugin_ptr->subtype.effect.audio_out_right_port.data.audio);
-    }
-  }
-}
-
-#define effect_ptr (&((struct zynjacku_plugin *)context)->subtype.effect)
-
-bool
-zynjacku_effect_create_port(
-  void * context,
-  unsigned int port_type,
-  bool output,
-  uint32_t port_index)
-{
-  struct zynjacku_port * port_ptr;
-
-  LOG_NOTICE("creating effect %s port of type %u, index %u", output ? "output" : "input", (unsigned int)port_type, (unsigned int)port_index);
-
-  if (port_type != PORT_TYPE_AUDIO)
-  {
-    /* ignore unknown ports */
-    return true;
-  }
-
-  if (!output)
-  {
-    if (effect_ptr->audio_in_left_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &effect_ptr->audio_in_left_port;
-    }
-    else if (effect_ptr->audio_in_right_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &effect_ptr->audio_in_right_port;
-    }
-    else
-    {
-      /* ignore, we dont support more than two audio ports yet */
-      return true;
-    }
-  }
-  else
-  {
-    if (effect_ptr->audio_out_left_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &effect_ptr->audio_out_left_port;
-    }
-    else if (effect_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
-    {
-      port_ptr = &effect_ptr->audio_out_right_port;
-    }
-    else
-    {
-      /* ignore, we dont support more than two audio ports yet */
-      return true;
-    }
-  }
-
-  port_ptr->type = PORT_TYPE_AUDIO;
-  port_ptr->index = port_index;
-
-  return true;
-}
-
-#undef effect_ptr
 #define effect_ptr (&plugin_ptr->subtype.effect)
 
 bool
@@ -834,19 +761,92 @@ zynjacku_plugin_construct_effect(
   size_t size_name;
   size_t size_id;
   struct lv2rack_engine * rack_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
+  struct zynjacku_port * audio_in_left_port_ptr;
+  struct zynjacku_port * audio_in_right_port_ptr;
+  struct zynjacku_port * audio_out_left_port_ptr;
+  struct zynjacku_port * audio_out_right_port_ptr;
 
   rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_object_ptr);
 
   plugin_ptr->type = PLUGIN_TYPE_EFFECT;
-  effect_ptr->audio_in_left_port.type = PORT_TYPE_INVALID;
-  effect_ptr->audio_in_right_port.type = PORT_TYPE_INVALID;
-  effect_ptr->audio_out_left_port.type = PORT_TYPE_INVALID;
-  effect_ptr->audio_out_right_port.type = PORT_TYPE_INVALID;
 
-  if (!zynjacku_plugin_repo_load_plugin(plugin_ptr, plugin_ptr, zynjacku_effect_create_port, zynjacku_rack_check_plugin, rack_ptr->host_features))
+  if (!zynjacku_plugin_repo_get_plugin_info(
+        plugin_ptr->uri,
+        plugin_ptr,
+        zynjacku_rack_check_plugin,
+        rack_ptr->host_features,
+        &plugin_ptr->name
+#if HAVE_DYNPARAMS
+        , &plugin_ptr->dynparams_supported
+#endif
+        ))
   {
     LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
     goto fail;
+  }
+
+  if (!zynjacku_plugin_repo_create_plugin_ports(
+        plugin_ptr->uri,
+        plugin_obj_ptr))
+  {
+    LOG_ERROR("Failed to create ports for plugin %s", plugin_ptr->uri);
+    goto fail_free_name;
+  }
+
+  audio_in_left_port_ptr = NULL;
+  audio_in_right_port_ptr = NULL;
+
+  list_for_each(node_ptr, &plugin_ptr->audio_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    assert(port_ptr->type == PORT_TYPE_AUDIO);
+    if (PORT_IS_INPUT(port_ptr))
+    {
+      if (audio_in_left_port_ptr == NULL)
+      {
+        audio_in_left_port_ptr = port_ptr;
+        continue;
+      }
+
+      assert(audio_in_right_port_ptr == NULL);
+      audio_in_right_port_ptr = port_ptr;
+      break;
+    }
+  }
+
+  if (audio_in_left_port_ptr == NULL)
+  {
+    LOG_ERROR("Cannot construct effect plugin without audio input port(s). %s", plugin_ptr->uri);
+    goto fail_free_name;
+  }
+
+  audio_out_left_port_ptr = NULL;
+  audio_out_right_port_ptr = NULL;
+
+  list_for_each(node_ptr, &plugin_ptr->audio_ports)
+  {
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+    assert(port_ptr->type == PORT_TYPE_AUDIO);
+    if (PORT_IS_OUTPUT(port_ptr))
+    {
+      if (audio_out_left_port_ptr == NULL)
+      {
+        audio_out_left_port_ptr = port_ptr;
+        continue;
+      }
+
+      assert(audio_out_right_port_ptr == NULL);
+      audio_out_right_port_ptr = port_ptr;
+      break;
+    }
+  }
+
+  if (audio_out_left_port_ptr == NULL)
+  {
+    LOG_ERROR("Cannot construct effect plugin without audio output port(s). %s", plugin_ptr->uri);
+    goto fail_free_name;
   }
 
   rack_ptr->progress.context = rack_object_ptr;
@@ -869,7 +869,7 @@ zynjacku_plugin_construct_effect(
   if (plugin_ptr->lv2plugin == NULL)
   {
     LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
-    goto fail;
+    goto fail_free_name;
   }
 
   /* connect parameter/measure ports */
@@ -888,31 +888,45 @@ zynjacku_plugin_construct_effect(
 
   /* setup audio ports (they are connected in jack process callback */
 
+  effect_ptr->audio_in_left_port_ptr = audio_in_left_port_ptr;
+  effect_ptr->audio_in_right_port_ptr = audio_in_right_port_ptr;
+  effect_ptr->audio_out_left_port_ptr = audio_out_left_port_ptr;
+  effect_ptr->audio_out_right_port_ptr = audio_out_right_port_ptr;
+
   size_name = strlen(plugin_ptr->name);
   port_name = malloc(size_name + 1024);
   if (port_name == NULL)
   {
     LOG_ERROR("Failed to allocate memory for port name");
-    goto fail_free_ports;
+    goto fail_unload;
   }
 
   size_id = sprintf(port_name, "%u:", id);
   memcpy(port_name + size_id, plugin_ptr->name, size_name);
 
-  if (effect_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
-      effect_ptr->audio_out_right_port.type == PORT_TYPE_AUDIO)
+  if (audio_out_left_port_ptr != NULL &&
+      audio_out_right_port_ptr != NULL)
   {
+    assert(audio_out_left_port_ptr->type == PORT_TYPE_AUDIO);
+    assert(PORT_IS_OUTPUT(audio_out_left_port_ptr));
+
     strcpy(port_name + size_id + size_name, " L");
-    effect_ptr->audio_out_left_port.data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    audio_out_left_port_ptr->data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+
+    assert(audio_out_right_port_ptr->type == PORT_TYPE_AUDIO);
+    assert(PORT_IS_OUTPUT(audio_out_right_port_ptr));
 
     strcpy(port_name + size_id + size_name, " R");
-    effect_ptr->audio_out_right_port.data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    audio_out_right_port_ptr->data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
   }
-  else if (effect_ptr->audio_out_left_port.type == PORT_TYPE_AUDIO &&
-           effect_ptr->audio_out_right_port.type == PORT_TYPE_INVALID)
+  else if (audio_out_left_port_ptr != NULL &&
+           audio_out_right_port_ptr == NULL)
   {
+    assert(audio_out_left_port_ptr->type == PORT_TYPE_AUDIO);
+    assert(PORT_IS_OUTPUT(audio_out_left_port_ptr));
+
     port_name[size_id + size_name] = 0;
-    effect_ptr->audio_out_left_port.data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    audio_out_left_port_ptr->data.audio = jack_port_register(rack_ptr->jack_client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
   }
 
   port_name[size_id + size_name] = 0;
@@ -938,7 +952,7 @@ zynjacku_plugin_construct_effect(
     plugin_ptr, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
 
   plugin_ptr->deactivate = zynjacku_rack_deactivate_effect;
-  plugin_ptr->free_ports = zynjacku_free_effect_ports;
+  plugin_ptr->unregister_port = zynjacku_rack_unregister_port;
 
   /* we dont support midi cc maps for lv2rack yet */
   plugin_ptr->set_midi_cc_map = NULL;
@@ -948,20 +962,11 @@ zynjacku_plugin_construct_effect(
 
   return true;
 
-fail_free_ports:
-  zynjacku_free_effect_ports(G_OBJECT(plugin_obj_ptr));
-  plugin_ptr->engine_object_ptr = NULL;
-
-#if HAVE_DYNPARAMS
-  if (plugin_ptr->dynparams != NULL)
-  {
-    lv2dynparam_host_detach(plugin_ptr->dynparams);
-    plugin_ptr->dynparams = NULL;
-  }
-#endif
-
 fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);
+
+fail_free_name:
+  free(plugin_ptr->name);
 
 fail:
   return false;

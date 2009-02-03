@@ -534,6 +534,8 @@ zynjacku_plugin_init(
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(instance);
 
   plugin_ptr->dispose_has_run = FALSE;
+  INIT_LIST_HEAD(&plugin_ptr->midi_ports);
+  INIT_LIST_HEAD(&plugin_ptr->audio_ports);
   INIT_LIST_HEAD(&plugin_ptr->parameter_ports);
   INIT_LIST_HEAD(&plugin_ptr->measure_ports);
 #if HAVE_DYNPARAMS
@@ -873,8 +875,11 @@ zynjacku_connect_plugin_ports(
       switch (port_ptr->type)
       {
       case PORT_TYPE_LV2_FLOAT:
-        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float);
-        LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.lv2float);
+        if (port_ptr->data.lv2float.default_value_provided)
+        {
+          zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float.value);
+          LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.lv2float.value);
+        }
         break;
       case PORT_TYPE_LV2_STRING:
         zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2string);
@@ -899,7 +904,7 @@ zynjacku_connect_plugin_ports(
       switch (port_ptr->type)
       {
       case PORT_TYPE_LV2_FLOAT:
-        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float);
+        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float.value);
         break;
       case PORT_TYPE_LV2_STRING:
         /* TODO measure string ports are broken for now */
@@ -918,7 +923,7 @@ zynjacku_connect_plugin_ports(
       switch (port_ptr->type)
       {
       case PORT_TYPE_LV2_FLOAT:
-        send_message(plugin_ptr, port_ptr, &port_ptr->data.lv2float);
+        send_message(plugin_ptr, port_ptr, &port_ptr->data.lv2float.value);
         break;
       case PORT_TYPE_LV2_STRING:
         send_message(plugin_ptr, port_ptr, &port_ptr->data.lv2string);
@@ -935,62 +940,18 @@ void
 zynjacku_free_port(
   struct zynjacku_port * port_ptr)
 {
-  assert(port_ptr->type == PORT_TYPE_LV2_FLOAT || port_ptr->type == PORT_TYPE_LV2_STRING);
-
   if (port_ptr->type == PORT_TYPE_LV2_STRING)
   {
     free(port_ptr->data.lv2string.data);
   }
 
+  if (port_ptr->name != NULL)
+  {
+    free(port_ptr->name);
+  }
+
   free(port_ptr->symbol);
-  free(port_ptr->name);
   free(port_ptr);
-}
-
-void
-zynjacku_free_plugin_ports(
-  struct zynjacku_plugin * plugin_ptr)
-{
-  struct list_head * node_ptr;
-  struct zynjacku_port * port_ptr;
-
-  while (!list_empty(&plugin_ptr->parameter_ports))
-  {
-    node_ptr = plugin_ptr->parameter_ports.next;
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    assert(PORT_IS_INPUT(port_ptr));
-
-    list_del(node_ptr);
-
-    zynjacku_free_port(port_ptr);
-  }
-
-  while (!list_empty(&plugin_ptr->measure_ports))
-  {
-    node_ptr = plugin_ptr->measure_ports.next;
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    assert(PORT_IS_OUTPUT(port_ptr));
-
-    list_del(node_ptr);
-
-    zynjacku_free_port(port_ptr);
-  }
-
-#if HAVE_DYNPARAMS
-  while (!list_empty(&plugin_ptr->dynparam_ports))
-  {
-    node_ptr = plugin_ptr->dynparam_ports.next;
-    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
-
-    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
-
-    list_del(node_ptr);
-
-    free(port_ptr);
-  }
-#endif
 }
 
 gboolean
@@ -1034,6 +995,8 @@ zynjacku_plugin_destruct(
   ZynjackuPlugin * plugin_obj_ptr)
 {
   struct zynjacku_plugin * plugin_ptr;
+  struct list_head * node_ptr;
+  struct zynjacku_port * port_ptr;
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
@@ -1046,7 +1009,67 @@ zynjacku_plugin_destruct(
     zynjacku_gtk2gui_destroy(plugin_ptr->gtk2gui);
   }
 
-  plugin_ptr->free_ports(G_OBJECT(plugin_obj_ptr));
+  while (!list_empty(&plugin_ptr->midi_ports))
+  {
+    node_ptr = plugin_ptr->midi_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    list_del(node_ptr);
+
+    zynjacku_free_port(port_ptr);
+  }
+
+  while (!list_empty(&plugin_ptr->audio_ports))
+  {
+    node_ptr = plugin_ptr->audio_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(port_ptr->type == PORT_TYPE_AUDIO);
+
+    plugin_ptr->unregister_port(plugin_ptr->engine_object_ptr, port_ptr);
+
+    list_del(node_ptr);
+
+    zynjacku_free_port(port_ptr);
+  }
+
+  while (!list_empty(&plugin_ptr->parameter_ports))
+  {
+    node_ptr = plugin_ptr->parameter_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(PORT_IS_INPUT(port_ptr));
+
+    list_del(node_ptr);
+
+    zynjacku_free_port(port_ptr);
+  }
+
+  while (!list_empty(&plugin_ptr->measure_ports))
+  {
+    node_ptr = plugin_ptr->measure_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(PORT_IS_OUTPUT(port_ptr));
+
+    list_del(node_ptr);
+
+    zynjacku_free_port(port_ptr);
+  }
+
+#if HAVE_DYNPARAMS
+  while (!list_empty(&plugin_ptr->dynparam_ports))
+  {
+    node_ptr = plugin_ptr->dynparam_ports.next;
+    port_ptr = list_entry(node_ptr, struct zynjacku_port, plugin_siblings);
+
+    assert(port_ptr->type == PORT_TYPE_DYNPARAM);
+
+    list_del(node_ptr);
+
+    free(port_ptr);
+  }
+#endif
 
 #if HAVE_DYNPARAMS
   if (plugin_ptr->dynparams != NULL)
@@ -1748,6 +1771,307 @@ zynjacku_plugin_set_midi_cc_map(
   LOG_DEBUG("zynjacku_plugin_set_midi_cc_map() called, context %p", port_ptr);
 
   return zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
+}
+
+static
+struct zynjacku_port *
+new_lv2parameter_port(
+  uint32_t index,
+  const char * symbol,
+  const char * name,
+  unsigned int type,
+  bool input,
+  bool msgcontext,
+  struct zynjacku_plugin * plugin_ptr)
+{
+  struct zynjacku_port * port_ptr;
+
+  port_ptr = malloc(sizeof(struct zynjacku_port));
+  if (port_ptr == NULL)
+  {
+    LOG_ERROR("malloc() failed to allocate memory for struct zynjacku_port.");
+    goto fail;
+  }
+
+  port_ptr->index = index;
+  port_ptr->type = type;
+  port_ptr->flags = 0;
+  port_ptr->ui_context = NULL;
+  port_ptr->plugin_ptr = plugin_ptr;
+  port_ptr->midi_cc_map_obj_ptr = NULL;
+
+  port_ptr->symbol = strdup(symbol);
+  if (port_ptr->symbol == NULL)
+  {
+    LOG_ERROR("strdup() failed.");
+    goto fail_free_port;
+  }
+
+  if (name != NULL)
+  {
+    port_ptr->name = strdup(name);
+    if (port_ptr->name == NULL)
+    {
+      LOG_ERROR("strdup() failed.");
+      goto fail_free_symbol;
+    }
+  }
+  else
+  {
+    port_ptr->name = NULL;
+  }
+
+  if (!input)
+  {
+    port_ptr->flags |= PORT_FLAGS_OUTPUT;
+  }
+
+  if (msgcontext)
+  {
+    port_ptr->flags |= PORT_FLAGS_MSGCONTEXT;
+  }
+
+  return port_ptr;
+      
+fail_free_symbol:
+  free(port_ptr->symbol);
+
+fail_free_port:
+  free(port_ptr);
+
+fail:
+  return NULL;
+}
+
+gboolean
+zynjacku_plugin_create_oldmidi_input_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  LOG_DEBUG("zynjacku_plugin_create_oldmidi_input_port(%u, %s).", (unsigned int)port_index, symbol);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    NULL,
+    PORT_TYPE_MIDI,
+    true, /* input port */
+    false,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  port_ptr->data.audio = NULL;
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->midi_ports);
+
+  return true;
+}
+
+gboolean
+zynjacku_plugin_create_eventmidi_input_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  LOG_DEBUG("zynjacku_plugin_create_eventmidi_input_port(%u, %s).", (unsigned int)port_index, symbol);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    NULL,
+    PORT_TYPE_EVENT_MIDI,
+    true, /* input port */
+    false,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->midi_ports);
+
+  return true;
+}
+
+gboolean
+zynjacku_plugin_create_audio_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  gboolean input)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  LOG_DEBUG("zynjacku_plugin_create_audio_port(%u, %s, %s).", (unsigned int)port_index, symbol, input ? "input" : "output");
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    NULL,
+    PORT_TYPE_AUDIO,
+    input,
+    false,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  port_ptr->data.audio = NULL;
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->audio_ports);
+
+  return true;
+}
+
+gboolean
+zynjacku_plugin_create_float_parameter_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  const gchar * name,
+  gboolean msgcontext,
+  gboolean default_provided,
+  gfloat default_value,
+  gboolean min_provided,
+  gfloat min_value,
+  gboolean max_provided,
+  gfloat max_value)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  LOG_DEBUG("zynjacku_plugin_create_float_parameter_port(%u, %s, %s).", (unsigned int)port_index, symbol, name);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    name,
+    PORT_TYPE_LV2_FLOAT,
+    true, /* input port */
+    msgcontext,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  port_ptr->data.lv2float.default_value_provided = default_provided;
+  port_ptr->data.lv2float.value = default_value;
+  port_ptr->data.lv2float.min_provided = min_provided;
+  port_ptr->data.lv2float.min = min_value;
+  port_ptr->data.lv2float.max_provided = max_provided;
+  port_ptr->data.lv2float.max = max_value;
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
+
+  return true;
+}
+
+gboolean
+zynjacku_plugin_create_float_measure_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  gboolean msgcontext)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    NULL,
+    PORT_TYPE_LV2_FLOAT,
+    false, /* output port */
+    msgcontext,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->measure_ports);
+
+  return true;
+}
+
+gboolean
+zynjacku_plugin_create_string_parameter_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  const gchar * name,
+  gboolean msgcontext,
+  const gchar * default_value,
+  gsize maxlen)
+{
+  struct zynjacku_plugin * plugin_ptr;
+  struct zynjacku_port * port_ptr;
+  size_t defval_len;
+
+  LOG_DEBUG("zynjacku_plugin_create_string_parameter_port(%u, %s, %s, %s, %s).", (unsigned int)port_index, symbol, name, msgcontext ? "true" : "false", default_value);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  port_ptr = new_lv2parameter_port(
+    port_index,
+    symbol,
+    name,
+    PORT_TYPE_LV2_STRING,
+    true, /* input port */
+    msgcontext,
+    plugin_ptr);
+  if (port_ptr == NULL)
+  {
+    return false;
+  }
+
+  port_ptr->data.lv2string.storage = maxlen;
+
+  if (default_value == NULL)
+  {
+    default_value = "";
+  }
+
+  defval_len = strlen(default_value) + 1;
+
+  if (defval_len > port_ptr->data.lv2string.storage)
+  {
+    port_ptr->data.lv2string.storage = defval_len;
+  }
+
+  port_ptr->data.lv2string.data = malloc(port_ptr->data.lv2string.storage);
+  memcpy(port_ptr->data.lv2string.data, default_value, defval_len);
+
+  port_ptr->data.lv2string.len = defval_len - 1;
+  port_ptr->data.lv2string.flags = LV2_STRING_DATA_CHANGED_FLAG;
+  port_ptr->data.lv2string.pad = 0;
+
+  list_add_tail(&port_ptr->plugin_siblings, &plugin_ptr->parameter_ports);
+
+  return true;
 }
 
 gboolean

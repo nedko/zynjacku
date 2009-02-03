@@ -133,6 +133,56 @@ zynjacku_plugin_set_midi_cc_map(
   gchar * string_context,
   GObject * midi_cc_map_obj_ptr);
 
+gboolean
+zynjacku_plugin_create_oldmidi_input_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol);
+
+gboolean
+zynjacku_plugin_create_eventmidi_input_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol);
+
+gboolean
+zynjacku_plugin_create_audio_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  gboolean input);
+
+gboolean
+zynjacku_plugin_create_float_parameter_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  const gchar * name,
+  gboolean msgcontext,
+  gboolean default_provided,
+  gfloat default_value,
+  gboolean min_provided,
+  gfloat min_value,
+  gboolean max_provided,
+  gfloat max_value);
+
+gboolean
+zynjacku_plugin_create_float_measure_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  gboolean msgcontext);
+
+gboolean
+zynjacku_plugin_create_string_parameter_port(
+  ZynjackuPlugin * plugin_obj_ptr,
+  guint port_index,
+  const gchar * symbol,
+  const gchar * name,
+  gboolean msgcontext,
+  const gchar * default_value,
+  gsize maxlen);
+
 G_END_DECLS
 
 #endif /* #ifndef PLUGIN_H__0C38A6AD_527B_4795_8711_3606AC3A16BD__INCLUDED */
