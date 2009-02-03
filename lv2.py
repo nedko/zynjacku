@@ -251,6 +251,9 @@ class LV2DB:
         return self.plugins
         
     def getPluginInfo(self, uri):
+        if not self.manifests.bySubject.has_key(uri):
+            return None
+
         if uri not in self.plugin_info:
             world = SimpleRDFModel()
             world.copyFrom(self.manifests)

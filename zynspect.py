@@ -3,15 +3,9 @@ import os
 import sys
 import lv2
 
-db = lv2.LV2DB()
-plugins = db.getPluginList()
-
-for uri in plugins:
-    plugin = db.getPluginInfo(uri)
-    if plugin == None:
-        continue
+def show_plugin_info(plugin):
     print "Plugin: %s" % plugin.name
-    print "URI: %s" % uri
+    print "URI: %s" % plugin.uri
     if plugin.microname != None:
         print "Tiny name: %s" % plugin.microname
     if plugin.maintainers:
@@ -46,3 +40,34 @@ for uri in plugins:
                 print "       Scale point %s: %s" % (sp[1], sp[0])
         #print port
     print 
+
+def list_plugins(verbose):
+    plugins = db.getPluginList()
+
+    for uri in plugins:
+        if verbose:
+            plugin = db.getPluginInfo(uri)
+            if plugin == None:
+                continue
+            show_plugin_info(plugin)
+        else:
+            print uri
+
+db = lv2.LV2DB()
+
+if len(sys.argv) >= 2:
+    if sys.argv[1] == "dump":
+        list_plugins(True)
+    else:
+        uri = sys.argv[1]
+
+        plugin = db.getPluginInfo(uri)
+
+        if plugin == None:
+            print 'Plugin URI "%s" is unknown' % uri
+            sys.exit(1)
+
+        show_plugin_info(plugin)
+
+else:
+    list_plugins(False)
