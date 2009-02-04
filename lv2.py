@@ -14,6 +14,9 @@ rdf_type = rdf + "type"
 tinyname_uri = "http://lv2plug.in/ns/dev/tiny-name"
 foaf = "http://xmlns.com/foaf/0.1/"
 doap = "http://usefulinc.com/ns/doap#"
+lv2ui = "http://lv2plug.in/ns/extensions/ui#"
+lv2ui_ui = lv2ui + "ui"
+lv2ui_binary = lv2ui + "binary"
 
 event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
@@ -198,6 +201,10 @@ class LV2Plugin(object):
     def __init__(self):
         pass
         
+class LV2UI(object):
+    def __init__(self):
+        pass
+        
 class LV2DB:
     def __init__(self, debug = False):
         self.debug = debug
@@ -344,5 +351,21 @@ class LV2DB:
         ports.sort(lambda x, y: cmp(x.index, y.index))
         dest.ports = ports
         dest.portDict = portDict
+
+        if info.bySubject[uri].has_key(lv2ui_ui):
+            dest.ui = info.bySubject[uri][lv2ui_ui]
+        else:
+            dest.ui = []
+
         return dest
 
+    def get_ui_info(self, plugin_uri, uri):
+        info = self.plugin_info[plugin_uri]
+
+        dest = LV2Plugin()
+        dest.uri = uri
+        dest.binary = info.getProperty(uri, lv2ui_binary)[0]
+        dest.requiredFeatures = info.getProperty(uri, lv2ui + "requiredFeature", optional = True)
+        dest.optionalFeatures = info.getProperty(uri, lv2ui + "optionalFeature", optional = True)
+
+        return dest

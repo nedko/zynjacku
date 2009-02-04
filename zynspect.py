@@ -39,7 +39,18 @@ def show_plugin_info(plugin):
             for sp in splist:
                 print "       Scale point %s: %s" % (sp[1], sp[0])
         #print port
-    print 
+    print
+
+    if plugin.ui:
+        print "UI bundles:"
+        for ui_uri in plugin.ui:
+            print "    " + ui_uri
+            ui = db.get_ui_info(plugin.uri, ui_uri)
+            print "        Binary: " + ui.binary
+            print "        Required features: " + repr(ui.requiredFeatures)
+            print "        Optional features: " + repr(ui.optionalFeatures)
+        print
+    print
 
 def list_plugins(verbose):
     plugins = db.getPluginList()
