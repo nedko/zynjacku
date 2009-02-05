@@ -22,6 +22,9 @@ event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
 }
 
+def uniq_seq(seq):
+    return {}.fromkeys(seq).keys()
+
 class DumpRDFModel:
     def addTriple(self, s, p, o):
         print "%s [%s] %s" % (s, p, repr(o))
@@ -353,7 +356,7 @@ class LV2DB:
         dest.portDict = portDict
 
         if info.bySubject[uri].has_key(lv2ui_ui):
-            dest.ui = info.bySubject[uri][lv2ui_ui]
+            dest.ui = uniq_seq(info.bySubject[uri][lv2ui_ui])
         else:
             dest.ui = []
 
