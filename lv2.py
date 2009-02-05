@@ -279,6 +279,7 @@ class LV2DB:
         info = self.plugin_info[uri]
         dest = LV2Plugin()
         dest.uri = uri
+        dest.binary = info.bySubject[uri][lv2 + 'binary'][0]
         dest.name = info.bySubject[uri][doap + 'name'][0]
         dest.license = info.bySubject[uri][doap + 'license'][0]
         dest.classes = info.bySubject[uri]["a"]

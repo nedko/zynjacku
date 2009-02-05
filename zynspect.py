@@ -14,6 +14,7 @@ def show_plugin_info(plugin):
     print "Classes: %s" % plugin.classes
     print "Required features: %s" % list(plugin.requiredFeatures)
     print "Optional features: %s" % list(plugin.optionalFeatures)
+    print "Binary: " + plugin.binary
     print "Ports:"
     types = ["Audio", "Control", "Event", "Input", "Output", "String", "LarslMidi"]
     for port in plugin.ports:
