@@ -233,7 +233,24 @@ class LV2DB:
         self.initManifests()
         
     def initManifests(self):
-        lv2path = ["/usr/lib/lv2", "/usr/local/lib/lv2"]
+        if os.environ.has_key("LV2_PATH"):
+            lv2path = os.environ["LV2_PATH"].split(':')
+        else:
+            lv2path = []
+
+            if os.environ.has_key("HOME"):
+                if sys.platform == "darwin":
+                    lv2path.append(os.environ["HOME"] + "/Library/Audio/Plug-Ins/LV2")
+                else:
+                    lv2path.append(os.environ["HOME"] + "/.lv2")
+
+            if sys.platform == "darwin":
+                lv2path.append("/Library/Audio/Plug-Ins/LV2")
+
+            lv2path += ["/usr/local/lib/lv2", "/usr/lib/lv2"]
+
+            print "LV2_PATH not set, defaulting to %s" % repr(lv2path)
+
         self.manifests = SimpleRDFModel()
         self.paths = {}
         self.plugin_info = dict()
