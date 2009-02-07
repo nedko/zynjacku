@@ -33,6 +33,22 @@ def show_plugin_info(plugin):
                 else:
                     s.append(evt)
             extra.append("events=%s" % ",".join(s))
+        if len(port.properties):
+            s = list()
+            for prop in port.properties:
+                if prop in lv2.port_property_names:
+                    s.append(lv2.port_property_names[prop])
+                else:
+                    s.append(prop)
+            extra.append("properties=%s" % ",".join(s))
+        if len(port.contexts):
+            s = list()
+            for context in port.contexts:
+                if context in lv2.context_names:
+                    s.append(lv2.context_names[context])
+                else:
+                    s.append(context)
+            extra.append("contexts=%s" % ",".join(s))
         print "%4s %-20s %-40s %s" % (port.index, port.symbol, port.name, ", ".join(extra))
         splist = port.scalePoints
         splist.sort(lambda x, y: cmp(x[1], y[1]))
@@ -47,6 +63,7 @@ def show_plugin_info(plugin):
         for ui_uri in plugin.ui:
             print "    " + ui_uri
             ui = db.get_ui_info(plugin.uri, ui_uri)
+            print "        Type: " + ui.type
             print "        Binary: " + ui.binary
             print "        Required features: " + repr(ui.requiredFeatures)
             print "        Optional features: " + repr(ui.optionalFeatures)
