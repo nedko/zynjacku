@@ -7,6 +7,7 @@ import zynjacku_ttl
 lv2 = "http://lv2plug.in/ns/lv2core#"
 lv2evt = "http://lv2plug.in/ns/ext/event#"
 lv2str = "http://lv2plug.in/ns/dev/string-port#"
+lv2ctx = "http://lv2plug.in/ns/dev/contexts#"
 rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 epi = "http://lv2plug.in/ns/dev/extportinfo#"
@@ -20,6 +21,24 @@ lv2ui_binary = lv2ui + "binary"
 
 event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
+}
+
+port_property_names = {
+    "http://lv2plug.in/ns/lv2core#reportsLatency": "reportsLatency",
+    "http://lv2plug.in/ns/lv2core#toggled": "toggled",
+    "http://lv2plug.in/ns/lv2core#integer": "integer",
+    "http://lv2plug.in/ns/lv2core#connectionOptional": "connectionOptional",
+    "http://lv2plug.in/ns/lv2core#sampleRate": "sampleRate",
+    "http://lv2plug.in/ns/dev/extportinfo#hasStrictBounds": "hasStrictBounds",
+    "http://lv2plug.in/ns/dev/extportinfo#logarithmic": "logarithmic",
+    "http://lv2plug.in/ns/dev/extportinfo#notAutomatic": "notAutomatic",
+    "http://lv2plug.in/ns/dev/extportinfo#trigger": "trigger",
+    "http://lv2plug.in/ns/dev/extportinfo#outputGain": "outputGain",
+    "http://lv2plug.in/ns/dev/extportinfo#reportsBpm": "reportsBpm",
+}
+
+context_names = {
+    "http://lv2plug.in/ns/dev/contexts#MessageContext": "MessageContext",
 }
 
 def uniq_seq(seq):
@@ -350,6 +369,7 @@ class LV2DB:
             pdata.microname = info.getProperty(psubj, [tinyname_uri], optional = True, single = True)
             pdata.properties = set(info.getProperty(psubj, [lv2 + "portProperty"], optional = True))
             pdata.events = set(info.getProperty(psubj, [lv2evt + "supportsEvent"], optional = True))
+            pdata.contexts = set(info.getProperty(psubj, [lv2ctx + "context"], optional = True))
             ports.append(pdata)
             portDict[pdata.uri] = pdata
         ports.sort(lambda x, y: cmp(x.index, y.index))
@@ -368,6 +388,7 @@ class LV2DB:
 
         dest = LV2Plugin()
         dest.uri = uri
+        dest.type = set(info.getProperty(uri, "a")).intersection(set([lv2ui + 'GtkUI', lv2ui + 'external'])).pop()
         dest.binary = info.getProperty(uri, lv2ui_binary)[0]
         dest.requiredFeatures = info.getProperty(uri, lv2ui + "requiredFeature", optional = True)
         dest.optionalFeatures = info.getProperty(uri, lv2ui + "optionalFeature", optional = True)
