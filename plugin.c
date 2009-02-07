@@ -23,15 +23,22 @@
 
 #include "config.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include <locale.h>
 #include <unistd.h>
-#include <slv2/slv2.h>
-//#include <slv2/query.h>
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <glib-object.h>
+
+#include <lv2.h>
+#if HAVE_DYNPARAMS
+#include <lv2dynparam/lv2dynparam.h>
+#include <lv2dynparam/lv2_rtmempool.h>
+#include <lv2dynparam/host.h>
+#endif
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"
@@ -40,11 +47,6 @@
 #include "list.h"
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
-#if HAVE_DYNPARAMS
-#include <lv2dynparam/lv2dynparam.h>
-#include <lv2dynparam/lv2_rtmempool.h>
-#include <lv2dynparam/host.h>
-#endif
 
 #include "plugin.h"
 #include "engine.h"
@@ -59,9 +61,6 @@
 
 #include "zynjacku.h"
 #include "plugin_internal.h"
-#include "plugin_repo.h"
-#include "synth.h"
-#include "effect.h"
 #include "midi_cc_map.h"
 #include "midi_cc_map_internal.h"
 
@@ -84,6 +83,9 @@
 
 /* properties */
 #define ZYNJACKU_PLUGIN_PROP_URI                1
+#define ZYNJACKU_PLUGIN_PROP_DLPATH             2
+#define ZYNJACKU_PLUGIN_PROP_BUNDLE_PATH        3
+#define ZYNJACKU_PLUGIN_PROP_NAME               4
 
 static guint g_zynjacku_plugin_signals[ZYNJACKU_PLUGIN_SIGNALS_COUNT];
 
@@ -189,6 +191,24 @@ zynjacku_plugin_dispose(GObject * obj)
     plugin_ptr->uri = NULL;
   }
 
+  if (plugin_ptr->dlpath != NULL)
+  {
+    g_free(plugin_ptr->dlpath);
+    plugin_ptr->dlpath = NULL;
+  }
+
+  if (plugin_ptr->bundle_path != NULL)
+  {
+    g_free(plugin_ptr->bundle_path);
+    plugin_ptr->bundle_path = NULL;
+  }
+
+  if (plugin_ptr->name != NULL)
+  {
+    g_free(plugin_ptr->name);
+    plugin_ptr->name = NULL;
+  }
+
   /* Chain up to the parent class */
   G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS(obj)))->dispose(obj);
 }
@@ -233,6 +253,36 @@ zynjacku_plugin_set_property(
     plugin_ptr->uri = g_value_dup_string(value_ptr);
     LOG_DEBUG("plugin uri set to: \"%s\"", plugin_ptr->uri);
     break;
+  case ZYNJACKU_PLUGIN_PROP_DLPATH:
+    //LOG_DEBUG("setting plugin dlpath to: \"%s\"", g_value_get_string(value_ptr));
+    //break;
+    if (plugin_ptr->dlpath != NULL)
+    {
+      g_free(plugin_ptr->dlpath);
+    }
+    plugin_ptr->dlpath = g_value_dup_string(value_ptr);
+    LOG_DEBUG("plugin dlpath set to: \"%s\"", plugin_ptr->dlpath);
+    break;
+  case ZYNJACKU_PLUGIN_PROP_BUNDLE_PATH:
+    //LOG_DEBUG("setting plugin bundle path to: \"%s\"", g_value_get_string(value_ptr));
+    //break;
+    if (plugin_ptr->bundle_path != NULL)
+    {
+      g_free(plugin_ptr->bundle_path);
+    }
+    plugin_ptr->bundle_path = g_value_dup_string(value_ptr);
+    LOG_DEBUG("plugin bundle path set to: \"%s\"", plugin_ptr->bundle_path);
+    break;
+  case ZYNJACKU_PLUGIN_PROP_NAME:
+    //LOG_DEBUG("setting plugin name to: \"%s\"", g_value_get_string(value_ptr));
+    //break;
+    if (plugin_ptr->name != NULL)
+    {
+      g_free(plugin_ptr->name);
+    }
+    plugin_ptr->name = g_value_dup_string(value_ptr);
+    LOG_DEBUG("plugin name set to: \"%s\"", plugin_ptr->name);
+    break;
   default:
     /* We don't have any other property... */
     G_OBJECT_WARN_INVALID_PROPERTY_ID(object_ptr, property_id, param_spec_ptr);
@@ -263,6 +313,36 @@ zynjacku_plugin_get_property(
       g_value_set_string(value_ptr, "");
     }
     break;
+  case ZYNJACKU_PLUGIN_PROP_DLPATH:
+    if (plugin_ptr->dlpath != NULL)
+    {
+      g_value_set_string(value_ptr, plugin_ptr->dlpath);
+    }
+    else
+    {
+      g_value_set_string(value_ptr, "");
+    }
+    break;
+  case ZYNJACKU_PLUGIN_PROP_BUNDLE_PATH:
+    if (plugin_ptr->bundle_path != NULL)
+    {
+      g_value_set_string(value_ptr, plugin_ptr->bundle_path);
+    }
+    else
+    {
+      g_value_set_string(value_ptr, "");
+    }
+    break;
+  case ZYNJACKU_PLUGIN_PROP_NAME:
+    if (plugin_ptr->name != NULL)
+    {
+      g_value_set_string(value_ptr, plugin_ptr->name);
+    }
+    else
+    {
+      g_value_set_string(value_ptr, "");
+    }
+    break;
   default:
     /* We don't have any other property... */
     G_OBJECT_WARN_INVALID_PROPERTY_ID(object_ptr, property_id, param_spec_ptr);
@@ -275,7 +355,7 @@ zynjacku_plugin_class_init(
   gpointer class_ptr,
   gpointer class_data_ptr)
 {
-  GParamSpec * uri_param_spec;
+  GParamSpec * param_spec;
 
   LOG_DEBUG("zynjacku_plugin_class_init() called.");
 
@@ -509,17 +589,53 @@ zynjacku_plugin_class_init(
   G_OBJECT_CLASS(class_ptr)->get_property = zynjacku_plugin_get_property;
   G_OBJECT_CLASS(class_ptr)->set_property = zynjacku_plugin_set_property;
 
-  uri_param_spec = g_param_spec_string(
+  param_spec = g_param_spec_string(
     "uri",
-    "Plugin LV2 URI construct property",
-    "Plugin LV2 URI construct property",
+    "Plugin URI",
+    "Plugin URI",
     "" /* default value */,
     G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
 
   g_object_class_install_property(
     G_OBJECT_CLASS(class_ptr),
     ZYNJACKU_PLUGIN_PROP_URI,
-    uri_param_spec);
+    param_spec);
+
+  param_spec = g_param_spec_string(
+    "dlpath",
+    "Path to plugin binary",
+    "Path to plugin binary",
+    "" /* default value */,
+    G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
+
+  g_object_class_install_property(
+    G_OBJECT_CLASS(class_ptr),
+    ZYNJACKU_PLUGIN_PROP_DLPATH,
+    param_spec);
+
+  param_spec = g_param_spec_string(
+    "bundle_path",
+    "Path to plugin bundle",
+    "Path to plugin bundle",
+    "" /* default value */,
+    G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
+
+  g_object_class_install_property(
+    G_OBJECT_CLASS(class_ptr),
+    ZYNJACKU_PLUGIN_PROP_BUNDLE_PATH,
+    param_spec);
+
+  param_spec = g_param_spec_string(
+    "name",
+    "Plugin name",
+    "Plugin name",
+    "" /* default value */,
+    G_PARAM_CONSTRUCT_ONLY |G_PARAM_READWRITE);
+
+  g_object_class_install_property(
+    G_OBJECT_CLASS(class_ptr),
+    ZYNJACKU_PLUGIN_PROP_NAME,
+    param_spec);
 }
 
 static void
@@ -542,10 +658,13 @@ zynjacku_plugin_init(
   INIT_LIST_HEAD(&plugin_ptr->dynparam_ports);
 #endif
 
-  plugin_ptr->type = PLUGIN_TYPE_UNKNOWN;
-
   plugin_ptr->uri = NULL;
+  plugin_ptr->name = NULL;
+  plugin_ptr->id = NULL;
+  plugin_ptr->dlpath = NULL;
+  plugin_ptr->bundle_path = NULL;
   plugin_ptr->lv2plugin = NULL;
+  plugin_ptr->gtk2gui = ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE;
 
   plugin_ptr->root_group_ui_context = NULL;
 }
@@ -710,41 +829,42 @@ zynjacku_plugin_generic_lv2_ui_off(
 }
 
 gboolean
-zynjacku_plugin_supports_generic_ui(
-  ZynjackuPlugin * plugin_obj_ptr)
-{
-//  struct zynjacku_plugin * plugin_ptr;
-
-  LOG_DEBUG("zynjacku_plugin_supports_generic_ui() called.");
-
-//  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-
-  /* we can generate it always */
-  return TRUE;
-}
-
-gboolean
-zynjacku_plugin_supports_custom_ui(
-  ZynjackuPlugin * plugin_obj_ptr)
-{
-  struct zynjacku_plugin * plugin_ptr;
-
-  LOG_DEBUG("zynjacku_plugin_supports_custom_ui() called.");
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-
-  return (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE) ? TRUE : FALSE;
-}
-
-gboolean
 zynjacku_plugin_ui_on(
-  ZynjackuPlugin * plugin_obj_ptr)
+  ZynjackuPlugin * plugin_obj_ptr,
+  const char * ui_uri,
+  const char * ui_type_uri,
+  const char * ui_binary_path,
+  const char * ui_bundle_path)
 {
   struct zynjacku_plugin * plugin_ptr;
+  const LV2_Feature * const * host_features;
+  unsigned int host_feature_count;
 
-  LOG_DEBUG("zynjacku_plugin_ui_on() called.");
+  LOG_DEBUG("zynjacku_plugin_ui_on(%s, %s, %s, %s) called.", ui_uri, ui_type_uri, ui_binary_path, ui_bundle_path);
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+  if (ui_uri != NULL &&
+      ui_type_uri != NULL &&
+      ui_binary_path != NULL &&
+      ui_bundle_path != NULL)
+  {
+    plugin_ptr->get_required_features(plugin_ptr->engine_object_ptr, &host_features, &host_feature_count);
+
+    plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(
+      host_features,
+      host_feature_count,
+      plugin_ptr->lv2plugin,
+      plugin_ptr,
+      plugin_obj_ptr,
+      ui_type_uri,
+      plugin_ptr->uri,
+      ui_uri,
+      ui_binary_path,
+      ui_bundle_path,
+      plugin_ptr->id,
+      &plugin_ptr->parameter_ports);
+  }
 
   if (plugin_ptr->gtk2gui != ZYNJACKU_GTK2GUI_HANDLE_INVALID_VALUE)
   {
@@ -798,8 +918,9 @@ zynjacku_plugin_ui_off(
   {
     zynjacku_gtk2gui_ui_off(plugin_ptr->gtk2gui);
   }
+  else
 #if HAVE_DYNPARAMS
-  else if (plugin_ptr->dynparams)
+  if (plugin_ptr->dynparams)
   {
     lv2dynparam_host_ui_off(plugin_ptr->dynparams);
   }
@@ -875,11 +996,8 @@ zynjacku_connect_plugin_ports(
       switch (port_ptr->type)
       {
       case PORT_TYPE_LV2_FLOAT:
-        if (port_ptr->data.lv2float.default_value_provided)
-        {
-          zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float.value);
-          LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.lv2float.value);
-        }
+        zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2float.value);
+        LOG_INFO("Set %s to %f", port_ptr->symbol, port_ptr->data.lv2float.value);
         break;
       case PORT_TYPE_LV2_STRING:
         zynjacku_lv2_connect_port(plugin_ptr->lv2plugin, port_ptr, &port_ptr->data.lv2string);
@@ -952,42 +1070,6 @@ zynjacku_free_port(
 
   free(port_ptr->symbol);
   free(port_ptr);
-}
-
-gboolean
-zynjacku_plugin_construct(
-  ZynjackuPlugin * plugin_obj_ptr,
-  GObject * engine_object_ptr)
-{
-  struct zynjacku_plugin * plugin_ptr;
-
-  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
-
-  if (plugin_ptr->uri == NULL)
-  {
-    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
-    return false;
-  }
-
-  if (ZYNJACKU_IS_ENGINE(engine_object_ptr))
-  {
-    return zynjacku_plugin_construct_synth(
-      plugin_ptr,
-      plugin_obj_ptr,
-      engine_object_ptr);
-  }
-
-  if (ZYNJACKU_IS_RACK(engine_object_ptr))
-  {
-    return zynjacku_plugin_construct_effect(
-      plugin_ptr,
-      plugin_obj_ptr,
-      engine_object_ptr);
-  }
-
-  LOG_ERROR("Cannot construct plugin for unknown engine type");
-
-  return false;
 }
 
 void
@@ -1773,6 +1855,25 @@ zynjacku_plugin_set_midi_cc_map(
   return zynjacku_plugin_set_midi_cc_map_internal(port_ptr, midi_cc_map_obj_ptr);
 }
 
+void
+zynjacku_plugin_add_supported_feature(
+  ZynjackuPlugin * plugin_obj_ptr,
+  const gchar * feature_uri)
+{
+  struct zynjacku_plugin * plugin_ptr;
+
+  LOG_ERROR("Plugin supports feature '%s'", feature_uri);
+
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
+
+#if HAVE_DYNPARAMS
+  if (strcmp(feature_uri, LV2DYNPARAM_URI) == 0)
+  {
+    plugin_ptr->dynparams_supported = true;
+  }
+#endif
+}
+
 static
 struct zynjacku_port *
 new_lv2parameter_port(
@@ -1975,8 +2076,23 @@ zynjacku_plugin_create_float_parameter_port(
     return false;
   }
 
-  port_ptr->data.lv2float.default_value_provided = default_provided;
-  port_ptr->data.lv2float.value = default_value;
+  if (default_provided)
+  {
+    port_ptr->data.lv2float.value = default_value;
+  }
+  else if (min_provided)
+  {
+    port_ptr->data.lv2float.value = min_value;
+  }
+  else if (max_provided)
+  {
+    port_ptr->data.lv2float.value = min_value;
+  }
+  else
+  {
+    port_ptr->data.lv2float.value = 0.0;
+  }
+
   port_ptr->data.lv2float.min_provided = min_provided;
   port_ptr->data.lv2float.min = min_value;
   port_ptr->data.lv2float.max_provided = max_provided;

@@ -1403,8 +1403,12 @@ class PluginUI(gobject.GObject):
         '''Hide synth window'''
 
 class PluginUICustom(PluginUI):
-    def __init__(self, plugin):
+    def __init__(self, plugin, ui_uri, ui_type_uri, ui_binary_path, ui_bundle_path):
         PluginUI.__init__(self, plugin)
+        self.ui_uri = ui_uri
+        self.ui_type_uri = ui_type_uri
+        self.ui_binary_path = ui_binary_path
+        self.ui_bundle_path = ui_bundle_path
 
         self.plugin.connect("custom-gui-off", self.on_window_destroy)
 
@@ -1414,7 +1418,7 @@ class PluginUICustom(PluginUI):
 
     def show(self):
         '''Show synth window'''
-        return self.plugin.ui_on()
+        return self.plugin.ui_on(self.ui_uri, self.ui_type_uri, self.ui_binary_path, self.ui_bundle_path)
 
     def hide(self):
         '''Hide synth window'''
@@ -2182,6 +2186,8 @@ class host:
 
         self.available_plugins = []
 
+        self.lv2db = lv2.LV2DB()
+
     def lash_check_events(self):
         while lash.lash_get_pending_event_count(self.lash_client):
             event = lash.lash_get_event(self.lash_client)
@@ -2213,11 +2219,30 @@ class host:
         return True
 
     def create_plugin_ui(self, plugin, data=None):
-        if not self.plugin_ui_available(plugin):
-            return False
+        info = self.lv2db.getPluginInfo(plugin.uri)
 
-        if plugin.supports_custom_ui():
-            plugin.ui_win = PluginUICustom(plugin)
+        ui_binary_path = None
+
+        for ui_uri in info.ui:
+            ui = self.lv2db.get_ui_info(plugin.uri, ui_uri)
+            features_match = True
+            for required_feature in ui.requiredFeatures:
+                if required_feature == "http://lv2plug.in/ns/extensions/ui#makeResident":
+                    continue
+                if not required_feature in self.lv2features_supported:
+                    features_match = False
+
+            if not features_match:
+                print "Skipping UI %s because of missing required feature %s" % (ui_uri, required_feature)
+                break
+
+            ui_type_uri = ui.type
+            ui_binary_path = ui.binary
+            break
+
+        if ui_binary_path:
+            ui_bundle_path = os.path.dirname(ui.binary) + '/'
+            plugin.ui_win = PluginUICustom(plugin, ui_uri, ui_type_uri, ui_binary_path, ui_bundle_path)
         else:
             plugin.ui_win = PluginUIUniversal(plugin, self.group_shadow_type, self.layout_type)
 
@@ -2227,12 +2252,95 @@ class host:
     def on_plugin_ui_window_destroyed(self, window, plugin, data):
         return
 
-    def plugin_ui_available(self, plugin):
-        return plugin.supports_custom_ui() or plugin.supports_generic_ui()
-
     def new_plugin(self, uri, parameters=[], maps={}):
-        plugin = zynjacku.Plugin(uri=uri)
-        if not plugin.construct(self.engine):
+        info = self.lv2db.getPluginInfo(uri)
+
+        plugin = zynjacku.Plugin(
+            uri = uri,
+            name = info.name,
+            dlpath = info.binary,
+            bundle_path = os.path.dirname(info.binary) + '/')
+
+        for port in info.ports:
+            msgcontext = "http://lv2plug.in/ns/dev/contexts#MessageContext" in port.contexts
+
+            if port.isAudio and not msgcontext:
+                if not plugin.create_audio_port(port.index, port.symbol, not port.isOutput):
+                    return False
+            elif port.isLarslMidi and port.isInput and not msgcontext:
+                if not plugin.create_oldmidi_input_port(port.index, port.symbol):
+                    return False
+            elif port.isEvent and port.isInput and "http://lv2plug.in/ns/ext/midi#MidiEvent" in port.events and not msgcontext:
+                if not plugin.create_eventmidi_input_port(port.index, port.symbol):
+                    return False
+            elif port.isControl:
+                if port.isInput:
+                    default_provided = port.__dict__.has_key('defaultValue')
+                    if default_provided:
+                        default_value = float(port.defaultValue)
+                    else:
+                        default_value = 0.0
+
+                    min_provided = port.__dict__.has_key('minimum')
+                    if min_provided:
+                        min_value = float(port.minimum);
+                    else:
+                        min_value = 0.0
+
+                    max_provided = port.__dict__.has_key('maximum')
+                    if max_provided:
+                        max_value = float(port.maximum)
+                    else:
+                        max_value = 1.0
+
+                    if not plugin.create_float_parameter_port(
+                        port.index,
+                        port.symbol,
+                        port.name,
+                        msgcontext,
+                        default_provided,
+                        default_value,
+                        min_provided,
+                        min_value,
+                        max_provided,
+                        max_value):
+                        return False
+                else:
+                    if not plugin.create_float_measure_port(port.index, port.symbol, msgcontext):
+                        return False
+            elif port.isString and port.isInput:
+                maxlen = 256 # TODO: get from lv2 (requiredSpace)
+
+                default_provided = port.__dict__.has_key('defaultValue')
+                if default_provided:
+                    default_value = port.defaultValue
+                else:
+                    default_value = ""
+
+                if not plugin.create_string_parameter_port(
+                    port.index,
+                    port.symbol,
+                    port.name,
+                    msgcontext,
+                    default_value,
+                    maxlen):
+                    return False
+            else:
+                print "Port %s with not matched type" % port.symbol
+                if not "http://lv2plug.in/ns/lv2core#connectionOptional" in port.properties:
+                    return False
+
+            # TODO: tell handle scale points somehow
+            #splist = port.scalePoints
+            #splist.sort(lambda x, y: cmp(x[1], y[1]))
+            #if len(splist):
+            #    for sp in splist:
+            #        print "       Scale point %s: %s" % (sp[1], sp[0])
+
+        for feature in info.requiredFeatures + info.optionalFeatures:
+            plugin.add_supported_feature(feature)
+
+        if not self.engine.construct_plugin(plugin):
             return False
 
         for parameter in parameters:
@@ -2272,8 +2380,7 @@ class host:
             progressbar.set_text("Searching for LV2 plugins...");
             progressbar.set_fraction(0.0)
 
-            db = lv2.LV2DB()
-            plugins = db.getPluginList()
+            plugins = self.lv2db.getPluginList()
 
             step = 1.0 / len(plugins)
             progress = 0.0
@@ -2281,7 +2388,7 @@ class host:
             for uri in plugins:
                 progressbar.set_fraction(progress)
                 progressbar.set_text("Checking %s" % uri);
-                plugin = db.getPluginInfo(uri)
+                plugin = self.lv2db.getPluginInfo(uri)
                 if plugin == None:
                     continue
 
@@ -2689,7 +2796,6 @@ class ZynjackuHostMulti(ZynjackuHost):
         event_ports_count = 0
         midi_event_in_ports_count = 0
 
-        #types = ["Audio", "Control", "Event", "Input", "Output", "LarslMidi"]
         for port in plugin.ports:
             if port.isAudio:
                 if port.isInput:
@@ -2752,7 +2858,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         if not synth:
             self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
         else:
-            row = False, synth.get_instance_name(), synth.get_name(), synth.get_uri(), synth
+            row = False, synth.get_instance_name(), synth.get_name(), synth.uri, synth
             self.store.append(row)
             self.statusbar.remove(statusbar_context_id, statusbar_id)
 
@@ -2836,10 +2942,6 @@ class ZynjackuHostOne(ZynjackuHost):
         self.plugin = self.new_plugin(uri)
         if not self.plugin:
             print"Failed to construct %s" % uri
-            return
-
-        if not ZynjackuHost.plugin_ui_available(self, self.plugin):
-            print"Synth window not available"
             return
 
         if not ZynjackuHost.create_plugin_ui(self, self.plugin):

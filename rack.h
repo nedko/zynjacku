@@ -70,15 +70,15 @@ zynjacku_rack_ui_run(
 const gchar *
 zynjacku_rack_get_version();
 
-void
-zynjacku_rack_iterate_plugins(
-  ZynjackuRack * rack_obj_ptr,
-  gboolean force);
-
 const gchar *
 zynjacku_rack_get_supported_feature(
   ZynjackuRack * rack_obj_ptr,
   guint index);
+
+gboolean
+zynjacku_rack_construct_plugin(
+  ZynjackuRack * rack_obj_ptr,
+  ZynjackuPlugin * plugin_obj_ptr);
 
 G_END_DECLS
 

@@ -50,7 +50,6 @@ then
   AC_DEFINE([HAVE_DYNPARAMS], 1, [Defined if dynparam1 is present.])
 fi
 AM_CONDITIONAL(HAVE_DYNPARAMS, test "$HAVE_DYNPARAMS" = "yes")
-PKG_CHECK_MODULES(SLV2, slv2 >= 0.6.1)
 
 # JACK MIDI
 have_jackmidi="unknown"

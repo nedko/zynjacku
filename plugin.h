@@ -50,21 +50,8 @@ struct _ZynjackuPluginClass {
 /* used by ZYNJACKU_TYPE_PLUGIN */
 GType zynjacku_plugin_get_type();
 
-gboolean
-zynjacku_plugin_construct(
-  ZynjackuPlugin * plugin_obj_ptr,
-  GObject * engine_obj_ptr);
-
 void
 zynjacku_plugin_destruct(
-  ZynjackuPlugin * plugin_obj_ptr);
-
-gboolean
-zynjacku_plugin_supports_generic_ui(
-  ZynjackuPlugin * plugin_obj_ptr);
-
-gboolean
-zynjacku_plugin_supports_custom_ui(
   ZynjackuPlugin * plugin_obj_ptr);
 
 const char *
@@ -81,7 +68,11 @@ zynjacku_plugin_get_uri(
 
 gboolean
 zynjacku_plugin_ui_on(
-  ZynjackuPlugin * plugin_obj_ptr);
+  ZynjackuPlugin * plugin_obj_ptr,
+  const char * ui_uri,
+  const char * ui_type_uri,
+  const char * ui_binary_path,
+  const char * ui_bundle_path);
 
 void
 zynjacku_plugin_ui_off(
@@ -132,6 +123,11 @@ zynjacku_plugin_set_midi_cc_map(
   ZynjackuPlugin * plugin_obj_ptr,
   gchar * string_context,
   GObject * midi_cc_map_obj_ptr);
+
+void
+zynjacku_plugin_add_supported_feature(
+  ZynjackuPlugin * plugin_obj_ptr,
+  const gchar * feature_uri);
 
 gboolean
 zynjacku_plugin_create_oldmidi_input_port(

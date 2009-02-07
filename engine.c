@@ -37,7 +37,6 @@
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 #endif
-#include <slv2/lv2_ui.h>
 
 #include "lv2_contexts.h"
 #include "lv2-miditype.h"
@@ -45,6 +44,7 @@
 #include "lv2_uri_map.h"
 #include "lv2_string_port.h"
 #include "lv2_progress.h"
+#include "lv2_ui.h"
 
 #include "list.h"
 #define LOG_LEVEL LOG_LEVEL_ERROR
@@ -63,15 +63,12 @@
 #if HAVE_DYNPARAMS
 #include "rtmempool.h"
 #endif
-#include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 #include "midi_cc_map.h"
 #include "midi_cc_map_internal.h"
 
-#define ZYNJACKU_ENGINE_SIGNAL_TICK      0 /* plugin iterated */
-#define ZYNJACKU_ENGINE_SIGNAL_TACK      1 /* "good" plugin found */
-#define ZYNJACKU_ENGINE_SIGNAL_PROGRESS  2 /* plugin instantiation progress */
-#define ZYNJACKU_ENGINE_SIGNALS_COUNT    3
+#define ZYNJACKU_ENGINE_SIGNAL_PROGRESS  0 /* plugin instantiation progress */
+#define ZYNJACKU_ENGINE_SIGNALS_COUNT    1
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
@@ -190,7 +187,6 @@ zynjacku_engine_dispose(GObject * obj)
   if (engine_ptr->jack_client)
   {
     zynjacku_engine_stop_jack(ZYNJACKU_ENGINE(obj));
-    zynjacku_plugin_repo_uninit();
   }
 
   pthread_mutex_destroy(&engine_ptr->rt_lock);
@@ -227,38 +223,6 @@ zynjacku_engine_class_init(
   G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_engine_finalize;
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct zynjacku_engine));
-
-  g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TICK] =
-    g_signal_new(
-      "tick",                   /* signal_name */
-      ZYNJACKU_ENGINE_TYPE,     /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      2,                        /* n_params */
-      G_TYPE_FLOAT,             /* progress 0 .. 1 */
-      G_TYPE_STRING);           /* uri of plugin being scanned */
-
-  g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TACK] =
-    g_signal_new(
-      "tack",                   /* signal_name */
-      ZYNJACKU_ENGINE_TYPE,     /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      4,                        /* n_params */
-      G_TYPE_STRING,            /* plugin name */
-      G_TYPE_STRING,            /* plugin uri */
-      G_TYPE_STRING,            /* plugin license */
-      G_TYPE_STRING);           /* plugin author */
 
   g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_PROGRESS] =
     g_signal_new(
@@ -447,8 +411,6 @@ zynjacku_engine_init(
   assert(ZYNJACKU_ENGINE_FEATURES == count);
   engine_ptr->host_features[count] = NULL;
   /* keep in mind to update the constant when adding things here */
-
-  zynjacku_plugin_repo_init();
 }
 
 GType zynjacku_engine_get_type()
@@ -994,6 +956,7 @@ jack_process_cb(
 
 #undef engine_ptr
 
+static
 void
 zynjacku_engine_deactivate_synth(
   GObject * synth_obj_ptr)
@@ -1015,6 +978,21 @@ zynjacku_engine_deactivate_synth(
   zynjacku_lv2_deactivate(synth_ptr->lv2plugin);
 }
 
+void
+zynjacku_engine_get_required_features(
+  GObject * engine_obj_ptr,
+  const LV2_Feature * const ** host_features,
+  unsigned int * host_feature_count)
+{
+  struct zynjacku_engine * engine_ptr;
+
+  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
+
+  *host_features = engine_ptr->host_features;
+  *host_feature_count = ZYNJACKU_ENGINE_FEATURES;
+}
+
+static
 void
 zynjacku_engine_unregister_port(
   GObject * engine_obj_ptr,
@@ -1116,106 +1094,6 @@ zynjacku_engine_get_supported_feature(
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
 
   return engine_ptr->host_features[index]->URI;
-}
-
-#define engine_obj_ptr ((ZynjackuEngine *)context)
-
-bool
-zynjacku_check_plugin(
-  void * context,
-  const char * plugin_uri,
-  const char * plugin_name,
-  uint32_t audio_in_ports_count,
-  uint32_t audio_out_ports_count,
-  uint32_t midi_in_ports_count,
-  uint32_t control_ports_count,
-  uint32_t string_ports_count,
-  uint32_t event_ports_count,
-  uint32_t midi_event_in_ports_count,
-  uint32_t ports_count)
-{
-  if (midi_in_ports_count + control_ports_count + string_ports_count + event_ports_count + audio_out_ports_count != ports_count ||
-      midi_in_ports_count + midi_event_in_ports_count != 1 ||
-      audio_out_ports_count == 0)
-  {
-    LOG_DEBUG("Skipping 's' %s, [synth] plugin with unsupported port configuration", plugin_name, plugin_uri);
-    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-    LOG_DEBUG("  string ports: %d", (unsigned int)string_ports_count);
-    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-    LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
-    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
-    return false;
-  }
-
-  LOG_DEBUG("Found \"simple\" synth plugin '%s' %s", plugin_name, plugin_uri);
-  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-  LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
-  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
-  return true;
-}
-
-void
-zynjacku_engine_tick(
-  void *context,
-  float progress,               /* 0..1 */
-  const char *message)
-{
-  g_signal_emit(
-    engine_obj_ptr,
-    g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TICK],
-    0,
-    progress,
-    message);
-}
-
-void
-zynjacku_engine_tack(
-  void *context,
-  const char *uri)
-{
-  const char * name;
-  const char * license;
-  const char * author;
-
-  name = zynjacku_plugin_repo_get_name(uri);
-  license = zynjacku_plugin_repo_get_license(uri);
-  author = zynjacku_plugin_repo_get_author(uri);
-
-  g_signal_emit(
-    engine_obj_ptr,
-    g_zynjacku_engine_signals[ZYNJACKU_ENGINE_SIGNAL_TACK],
-    0,
-    name,
-    uri,
-    license,
-    author);
-}
-
-#undef engine_obj_ptr
-
-void
-zynjacku_engine_iterate_plugins(
-  ZynjackuEngine * engine_obj_ptr,
-  gboolean force)
-{
-  struct zynjacku_engine * engine_ptr;
-
-  engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_obj_ptr);
-
-  zynjacku_plugin_repo_iterate(
-    force,
-    engine_ptr->host_features,
-    engine_obj_ptr,
-    zynjacku_check_plugin,
-    zynjacku_engine_tick,
-    zynjacku_engine_tack);
 }
 
 static
@@ -1355,11 +1233,10 @@ zynjacku_midi_cc_map_cc_no_assign(
 
 #define synth_ptr (&plugin_ptr->subtype.synth)
 
-bool
-zynjacku_plugin_construct_synth(
-  struct zynjacku_plugin * plugin_ptr,
-  ZynjackuPlugin * plugin_obj_ptr,
-  GObject * engine_object_ptr)
+gboolean
+zynjacku_engine_construct_plugin(
+  ZynjackuEngine * engine_object_ptr,
+  ZynjackuPlugin * plugin_object_ptr)
 {
   static unsigned int id;
   char * port_name;
@@ -1371,51 +1248,52 @@ zynjacku_plugin_construct_synth(
   struct zynjacku_port * midi_port_ptr;
   struct zynjacku_port * audio_left_port_ptr;
   struct zynjacku_port * audio_right_port_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
   engine_ptr = ZYNJACKU_ENGINE_GET_PRIVATE(engine_object_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
 
-  plugin_ptr->type = PLUGIN_TYPE_SYNTH;
-
-  if (!zynjacku_plugin_repo_get_plugin_info(
-        plugin_ptr->uri,
-        plugin_ptr,
-        zynjacku_check_plugin,
-        engine_ptr->host_features,
-        &plugin_ptr->name
-#if HAVE_DYNPARAMS
-        , &plugin_ptr->dynparams_supported
-#endif
-        ))
+  if (plugin_ptr->uri == NULL)
   {
-    LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
+    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
     goto fail;
   }
 
-  if (!zynjacku_plugin_repo_create_plugin_ports(
-        plugin_ptr->uri,
-        plugin_obj_ptr))
+  if (plugin_ptr->name == NULL)
   {
-    LOG_ERROR("Failed to create ports for plugin %s", plugin_ptr->uri);
-    goto fail_free_name;
+    LOG_ERROR("\"name\" property needs to be set before constructing plugin");
+    goto fail;
+  }
+
+  if (plugin_ptr->dlpath == NULL)
+  {
+    LOG_ERROR("Plugin %s has no dlpath set", plugin_ptr->uri);
+    goto fail;
+  }
+
+  if (plugin_ptr->bundle_path == NULL)
+  {
+    LOG_ERROR("Plugin %s has no bundle path set", plugin_ptr->uri);
+    goto fail;
   }
 
   if (list_empty(&plugin_ptr->midi_ports))
   {
     LOG_ERROR("Cannot construct synth plugin without MIDI port. %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   midi_port_ptr = list_entry(plugin_ptr->midi_ports.next, struct zynjacku_port, plugin_siblings);
   if (!PORT_IS_INPUT(midi_port_ptr))
   {
     LOG_ERROR("Cannot construct synth plugin without MIDI inpu port. %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   if (plugin_ptr->midi_ports.next != plugin_ptr->midi_ports.prev)
   {
     LOG_ERROR("Cannot construct synth plugin with more than one MIDI input port. %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   audio_left_port_ptr = NULL;
@@ -1442,7 +1320,7 @@ zynjacku_plugin_construct_synth(
   if (audio_left_port_ptr == NULL)
   {
     LOG_ERROR("Cannot construct synth plugin without audio output port(s). %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   engine_ptr->progress.context = engine_object_ptr;
@@ -1451,6 +1329,8 @@ zynjacku_plugin_construct_synth(
 
   plugin_ptr->lv2plugin = zynjacku_lv2_load(
     plugin_ptr->uri,
+    plugin_ptr->dlpath,
+    plugin_ptr->bundle_path,
     zynjacku_engine_get_sample_rate(ZYNJACKU_ENGINE(engine_object_ptr)),
     engine_ptr->host_features);
 
@@ -1465,14 +1345,14 @@ zynjacku_plugin_construct_synth(
   if (plugin_ptr->lv2plugin == NULL)
   {
     LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   /* connect parameter/measure ports */
   if (!zynjacku_connect_plugin_ports(
         plugin_ptr,
-        plugin_obj_ptr,
-        engine_object_ptr
+        plugin_object_ptr,
+        G_OBJECT(engine_object_ptr)
 #if HAVE_DYNPARAMS
         , &engine_ptr->mempool_allocator
 #endif
@@ -1556,11 +1436,8 @@ zynjacku_plugin_construct_synth(
 
   g_object_ref(plugin_ptr->engine_object_ptr);
 
-  /* no plugins to test gtk2gui */
-  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(engine_ptr->host_features, ZYNJACKU_ENGINE_FEATURES, plugin_ptr->lv2plugin, 
-    plugin_ptr, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
-
   plugin_ptr->deactivate = zynjacku_engine_deactivate_synth;
+  plugin_ptr->get_required_features = zynjacku_engine_get_required_features;
   plugin_ptr->unregister_port = zynjacku_engine_unregister_port;
   plugin_ptr->set_midi_cc_map = zynjacku_set_midi_cc_map;
   plugin_ptr->midi_cc_map_cc_no_assign = zynjacku_midi_cc_map_cc_no_assign;
@@ -1580,9 +1457,6 @@ fail_detach_dynparams:
 
 fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);
-
-fail_free_name:
-  free(plugin_ptr->name);
 
 fail:
   return false;

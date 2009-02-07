@@ -34,7 +34,6 @@
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 #endif
-#include <slv2/lv2_ui.h>
 #include <gtk/gtk.h>
 #include <jack/jack.h>
 
@@ -43,6 +42,7 @@
 #include "lv2_uri_map.h"
 #include "lv2_data_access.h"
 #include "lv2_string_port.h"
+#include "lv2_ui.h"
 #include "lv2_external_ui.h"
 
 #include "list.h"
@@ -51,7 +51,6 @@
 #include "zynjacku.h"
 #include "plugin.h"
 #include "plugin_internal.h"
-#include "plugin_repo.h"
 
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #include "log.h"
@@ -65,15 +64,15 @@
 struct zynjacku_gtk2gui
 {
   const LV2_Feature ** host_features;
-  const char *plugin_uri;
-  char *bundle_path;
+  char * plugin_uri;
+  char * bundle_path;
   unsigned int ports_count;
   struct zynjacku_port ** ports;
-  struct zynjacku_plugin * plugin;
+  struct zynjacku_plugin * plugin_ptr;
   void * context_ptr;
-  const char * synth_id;
+  const char * instance_name;
   bool resizable;
-  void *dlhandle;
+  void * dlhandle;
   const LV2UI_Descriptor * lv2ui;
   LV2UI_Handle ui_handle;
   GtkWidget * widget_ptr;
@@ -106,29 +105,30 @@ zynjacku_gtk2gui_create(
   const LV2_Feature * const * host_features,
   unsigned int host_feature_count,
   zynjacku_lv2_handle plugin_handle,
-  struct zynjacku_plugin *plugin,
-  void *context_ptr,
-  const char *uri,
-  const char *synth_id,
-  const struct list_head *parameter_ports_ptr)
+  struct zynjacku_plugin * plugin_ptr,
+  void * context_ptr,
+  const char * ui_type_uri,
+  const char * plugin_uri,
+  const char * ui_uri,
+  const char * ui_binary_path,
+  const char * ui_bundle_path,
+  const char * plugin_instance_name,
+  const struct list_head * parameter_ports_ptr)
 {
   struct zynjacku_gtk2gui * ui_ptr;
   unsigned int ports_count;
-  struct list_head *node_ptr;
+  struct list_head * node_ptr;
   struct zynjacku_port * port_ptr;
   LV2UI_DescriptorFunction lookup;
   uint32_t index;
-  char * ui_uri;
-  char * ui_binary_path;
-  char * ui_bundle_path;
   unsigned int type;
 
-  if (zynjacku_plugin_repo_get_ui_info(uri, LV2_UI_GTK_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
+  if (strcmp(ui_type_uri, LV2_UI_GTK_URI) == 0)
   {
     LOG_NOTICE("GtkUI for '%s'", uri);
     type = UI_TYPE_GTK;
   }
-  else if (zynjacku_plugin_repo_get_ui_info(uri, LV2_EXTERNAL_UI_URI, &ui_uri, &ui_binary_path, &ui_bundle_path))
+  else if (strcmp(ui_type_uri, LV2_EXTERNAL_UI_URI) == 0)
   {
     LOG_NOTICE("External UI for '%s'", uri);
     type = UI_TYPE_EXTERNAL;
@@ -143,20 +143,26 @@ zynjacku_gtk2gui_create(
   if (ui_ptr == NULL)
   {
     LOG_ERROR("malloc() failed.");
-    goto fail_free_ui_strings;
+    goto fail;
   }
 
   ui_ptr->type = type;
 
-  ui_ptr->plugin_uri = uri;
-  ui_ptr->plugin = plugin;
+  ui_ptr->plugin_uri = strdup(plugin_uri);
+  if (ui_ptr->plugin_uri == NULL)
+  {
+    LOG_ERROR("strdup(\"%s\") failed", plugin_uri);
+    goto fail_free;
+  }
+
+  ui_ptr->plugin_ptr = plugin_ptr;
   ui_ptr->context_ptr = context_ptr;
-  ui_ptr->synth_id = synth_id;
+  ui_ptr->instance_name = plugin_instance_name;
   ui_ptr->resizable = true;
   ui_ptr->lv2plugin = plugin_handle;
   ui_ptr->data_access.data_access = zynjacku_lv2_get_descriptor(plugin_handle)->extension_data;
   ui_ptr->external_ui.ui_closed = zynjacku_plugin_ui_closed;
-  ui_ptr->external_ui.plugin_human_id = synth_id;
+  ui_ptr->external_ui.plugin_human_id = plugin_instance_name;
 
   ui_ptr->gui_feature_instance_access.URI = "http://lv2plug.in/ns/ext/instance-access";
   ui_ptr->gui_feature_instance_access.data = zynjacku_lv2_get_handle(ui_ptr->lv2plugin);
@@ -180,7 +186,7 @@ zynjacku_gtk2gui_create(
   if (ui_ptr->ports == NULL)
   {
     LOG_ERROR("malloc() failed.");
-    goto fail_free;
+    goto fail_free_plugin_uri;
   }
 
   memset(ui_ptr->ports, 0, ports_count * sizeof(struct zynjacku_port *));
@@ -207,13 +213,18 @@ zynjacku_gtk2gui_create(
   ui_ptr->host_features[host_feature_count++] = &ui_ptr->gui_feature_external_ui;
   ui_ptr->host_features[host_feature_count++] = NULL;
 
-  ui_ptr->bundle_path = ui_bundle_path;
+  ui_ptr->bundle_path = strdup(ui_bundle_path);
+  if (ui_ptr->bundle_path == NULL)
+  {
+    LOG_ERROR("strdup(\"%s\") failed", ui_bundle_path);
+    goto fail_free_features;
+  }
 
   ui_ptr->dlhandle = dlopen(ui_binary_path, RTLD_NOW);
   if (ui_ptr->dlhandle == NULL)
   {
     LOG_WARNING("Cannot load \"%s\": %s", ui_binary_path, dlerror());
-    goto fail_free_features;
+    goto fail_free_bundle_path;
   }
 
   lookup = (LV2UI_DescriptorFunction)dlsym(ui_ptr->dlhandle, "lv2ui_descriptor");
@@ -230,7 +241,7 @@ zynjacku_gtk2gui_create(
     ui_ptr->lv2ui = lookup(index);
     if (ui_ptr->lv2ui == NULL)
     {
-      LOG_ERROR("Did not find UI %s in %s", uri, ui_binary_path);
+      LOG_ERROR("Did not find UI %s in %s", ui_uri, ui_binary_path);
       goto fail_dlclose;
     }
 
@@ -243,12 +254,13 @@ zynjacku_gtk2gui_create(
   ui_ptr->window_ptr = NULL;
   ui_ptr->external_ui_control = NULL;
 
-  free(ui_uri);
-
   return ui_ptr;
 
 fail_dlclose:
   dlclose(ui_ptr->dlhandle);
+
+fail_free_bundle_path:
+  free(ui_ptr->bundle_path);
 
 fail_free_features:
   free(ui_ptr->host_features);
@@ -256,13 +268,11 @@ fail_free_features:
 fail_free_ports:
   free(ui_ptr->ports);
 
+fail_free_plugin_uri:
+  free(ui_ptr->plugin_uri);
+
 fail_free:
   free(ui_ptr);
-
-fail_free_ui_strings:
-  free(ui_uri);
-  free(ui_bundle_path);
-  free(ui_binary_path);
 
 fail:
   return NULL;
@@ -332,6 +342,7 @@ zynjacku_gtk2gui_destroy(
   dlclose(ui_ptr->dlhandle);
   free(ui_ptr->ports);
   free(ui_ptr->bundle_path);
+  free(ui_ptr->plugin_uri);
   free(ui_ptr);
 }
 
@@ -424,7 +435,7 @@ zynjacku_gtk2gui_ui_on(
     {
       ui_ptr->window_ptr = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-      gtk_window_set_title(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->synth_id);
+      gtk_window_set_title(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->instance_name);
 
       gtk_window_set_resizable(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->resizable);
 

@@ -32,7 +32,6 @@ endif
 
 zynjacku_c_CFLAGS += @GTK_CFLAGS@
 zynjacku_c_CFLAGS += @PYGTK_CFLAGS@
-zynjacku_c_CFLAGS += @SLV2_CFLAGS@
 zynjacku_c_CFLAGS += @JACK_CFLAGS@
 zynjacku_c_CFLAGS += @LV2DYNPARAMHOST1_CFLAGS@
 
@@ -45,7 +44,6 @@ pkgpyexec_SCRIPTS = lv2.py
 
 ZYNJACKU_LDFLAGS = @GTK_LIBS@
 ZYNJACKU_LDFLAGS += @PYGTK_LIBS@
-ZYNJACKU_LDFLAGS += @SLV2_LIBS@
 ZYNJACKU_LDFLAGS += @JACK_LIBS@
 ZYNJACKU_LDFLAGS += @LV2DYNPARAMHOST1_LIBS@
 
@@ -65,8 +63,6 @@ zynjacku_c_la_SOURCES += synth.h
 zynjacku_c_la_SOURCES += effect.h
 zynjacku_c_la_SOURCES += lv2.c
 zynjacku_c_la_SOURCES += lv2.h
-zynjacku_c_la_SOURCES += plugin_repo.c
-zynjacku_c_la_SOURCES += plugin_repo.h
 zynjacku_c_la_SOURCES += log.c
 zynjacku_c_la_SOURCES += log.h
 zynjacku_c_la_SOURCES += zynjacku_wrap.c
@@ -105,6 +101,10 @@ zynjacku.defs: engine.h rack.h plugin.h enum.h hints.h midi_cc_map.h
 	python $(PYGTK_CODEGEN)/h2def.py $^ | \
 	sed -e '/define-method set_parameter/,/^$$/ { s/\("midi_cc_map_obj_ptr"\)/\1 (null-ok) (default "NULL")/g; }' \
 	    -e '/define-method set_midi_cc_map/,/^$$/ { s/\("midi_cc_map_obj_ptr"\)/\1 (null-ok)/g; }' \
+	    -e '/define-method ui_on/,/^$$/ { s/\("ui_uri"\)/\1 (null-ok) (default "NULL")/g; }' \
+	    -e '/define-method ui_on/,/^$$/ { s/\("ui_type_uri"\)/\1 (null-ok) (default "NULL")/g; }' \
+	    -e '/define-method ui_on/,/^$$/ { s/\("ui_binary_path"\)/\1 (null-ok) (default "NULL")/g; }' \
+	    -e '/define-method ui_on/,/^$$/ { s/\("ui_bundle_path"\)/\1 (null-ok) (default "NULL")/g; }' \
 	> $@
 
 # Generate the C wrapper from the defs and our override file

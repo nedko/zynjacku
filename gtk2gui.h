@@ -35,8 +35,12 @@ zynjacku_gtk2gui_create(
   zynjacku_lv2_handle plugin_handle,
   struct zynjacku_plugin * plugin,
   void * context_ptr,
-  const char * uri,
-  const char * synth_id,
+  const char * ui_type_uri,
+  const char * plugin_uri,
+  const char * ui_uri,
+  const char * ui_binary_path,
+  const char * ui_bundle_path,
+  const char * plugin_instance_name,
   const struct list_head * parameter_ports_ptr);
 
 void

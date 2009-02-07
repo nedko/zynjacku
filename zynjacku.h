@@ -58,7 +58,6 @@ struct zynjacku_port
   {
     struct
     {
-      gboolean default_value_provided;
       float value;
       bool min_provided;
       float min;

@@ -61,7 +61,6 @@
 #if HAVE_DYNPARAMS
 #include "rtmempool.h"
 #endif
-#include "plugin_repo.h"
 #include "lv2_event_helpers.h"
 
 #if HAVE_DYNPARAMS
@@ -107,10 +106,8 @@ struct lv2rack_engine
 
 #define ZYNJACKU_RACK_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), ZYNJACKU_RACK_TYPE, struct lv2rack_engine))
 
-#define ZYNJACKU_RACK_SIGNAL_TICK      0 /* plugin iterated */
-#define ZYNJACKU_RACK_SIGNAL_TACK      1 /* "good" plugin found */
-#define ZYNJACKU_RACK_SIGNAL_PROGRESS  2 /* plugin instantiation progress */
-#define ZYNJACKU_RACK_SIGNALS_COUNT    3
+#define ZYNJACKU_RACK_SIGNAL_PROGRESS  0 /* plugin instantiation progress */
+#define ZYNJACKU_RACK_SIGNALS_COUNT    1
 
 /* URI map value for event MIDI type */
 #define ZYNJACKU_MIDI_EVENT_ID 1
@@ -151,7 +148,6 @@ zynjacku_rack_dispose(GObject * obj)
   if (rack_ptr->jack_client)
   {
     zynjacku_rack_stop_jack(ZYNJACKU_RACK(obj));
-    zynjacku_plugin_repo_uninit();
   }
 
   /* Chain up to the parent class */
@@ -186,38 +182,6 @@ zynjacku_rack_class_init(
   G_OBJECT_CLASS(class_ptr)->finalize = zynjacku_rack_finalize;
 
   g_type_class_add_private(G_OBJECT_CLASS(class_ptr), sizeof(struct lv2rack_engine));
-
-  g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TICK] =
-    g_signal_new(
-      "tick",                   /* signal_name */
-      ZYNJACKU_RACK_TYPE,       /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      2,                        /* n_params */
-      G_TYPE_FLOAT,             /* progress 0 .. 1 */
-      G_TYPE_STRING);           /* uri of plugin being scanned */
-
-  g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TACK] =
-    g_signal_new(
-      "tack",                   /* signal_name */
-      ZYNJACKU_RACK_TYPE,       /* itype */
-      G_SIGNAL_RUN_LAST |
-      G_SIGNAL_ACTION,          /* signal_flags */
-      0,                        /* class_offset */
-      NULL,                     /* accumulator */
-      NULL,                     /* accu_data */
-      NULL,                     /* c_marshaller */
-      G_TYPE_NONE,              /* return type */
-      4,                        /* n_params */
-      G_TYPE_STRING,            /* plugin name */
-      G_TYPE_STRING,            /* plugin uri */
-      G_TYPE_STRING,            /* plugin license */
-      G_TYPE_STRING);           /* plugin author */
 
   g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_PROGRESS] =
     g_signal_new(
@@ -353,8 +317,6 @@ zynjacku_rack_init(
   rack_ptr->host_features[count++] = &rack_ptr->host_feature_progress;
   assert(ZYNJACKU_RACK_ENGINE_FEATURES == count);
   rack_ptr->host_features[count] = NULL;
-
-  zynjacku_plugin_repo_init();
 }
 
 GType zynjacku_rack_get_type()
@@ -570,6 +532,7 @@ jack_process_cb(
 
 #undef rack_ptr
 
+static
 void
 zynjacku_rack_deactivate_effect(
   GObject * effect_obj_ptr)
@@ -591,6 +554,21 @@ zynjacku_rack_deactivate_effect(
   zynjacku_lv2_deactivate(effect_ptr->lv2plugin);
 }
 
+void
+zynjacku_rack_get_required_features(
+  GObject * rack_obj_ptr,
+  const LV2_Feature * const ** host_features,
+  unsigned int * host_feature_count)
+{
+  struct lv2rack_engine * rack_ptr;
+
+  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_obj_ptr);
+
+  *host_features = rack_ptr->host_features;
+  *host_feature_count = ZYNJACKU_RACK_ENGINE_FEATURES;
+}
+
+static
 void
 zynjacku_rack_unregister_port(
   GObject * rack_obj_ptr,
@@ -666,112 +644,12 @@ zynjacku_rack_get_supported_feature(
   return rack_ptr->host_features[index]->URI;
 }
 
-#define rack_obj_ptr ((ZynjackuRack *)context)
-
-bool
-zynjacku_rack_check_plugin(
-  void * context,
-  const char * plugin_uri,
-  const char * plugin_name,
-  uint32_t audio_in_ports_count,
-  uint32_t audio_out_ports_count,
-  uint32_t midi_in_ports_count,
-  uint32_t control_ports_count,
-  uint32_t string_ports_count,
-  uint32_t event_ports_count,
-  uint32_t midi_event_in_ports_count,
-  uint32_t ports_count)
-{
-  if (audio_in_ports_count == 0 || audio_out_ports_count == 0)
-  {
-    LOG_DEBUG("Skipping 's' %s, [effect] plugin with unsupported port configuration", name, plugin_uri);
-    LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-    LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-    LOG_DEBUG("  string ports: %d", (unsigned int)string_ports_count);
-    LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-    LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-    LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
-    LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-    LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
-    return false;
-  }
-
-  LOG_DEBUG("Found effect plugin '%s' %s", name, plugin_uri);
-  LOG_DEBUG("  midi input ports: %d", (unsigned int)midi_in_ports_count);
-  LOG_DEBUG("  control ports: %d", (unsigned int)control_ports_count);
-  LOG_DEBUG("  string ports: %d", (unsigned int)string_ports_count);
-  LOG_DEBUG("  event ports: %d", (unsigned int)event_ports_count);
-  LOG_DEBUG("  event midi input ports: %d", (unsigned int)midi_event_in_ports_count);
-  LOG_DEBUG("  audio input ports: %d", (unsigned int)audio_in_ports_count);
-  LOG_DEBUG("  audio output ports: %d", (unsigned int)audio_out_ports_count);
-  LOG_DEBUG("  total ports %d", (unsigned int)ports_count);
-  return true;
-}
-
-void
-zynjacku_rack_tick(
-  void *context,
-  float progress,               /* 0..1 */
-  const char *message)
-{
-  g_signal_emit(
-    rack_obj_ptr,
-    g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TICK],
-    0,
-    progress,
-    message);
-}
-
-void
-zynjacku_rack_tack(
-  void *context,
-  const char *uri)
-{
-  const char * name;
-  const char * license;
-  const char * author;
-
-  name = zynjacku_plugin_repo_get_name(uri);
-  license = zynjacku_plugin_repo_get_license(uri);
-  author = zynjacku_plugin_repo_get_author(uri);
-
-  g_signal_emit(
-    rack_obj_ptr,
-    g_zynjacku_rack_signals[ZYNJACKU_RACK_SIGNAL_TACK],
-    0,
-    name,
-    uri,
-    license,
-    author);
-}
-
-#undef rack_obj_ptr
-
-void
-zynjacku_rack_iterate_plugins(
-  ZynjackuRack * rack_obj_ptr,
-  gboolean force)
-{
-  struct lv2rack_engine * rack_ptr;
-
-  rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_obj_ptr);
-
-  zynjacku_plugin_repo_iterate(
-    force,
-    rack_ptr->host_features,
-    rack_obj_ptr,
-    zynjacku_rack_check_plugin,
-    zynjacku_rack_tick,
-    zynjacku_rack_tack);
-}
-
 #define effect_ptr (&plugin_ptr->subtype.effect)
 
-bool
-zynjacku_plugin_construct_effect(
-  struct zynjacku_plugin * plugin_ptr,
-  ZynjackuPlugin * plugin_obj_ptr,
-  GObject * rack_object_ptr)
+gboolean
+zynjacku_rack_construct_plugin(
+  ZynjackuRack * rack_object_ptr,
+  ZynjackuPlugin * plugin_object_ptr)
 {
   static unsigned int id;
   char * port_name;
@@ -784,32 +662,33 @@ zynjacku_plugin_construct_effect(
   struct zynjacku_port * audio_in_right_port_ptr;
   struct zynjacku_port * audio_out_left_port_ptr;
   struct zynjacku_port * audio_out_right_port_ptr;
+  struct zynjacku_plugin * plugin_ptr;
 
   rack_ptr = ZYNJACKU_RACK_GET_PRIVATE(rack_object_ptr);
+  plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_object_ptr);
 
-  plugin_ptr->type = PLUGIN_TYPE_EFFECT;
-
-  if (!zynjacku_plugin_repo_get_plugin_info(
-        plugin_ptr->uri,
-        plugin_ptr,
-        zynjacku_rack_check_plugin,
-        rack_ptr->host_features,
-        &plugin_ptr->name
-#if HAVE_DYNPARAMS
-        , &plugin_ptr->dynparams_supported
-#endif
-        ))
+  if (plugin_ptr->uri == NULL)
   {
-    LOG_ERROR("Failed to load LV2 info for plugin %s", plugin_ptr->uri);
+    LOG_ERROR("\"uri\" property needs to be set before constructing plugin");
     goto fail;
   }
 
-  if (!zynjacku_plugin_repo_create_plugin_ports(
-        plugin_ptr->uri,
-        plugin_obj_ptr))
+  if (plugin_ptr->name == NULL)
   {
-    LOG_ERROR("Failed to create ports for plugin %s", plugin_ptr->uri);
-    goto fail_free_name;
+    LOG_ERROR("\"name\" property needs to be set before constructing plugin");
+    goto fail;
+  }
+
+  if (plugin_ptr->dlpath == NULL)
+  {
+    LOG_ERROR("Plugin %s has no dlpath set", plugin_ptr->uri);
+    goto fail;
+  }
+
+  if (plugin_ptr->bundle_path == NULL)
+  {
+    LOG_ERROR("Plugin %s has no bundle path set", plugin_ptr->uri);
+    goto fail;
   }
 
   audio_in_left_port_ptr = NULL;
@@ -836,7 +715,7 @@ zynjacku_plugin_construct_effect(
   if (audio_in_left_port_ptr == NULL)
   {
     LOG_ERROR("Cannot construct effect plugin without audio input port(s). %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   audio_out_left_port_ptr = NULL;
@@ -863,7 +742,7 @@ zynjacku_plugin_construct_effect(
   if (audio_out_left_port_ptr == NULL)
   {
     LOG_ERROR("Cannot construct effect plugin without audio output port(s). %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   rack_ptr->progress.context = rack_object_ptr;
@@ -872,6 +751,8 @@ zynjacku_plugin_construct_effect(
 
   plugin_ptr->lv2plugin = zynjacku_lv2_load(
     plugin_ptr->uri,
+    plugin_ptr->dlpath,
+    plugin_ptr->bundle_path,
     zynjacku_rack_get_sample_rate(ZYNJACKU_RACK(rack_object_ptr)),
     rack_ptr->host_features);
 
@@ -886,15 +767,15 @@ zynjacku_plugin_construct_effect(
   if (plugin_ptr->lv2plugin == NULL)
   {
     LOG_ERROR("Failed to load LV2 plugin %s", plugin_ptr->uri);
-    goto fail_free_name;
+    goto fail;
   }
 
   /* connect parameter/measure ports */
 
   if (!zynjacku_connect_plugin_ports(
         plugin_ptr,
-        plugin_obj_ptr,
-        rack_object_ptr
+        plugin_object_ptr,
+        G_OBJECT(rack_object_ptr)
 #if HAVE_DYNPARAMS
         , &rack_ptr->mempool_allocator
 #endif
@@ -964,12 +845,9 @@ zynjacku_plugin_construct_effect(
 
   g_object_ref(plugin_ptr->engine_object_ptr);
 
-  /* no plugins to test gtk2gui */
-  plugin_ptr->gtk2gui = zynjacku_gtk2gui_create(rack_ptr->host_features, ZYNJACKU_RACK_ENGINE_FEATURES, plugin_ptr->lv2plugin, 
-    plugin_ptr, plugin_obj_ptr, plugin_ptr->uri, plugin_ptr->id, &plugin_ptr->parameter_ports);
-
   plugin_ptr->deactivate = zynjacku_rack_deactivate_effect;
   plugin_ptr->unregister_port = zynjacku_rack_unregister_port;
+  plugin_ptr->get_required_features = zynjacku_rack_get_required_features;
 
   /* we dont support midi cc maps for lv2rack yet */
   plugin_ptr->set_midi_cc_map = NULL;
@@ -981,9 +859,6 @@ zynjacku_plugin_construct_effect(
 
 fail_unload:
   zynjacku_lv2_unload(plugin_ptr->lv2plugin);
-
-fail_free_name:
-  free(plugin_ptr->name);
 
 fail:
   return false;

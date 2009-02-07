@@ -50,7 +50,6 @@
 //#define LOG_LEVEL LOG_LEVEL_DEBUG
 #include "log.h"
 #include "plugin.h"
-#include "plugin_repo.h"
 
 struct zynjacku_lv2_plugin
 {
@@ -63,30 +62,15 @@ struct zynjacku_lv2_plugin
 zynjacku_lv2_handle
 zynjacku_lv2_load(
   const char * uri,
+  const char * dlpath,
+  const char * bundle_path,
   double sample_rate,
   const LV2_Feature * const * features)
 {
-  const char *dlpath;
-  const char *bundle_path;
-
   struct zynjacku_lv2_plugin *plugin_ptr;
   LV2_Descriptor_Function lv2lookup;
   char *error;
   uint32_t plugin_index;
-
-  dlpath = zynjacku_plugin_repo_get_dlpath(uri);
-  if (dlpath == NULL)
-  {
-    LOG_ERROR("Failed to get path of library implementeding plugin %s", uri);
-    goto fail;
-  }
-
-  bundle_path = zynjacku_plugin_repo_get_bundle_path(uri);
-  if (bundle_path == NULL)
-  {
-    LOG_ERROR("Failed to get bundle path of plugin %s", uri);
-    goto fail;
-  }
 
   plugin_ptr = malloc(sizeof(struct zynjacku_lv2_plugin));
   if (plugin_ptr == NULL)

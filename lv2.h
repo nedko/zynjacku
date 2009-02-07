@@ -30,6 +30,8 @@ struct zynjacku_port;
 zynjacku_lv2_handle
 zynjacku_lv2_load(
   const char * uri,
+  const char * dlpath,
+  const char * bundle_path,
   double sample_rate,
   const LV2_Feature * const * host_features);
 

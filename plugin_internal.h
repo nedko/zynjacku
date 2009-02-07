@@ -25,10 +25,6 @@
 
 #ifdef LV2_H_INCLUDED
 
-#define PLUGIN_TYPE_UNKNOWN  0
-#define PLUGIN_TYPE_SYNTH    1
-#define PLUGIN_TYPE_EFFECT   2
-
 struct zynjacku_rt_plugin_command
 {
   struct zynjacku_port * port; /* port to set data for */
@@ -42,6 +38,8 @@ struct zynjacku_plugin
   GObject * root_group_ui_context;
   GObject * engine_object_ptr;
   gchar * uri;
+  gchar * dlpath;
+  gchar * bundle_path;
 
   struct list_head siblings_all;
   struct list_head siblings_active;
@@ -62,8 +60,6 @@ struct zynjacku_plugin
   char * name;
 
   bool recycle;
-
-  unsigned int type;
 
   union
   {
@@ -86,6 +82,7 @@ struct zynjacku_plugin
   struct zynjacku_rt_plugin_command * volatile command_result; /* command that has been executed */
 
   void (* deactivate)(GObject * synth_obj_ptr);
+  void (* get_required_features)(GObject * engine_obj_ptr, const LV2_Feature * const ** host_features, unsigned int * host_feature_count);
   void (* unregister_port)(GObject * engine_obj_ptr, struct zynjacku_port * port_ptr);
   bool (* set_midi_cc_map)(GObject * engine_obj_ptr, struct zynjacku_port * port_ptr, GObject * midi_cc_map_obj_ptr);
   bool (* midi_cc_map_cc_no_assign)(GObject * engine_obj_ptr, GObject * midi_cc_map_obj_ptr, guint cc_no);

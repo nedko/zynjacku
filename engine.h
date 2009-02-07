@@ -74,15 +74,15 @@ zynjacku_engine_get_midi_activity(
 const gchar *
 zynjacku_get_version();
 
-void
-zynjacku_engine_iterate_plugins(
-  ZynjackuEngine * engine_obj_ptr,
-  gboolean force);
-
 const gchar *
 zynjacku_engine_get_supported_feature(
   ZynjackuEngine * engine_obj_ptr,
   guint index);
+
+gboolean
+zynjacku_engine_construct_plugin(
+  ZynjackuEngine * engine_obj_ptr,
+  ZynjackuPlugin * plugin_obj_ptr);
 
 G_END_DECLS
 
