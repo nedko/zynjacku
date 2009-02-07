@@ -51,6 +51,7 @@ class DumpRDFModel:
 class SimpleRDFModel:
     def __init__(self):
         self.bySubject = {}
+        self.bySubject["$classes"] = {}
         self.byPredicate = {}
     def getByType(self, classname):
         classes = self.bySubject["$classes"]
@@ -67,6 +68,8 @@ class SimpleRDFModel:
         else:
             prop = props
         if type(subject) is str:
+            if not self.bySubject.has_key(subject):
+                return None
             subject = self.bySubject[subject]
         elif type(subject) is dict:
             pass
@@ -280,6 +283,8 @@ class LV2DB:
         
     def add_category_recursive(self, tree_pos, category):
         cat_name = self.manifests.getProperty(category, rdfs + "label", single = True, optional = True)
+        if not cat_name:
+            return
         self.category_paths.append(((tree_pos + [cat_name])[1:], category))
         self.categories.add(category)
         items = self.manifests.byPredicate[rdfs + "subClassOf"]
