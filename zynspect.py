@@ -1,7 +1,27 @@
 #!/usr/bin/env python
 import os
 import sys
-import lv2
+from distutils import sysconfig
+
+old_path = sys.path
+
+inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
+if os.access(inplace_libs, os.R_OK):
+    sys.path.append(inplace_libs)
+
+sys.path.append(os.path.join(sysconfig.get_python_lib(), "zynjacku"))
+
+try:
+    import lv2
+except Exception, e:
+    print "Failed to import zynjacku internal python modules"
+    print repr(e)
+    print "These directories were searched"
+    for path in sys.path:
+        print "    " + path
+    sys.exit(1)
+
+sys.path = old_path
 
 def show_plugin_info(plugin):
     print "Plugin: %s" % plugin.name
