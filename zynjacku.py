@@ -29,11 +29,27 @@ import xml.dom.minidom
 import cairo
 from math import pi, sin, cos, atan2
 from colorsys import hls_to_rgb, rgb_to_hls
+from distutils import sysconfig
 
 old_path = sys.path
-sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
-import zynjacku_c as zynjacku
-import lv2
+
+inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
+if os.access(inplace_libs, os.R_OK):
+    sys.path.append(inplace_libs)
+
+sys.path.append(os.path.join(sysconfig.get_python_lib(), "zynjacku"))
+
+try:
+    import zynjacku_c as zynjacku
+    import lv2
+except Exception, e:
+    print "Failed to import zynjacku internal python modules"
+    print repr(e)
+    print "These directories were searched"
+    for path in sys.path:
+        print "    " + path
+    sys.exit(1)
+
 sys.path = old_path
 
 try:

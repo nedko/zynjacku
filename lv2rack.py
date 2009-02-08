@@ -24,10 +24,26 @@ import gtk.glade
 import gobject
 import re
 import time
+from distutils import sysconfig
 
 old_path = sys.path
-sys.path.insert(0, "%s/.libs" % os.path.dirname(sys.argv[0]))
-import zynjacku_c
+
+inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
+if os.access(inplace_libs, os.R_OK):
+    sys.path.append(inplace_libs)
+
+sys.path.append(os.path.join(sysconfig.get_python_lib(), "zynjacku"))
+
+try:
+    import zynjacku_c
+except Exception, e:
+    print "Failed to import zynjacku internal python modules"
+    print repr(e)
+    print "These directories were searched"
+    for path in sys.path:
+        print "    " + path
+    sys.exit(1)
+
 sys.path = old_path
 
 import zynjacku as zynjacku
