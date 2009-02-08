@@ -1287,8 +1287,12 @@ zynjacku_plugin_set_midi_cc_map_internal(
 
   if (plugin_ptr->set_midi_cc_map == NULL)
   {
-    LOG_ERROR("Cannot set midi cc map for plugin without engine");
-    assert(0);
+    if (midi_cc_map_obj_ptr != NULL)
+    {
+      LOG_ERROR("Cannot set midi cc map for plugin without engine");
+      assert(0);
+    }
+
     return false;
   }
 
