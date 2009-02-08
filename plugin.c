@@ -1862,7 +1862,7 @@ zynjacku_plugin_add_supported_feature(
 {
   struct zynjacku_plugin * plugin_ptr;
 
-  LOG_ERROR("Plugin supports feature '%s'", feature_uri);
+  LOG_DEBUG("Plugin supports feature '%s'", feature_uri);
 
   plugin_ptr = ZYNJACKU_PLUGIN_GET_PRIVATE(plugin_obj_ptr);
 
