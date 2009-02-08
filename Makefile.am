@@ -59,8 +59,6 @@ zynjacku_c_la_SOURCES += jack_compat.c
 zynjacku_c_la_SOURCES += plugin.c
 zynjacku_c_la_SOURCES += plugin.h
 zynjacku_c_la_SOURCES += plugin_internal.h
-zynjacku_c_la_SOURCES += synth.h
-zynjacku_c_la_SOURCES += effect.h
 zynjacku_c_la_SOURCES += lv2.c
 zynjacku_c_la_SOURCES += lv2.h
 zynjacku_c_la_SOURCES += log.c
@@ -74,6 +72,7 @@ zynjacku_c_la_SOURCES += gtk2gui.h
 zynjacku_c_la_SOURCES += hints.c
 zynjacku_c_la_SOURCES += hints.h
 zynjacku_c_la_SOURCES += list.h
+zynjacku_c_la_SOURCES += lv2_ui.h
 zynjacku_c_la_SOURCES += lv2-miditype.h
 zynjacku_c_la_SOURCES += lv2_contexts.h
 zynjacku_c_la_SOURCES += lv2_data_access.h
@@ -123,7 +122,7 @@ zynjacku_ttl_la_SOURCES += flex_ttl.cpp
 zynjacku_ttl_la_SOURCES += flex_ttl.h
 
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py lv2.py
 
 bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
 
