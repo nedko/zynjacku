@@ -2434,7 +2434,8 @@ class host:
 
         dialog.set_title(title)
 
-        if not plugin_repo_widget.get_model():
+        store = plugin_repo_widget.get_model()
+        if not store:
             plugin_repo_widget.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
             store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
