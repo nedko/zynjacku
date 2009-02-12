@@ -53,6 +53,7 @@ class SimpleRDFModel:
         self.bySubject = {}
         self.bySubject["$classes"] = {}
         self.byPredicate = {}
+        self.object_sources = {}
     def getByType(self, classname):
         classes = self.bySubject["$classes"]
         if classname in classes:
@@ -106,7 +107,10 @@ class SimpleRDFModel:
         return list(anyprops)
         
                 
-    def addTriple(self, s, p, o):
+    def addTriple(self, s, p, o, source=None):
+        if not self.object_sources.has_key(o):
+            self.object_sources[o] = set()
+        self.object_sources[o].add(source)
         if p == rdf_type:
             p = "a"
         if s not in self.bySubject:
@@ -120,7 +124,7 @@ class SimpleRDFModel:
             self.byPredicate[p][s] = []
         self.byPredicate[p][s].append(o)
         if p == "a":
-            self.addTriple("$classes", o, s)
+            self.addTriple("$classes", o, s, source)
     def copyFrom(self, src):
         for s in src.bySubject:
             po = src.bySubject[s]
@@ -153,7 +157,7 @@ def parseTTL(uri, content, model, debug):
                 if spo[0] == "@prefix":
                     prefixes[spo[1][:-1]] = spo[2]
                 else:
-                    model.addTriple(spo[0], spo[1], spo[2])
+                    model.addTriple(spo[0], spo[1], spo[2], uri)
                 if x[0] == '.': item = 0
                 elif x[0] == ';': item = 1
                 elif x[0] == ',': item = 2
@@ -193,7 +197,7 @@ def parseTTL(uri, content, model, debug):
             anoncnt += 1
         elif x[0] == ']' or x[0] == ')':
             if item == 3:
-                model.addTriple(spo[0], spo[1], spo[2])
+                model.addTriple(spo[0], spo[1], spo[2], uri)
                 item = 0
             spo = spo_stack[-1]
             spo_stack = spo_stack[:-1]
@@ -307,16 +311,20 @@ class LV2DB:
 
         if uri not in self.plugin_info:
             world = SimpleRDFModel()
+            world.sources = set()
             world.copyFrom(self.manifests)
             seeAlso = self.manifests.bySubject[uri]["http://www.w3.org/2000/01/rdf-schema#seeAlso"]
             try:
                 for doc in seeAlso:
                     # print "Loading " + doc + " for plugin " + uri
                     parseTTL(doc, file(doc).read(), world, self.debug)
+                    world.sources.add(doc)
                 self.plugin_info[uri] = world                
             except Exception, e:
                 print "ERROR %s: %s" % (uri, str(e))
                 return None
+            for source in self.manifests.object_sources[uri]:
+                world.sources.add(source)
         info = self.plugin_info[uri]
         dest = LV2Plugin()
         dest.uri = uri
@@ -402,6 +410,8 @@ class LV2DB:
             dest.ui = uniq_seq(info.bySubject[uri][lv2ui_ui])
         else:
             dest.ui = []
+
+        dest.sources = info.sources
 
         return dest
 

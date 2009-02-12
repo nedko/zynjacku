@@ -90,6 +90,11 @@ def show_plugin_info(plugin):
         print
     print
 
+    print "Sources:"
+    for source in plugin.sources:
+        print "    " + source
+    print
+
 def list_plugins(verbose):
     plugins = db.getPluginList()
 
@@ -117,6 +122,5 @@ if len(sys.argv) >= 2:
             sys.exit(1)
 
         show_plugin_info(plugin)
-
 else:
     list_plugins(False)
