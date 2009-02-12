@@ -2502,6 +2502,8 @@ class host:
             plugin_repo_widget.append_column(column_license)
             plugin_repo_widget.append_column(column_author)
 
+            store.set_sort_column_id(0, gtk.SORT_ASCENDING)
+
             plugin_repo_widget.set_model(store)
             def on_row_activated(widget, path, column):
                 dialog.response(0)
