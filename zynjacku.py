@@ -2202,7 +2202,25 @@ class host:
 
         self.available_plugins = []
 
-        self.lv2db = lv2.LV2DB()
+        lv2sources = []
+        cachedir = os.path.join(os.environ["HOME"], ".cache", preset_extension)
+        if not os.path.isdir(cachedir):
+            print 'Creating cache directory "%s"' % cachedir
+            os.makedirs(cachedir, 0755)
+
+        self.lv2_plugins_cache = os.path.join(cachedir, "plugins")
+        if os.path.isfile(self.lv2_plugins_cache):
+            print 'Loading LV2 plugin cache from "%s"' % self.lv2_plugins_cache
+            for line in file(self.lv2_plugins_cache):
+                source = line.strip()
+                if os.path.isfile(source) and os.access(source, os.R_OK):
+                    lv2sources.append(source)
+                else:
+                    print "Warning \"%s\" is not readble" % source
+        else:
+            file(self.lv2_plugins_cache, 'w')
+
+        self.lv2db = lv2.LV2DB(lv2sources)
 
     def lash_check_events(self):
         while lash.lash_get_pending_event_count(self.lash_client):
@@ -2387,10 +2405,15 @@ class host:
 
         progressbar.show()
 
+        if force:
+            self.lv2db = lv2.LV2DB()
+            self.available_plugins = []
+
         if self.available_plugins and not force:
             for plugin in self.available_plugins:
                 store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
         else:
+            lv2sources = set()
             self.available_plugins = []
 
             progressbar.set_text("Searching for LV2 plugins...");
@@ -2437,8 +2460,15 @@ class host:
 
                     self.available_plugins.append(plugin)
                     store.append([plugin.name, plugin.uri, plugin.license_decoded, plugin.maintainers_string])
+                    for source in plugin.sources:
+                        lv2sources.add(source)
 
                 progress += step
+
+            if lv2sources and os.path.isfile(self.lv2_plugins_cache):
+                cachefile = file(self.lv2_plugins_cache, 'w')
+                for source in lv2sources:
+                    cachefile.write(source + "\n")
 
         progressbar.hide()
 

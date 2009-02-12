@@ -235,8 +235,9 @@ class LV2UI(object):
         pass
         
 class LV2DB:
-    def __init__(self, debug = False):
+    def __init__(self, sources=[], debug = False):
         self.debug = debug
+        self.sources = sources
         self.initManifests()
         
     def initManifests(self):
@@ -261,26 +262,31 @@ class LV2DB:
         self.manifests = SimpleRDFModel()
         self.paths = {}
         self.plugin_info = dict()
-        # Scan manifests
-        for dir in lv2path:
-            for bundle in glob.iglob(dir + "/*.lv2"):
-                fn = bundle+"/manifest.ttl"
-                if os.path.exists(fn):
+        if not self.sources:
+            # Scan manifests
+            for dir in lv2path:
+                for bundle in glob.iglob(dir + "/*.lv2"):
+                    fn = bundle+"/manifest.ttl"
+                    if os.path.exists(fn):
+                        parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+            # Read all specifications from all manifests
+            if (lv2 + "Specification" in self.manifests.bySubject["$classes"]):
+                specs = self.manifests.getByType(lv2 + "Specification")
+                filenames = set()
+                for spec in specs:
+                    subj = self.manifests.bySubject[spec]
+                    if rdfs+"seeAlso" in subj:
+                        for fn in subj[rdfs+"seeAlso"]:
+                            filenames.add(fn)
+                for fn in filenames:
                     parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-        # Read all specifications from all manifests
-        if (lv2 + "Specification" in self.manifests.bySubject["$classes"]):
-            specs = self.manifests.getByType(lv2 + "Specification")
-            filenames = set()
-            for spec in specs:
-                subj = self.manifests.bySubject[spec]
-                if rdfs+"seeAlso" in subj:
-                    for fn in subj[rdfs+"seeAlso"]:
-                        filenames.add(fn)
-            for fn in filenames:
-                parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-        #fn = "/usr/lib/lv2/lv2core.lv2/lv2.ttl"
-        #parseTTL(fn, file(fn).read(), self.manifests)
-        self.plugins = self.manifests.getByType(lv2 + "Plugin")
+            self.plugins = self.manifests.getByType(lv2 + "Plugin")
+        else:
+            for source in self.sources:
+                parseTTL(source, file(source).read(), self.manifests, self.debug)
+            #fn = "/usr/lib/lv2/lv2core.lv2/lv2.ttl"
+            #parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+            self.plugins = set(self.manifests.getByType(lv2 + "Plugin"))
         self.categories = set()
         self.category_paths = []
         self.add_category_recursive([], lv2 + "Plugin")
@@ -306,30 +312,45 @@ class LV2DB:
         return self.plugins
         
     def getPluginInfo(self, uri):
+        #print "getting info for plugin " + uri
         if not self.manifests.bySubject.has_key(uri):
             return None
 
+        sources = []
         if uri not in self.plugin_info:
-            world = SimpleRDFModel()
-            world.sources = set()
-            world.copyFrom(self.manifests)
-            seeAlso = self.manifests.bySubject[uri]["http://www.w3.org/2000/01/rdf-schema#seeAlso"]
-            try:
-                for doc in seeAlso:
-                    # print "Loading " + doc + " for plugin " + uri
-                    parseTTL(doc, file(doc).read(), world, self.debug)
-                    world.sources.add(doc)
-                self.plugin_info[uri] = world                
-            except Exception, e:
-                print "ERROR %s: %s" % (uri, str(e))
-                return None
-            for source in self.manifests.object_sources[uri]:
-                world.sources.add(source)
+            if not self.sources:
+                world = SimpleRDFModel()
+                world.sources = set()
+                world.copyFrom(self.manifests)
+                seeAlso = self.manifests.bySubject[uri]["http://www.w3.org/2000/01/rdf-schema#seeAlso"]
+                try:
+                    for doc in seeAlso:
+                        # print "Loading " + doc + " for plugin " + uri
+                        parseTTL(doc, file(doc).read(), world, self.debug)
+                        world.sources.add(doc)
+                    self.plugin_info[uri] = world                
+                except Exception, e:
+                    print "ERROR %s: %s" % (uri, str(e))
+                    return None
+                for source in self.manifests.object_sources[uri]:
+                    world.sources.add(source)
+                sources = world.sources
+            else:
+                self.plugin_info[uri] = self.manifests
         info = self.plugin_info[uri]
         dest = LV2Plugin()
         dest.uri = uri
-        dest.binary = info.bySubject[uri][lv2 + 'binary'][0]
-        dest.name = info.bySubject[uri][doap + 'name'][0]
+
+        dest.binary = info.getProperty(uri, lv2 + "binary", optional = True)
+        if not dest.binary:
+            return None
+        dest.binary = dest.binary[0]
+
+        dest.name = info.getProperty(uri, doap + 'name', optional = True)
+        if not dest.name:
+            return None
+        dest.name = dest.name[0]
+
         dest.license = info.bySubject[uri][doap + 'license'][0]
         dest.classes = info.bySubject[uri]["a"]
         dest.requiredFeatures = info.getProperty(uri, lv2 + "requiredFeature", optional = True)
@@ -411,7 +432,7 @@ class LV2DB:
         else:
             dest.ui = []
 
-        dest.sources = info.sources
+        dest.sources = sources
 
         return dest
 
