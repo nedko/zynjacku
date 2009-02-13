@@ -37,11 +37,9 @@ inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
 if os.access(inplace_libs, os.R_OK):
     sys.path.append(inplace_libs)
 
-sys.path.append(os.path.join(sysconfig.get_python_lib(), "zynjacku"))
-
 try:
     import zynjacku_c as zynjacku
-    import lv2
+    import zynjacku_lv2 as lv2
 except Exception, e:
     print "Failed to import zynjacku internal python modules"
     print repr(e)

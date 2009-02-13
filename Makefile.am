@@ -37,10 +37,10 @@ zynjacku_c_CFLAGS += @LV2DYNPARAMHOST1_CFLAGS@
 
 INCLUDES = $(PYTHON_INCLUDES) $(zynjacku_c_CFLAGS)
 
-pkgpyexecdir = $(pythondir)/zynjacku/
+pkgpyexecdir = $(pythondir)/
 
 pkgpyexec_LTLIBRARIES = zynjacku_c.la zynjacku_ttl.la
-pkgpyexec_SCRIPTS = lv2.py
+pkgpyexec_SCRIPTS = zynjacku_lv2.py
 
 ZYNJACKU_LDFLAGS = @GTK_LIBS@
 ZYNJACKU_LDFLAGS += @PYGTK_LIBS@
