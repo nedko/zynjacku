@@ -10,7 +10,7 @@ if os.access(inplace_libs, os.R_OK):
     sys.path.append(inplace_libs)
 
 try:
-    import zynjacku_lv2 as lv2
+    from zynworld import lv2
 except Exception, e:
     print "Failed to import zynjacku internal python modules"
     print repr(e)

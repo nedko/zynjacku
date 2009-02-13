@@ -36,10 +36,15 @@ old_path = sys.path
 inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
 if os.access(inplace_libs, os.R_OK):
     sys.path.append(inplace_libs)
+else:
+    inplace_libs = None
 
 try:
-    import zynjacku_c as zynjacku
-    import zynjacku_lv2 as lv2
+    if inplace_libs:
+        import zynjacku_c as zynjacku
+    else:
+        from zynworld import zynjacku_c as zynjacku
+    from zynworld import lv2
 except Exception, e:
     print "Failed to import zynjacku internal python modules"
     print repr(e)
