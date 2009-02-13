@@ -64,17 +64,19 @@ class SimpleRDFModel:
             return self.byPredicate[propname]
         return []
     def getProperty(self, subject, props, optional = False, single = False):
+        #print "getProperty(%s, %s)" % (repr(subject), repr(props))
         if type(props) is list:
             prop = props[0]
         else:
             prop = props
-        if type(subject) is str:
+        if type(subject) is str or type(subject) is unicode:
             if not self.bySubject.has_key(subject):
                 return None
             subject = self.bySubject[subject]
         elif type(subject) is dict:
             pass
         else:
+            #print "subject type is %s" % type(subject)
             if single:
                 return None
             else:
@@ -108,6 +110,8 @@ class SimpleRDFModel:
         
                 
     def addTriple(self, s, p, o, source=None):
+        #if p == lv2 + "binary":
+        #    print 'binary "%s" of %s found' % (o, s)
         if not self.object_sources.has_key(o):
             self.object_sources[o] = set()
         self.object_sources[o].add(source)
@@ -316,6 +320,7 @@ class LV2DB:
     def getPluginInfo(self, uri):
         #print "getting info for plugin " + uri
         if not self.manifests.bySubject.has_key(uri):
+            #print 'no subject "%s"' % uri
             return None
 
         sources = []
@@ -345,6 +350,7 @@ class LV2DB:
 
         dest.binary = info.getProperty(uri, lv2 + "binary", optional = True)
         if not dest.binary:
+            #print "No binary"
             return None
         dest.binary = dest.binary[0]
 
