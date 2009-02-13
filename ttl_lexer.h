@@ -5,4 +5,6 @@
 
 extern PyObject *ttl_list;
 
+#define YY_NO_INPUT
+
 #endif
