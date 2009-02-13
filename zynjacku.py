@@ -2989,7 +2989,7 @@ class ZynjackuHostMulti(ZynjackuHost):
 class ZynjackuHostOne(ZynjackuHost):
     def __init__(self, glade_xml, client_name, uri):
         #print "ZynjackuHostOne constructor called."
-        ZynjackuHost.__init__(self, client_name)
+        ZynjackuHost.__init__(self, client_name, "zynjacku")
 
         self.plugin = self.new_plugin(uri)
         if not self.plugin:
