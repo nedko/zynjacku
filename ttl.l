@@ -2,15 +2,33 @@
 #include <Python.h>
 #include "ttl_lexer.h"
 
-int yyFlexLexer::yywrap() { return 1; }
+
+PyObject *ttl_list = NULL;
+static PyObject *tmp_string = NULL;
 
 void yyerror(const char *str)
 {
     PyErr_SetString(PyExc_SyntaxError, str);
 }
 
+void add_to(const char *str)
+{
+    PyString_ConcatAndDel(&tmp_string, PyString_FromString(str));
+}
+
+void add_token_str(const char *name, const char *value)
+{
+    PyList_Append(ttl_list, Py_BuildValue("(ss)", name, value));
+}
+
+void add_token(const char *name, PyObject *value)
+{
+    PyList_Append(ttl_list, Py_BuildValue("(sO)", name, value));
+}        
+
 %}
 
+%option nounput reentrant
 %x C_COMMENT C_LONGSTRING C_STRING
 
 SYMBOL [A-Za-z_-][a-zA-Z0-9_-]*
@@ -18,34 +36,39 @@ TRIPLEQUOTE \"\"\"
 
 %%
 
-@prefix { LEXER_DATA->add("prefix", "@prefix"); }
+@prefix { add_token_str("prefix", "@prefix"); }
 # BEGIN(C_COMMENT);
-{TRIPLEQUOTE} { LEXER_DATA->strctx.clear(); BEGIN(C_LONGSTRING); }
-\" { LEXER_DATA->strctx.clear(); BEGIN(C_STRING); }
-\<[^>]*\> { LEXER_DATA->add("URI", std::string(yytext + 1, strlen(yytext) - 2)); }
-[+-]?([0-9]+\.[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)? { std::stringstream ss(yytext); double value; ss >> value; LEXER_DATA->add("number", PyFloat_FromDouble(value)); }
-[+-]?[0-9]+ { LEXER_DATA->add("number", PyInt_FromLong(atol(yytext))); }
-{SYMBOL}?:{SYMBOL}? { LEXER_DATA->add("prnot", yytext); } 
-{SYMBOL} { LEXER_DATA->add("symbol", yytext); } 
-[.,;\[\]\(\)] { LEXER_DATA->add(yytext, yytext); } 
+{TRIPLEQUOTE} { tmp_string = PyString_FromString(""); BEGIN(C_LONGSTRING); }
+\" { tmp_string = PyString_FromString("");  BEGIN(C_STRING); }
+\<[^>]*\> { add_token_str("URI_", yytext); }
+[+-]?([0-9]+\.[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)? { add_token_str("float", yytext); }
+[+-]?[0-9]+ { add_token("number", PyInt_FromLong(atol(yytext))); }
+{SYMBOL}?:{SYMBOL}? { add_token_str("prnot", yytext); } 
+{SYMBOL} { add_token_str("symbol", yytext); } 
+[.,;\[\]\(\)] { add_token_str(yytext, yytext); } 
 [ \t\n] ;
 
 . { 
-    std::stringstream ss;
-    ss << "Unexpected characters: '" << yytext << "'" << std::endl;
-    PyErr_SetString(PyExc_ValueError, ss.str().c_str());
+    // TODO concat with yytext
+    PyErr_SetString(PyExc_ValueError, "Unexpected characters");
     yyerror("Syntax error");
 }
 
-<C_LONGSTRING>{TRIPLEQUOTE} { LEXER_DATA->add("string", LEXER_DATA->strctx); BEGIN(INITIAL); }
-<C_LONGSTRING>[^"]+ LEXER_DATA->strctx += yytext;
-<C_LONGSTRING>\" LEXER_DATA->strctx += yytext;
+<C_LONGSTRING>{TRIPLEQUOTE} { add_token("string", tmp_string); BEGIN(INITIAL); }
+<C_LONGSTRING>[^"]+ add_to(yytext);
+<C_LONGSTRING>\" add_to("\"");
 
-<C_STRING>\" { LEXER_DATA->add("string", LEXER_DATA->strctx); BEGIN(INITIAL); }
-<C_STRING>\\\" LEXER_DATA->strctx += "\""; 
-<C_STRING>[^\\\"\n]+ LEXER_DATA->strctx += yytext;
+<C_STRING>\" { add_token("string", tmp_string); BEGIN(INITIAL); }
+<C_STRING>\\\" add_to("\""); 
+<C_STRING>[^\\\"\n]+ add_to(yytext);
 
 <C_COMMENT>\n { BEGIN(INITIAL); }
 <C_COMMENT>. ;
 
 %%
+
+int yywrap(yyscan_t scanner)
+{
+  return 1;
+}
+

@@ -116,9 +116,9 @@ zynjacku_wrap.c: zynjacku.defs zynjacku.override
 
 zynjacku_ttl_la_LDFLAGS = -module -avoid-version
 
-zynjacku_ttl_la_SOURCES  = zynjacku_ttl.cpp
+zynjacku_ttl_la_SOURCES  = zynjacku_ttl.c
 zynjacku_ttl_la_SOURCES += ttl_lexer.h
-zynjacku_ttl_la_SOURCES += flex_ttl.cpp
+zynjacku_ttl_la_SOURCES += flex_ttl.c
 zynjacku_ttl_la_SOURCES += flex_ttl.h
 
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
@@ -138,4 +138,4 @@ uninstall-hook:
 	rm -vf $(DESTDIR)$(bindir)/zynjacku
 
 ttl_flex_regenerate:
-	flex --batch --nodefault --c++ -o flex_ttl.cpp --header-file=flex_ttl.h ttl.l
+	flex --batch --nodefault -o flex_ttl.c --header-file=flex_ttl.h ttl.l

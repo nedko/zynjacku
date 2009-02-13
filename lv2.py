@@ -148,6 +148,8 @@ def parseTTL(uri, content, model, debug):
     for x in zynjacku_ttl.scan_string(content):
         if x[0] == '':
             continue
+        if x[0] == "URI_": x = ('URI', x[1][1:-1])
+        if x[0] == "float": x = ('number', float(x[1]))
         if x[0] == 'prefix':
             spo[0] = "@prefix"
             item = 1

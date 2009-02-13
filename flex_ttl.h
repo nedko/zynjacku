@@ -13,22 +13,18 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 35
+#define YY_FLEX_SUBMINOR_VERSION 34
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
 
-    /* The c++ scanner is a mess. The FlexLexer.h header file relies on the
-     * following macro. This is required in order to pass the c++-multiple-scanners
-     * test in the regression suite. We get reports that it breaks inheritance.
-     * We will address this in a future release of flex, or omit the C++ scanner
-     * altogether.
-     */
-    #define yyFlexLexer yyFlexLexer
-
 /* First, we deal with  platform-specific or compiler-specific issues. */
 
 /* begin standard C headers. */
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
 
 /* end standard C headers. */
 
@@ -95,13 +91,6 @@ typedef unsigned int flex_uint32_t;
 
 #endif /* ! FLEXINT_H */
 
-/* begin standard C++ headers. */
-#include <iostream> 
-#include <errno.h>
-#include <cstdlib>
-#include <cstring>
-/* end standard C++ headers. */
-
 #ifdef __cplusplus
 
 /* The "const" storage-class-modifier is valid. */
@@ -123,6 +112,23 @@ typedef unsigned int flex_uint32_t;
 #define yyconst
 #endif
 
+/* An opaque pointer. */
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
+typedef void* yyscan_t;
+#endif
+
+/* For convenience, these vars (plus the bison vars far below)
+   are macros in the reentrant scanner. */
+#define yyin yyg->yyin_r
+#define yyout yyg->yyout_r
+#define yyextra yyg->yyextra_r
+#define yyleng yyg->yyleng_r
+#define yytext yyg->yytext_r
+#define yylineno (YY_CURRENT_BUFFER_LVALUE->yy_bs_lineno)
+#define yycolumn (YY_CURRENT_BUFFER_LVALUE->yy_bs_column)
+#define yy_flex_debug yyg->yy_flex_debug_r
+
 /* Size of default input buffer. */
 #ifndef YY_BUF_SIZE
 #define YY_BUF_SIZE 16384
@@ -133,7 +139,12 @@ typedef unsigned int flex_uint32_t;
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
-extern int yyleng;
+/* The following is because we cannot portably get our hands on size_t
+ * (without autoconf's help, which isn't available because we want
+ * flex-generated scanners to compile on their own).
+ * Given that the standard has decreed that size_t exists since 1989,
+ * I guess we can afford to depend on it. Manoj.
+ */
 
 #ifndef YY_TYPEDEF_YY_SIZE_T
 #define YY_TYPEDEF_YY_SIZE_T
@@ -144,8 +155,7 @@ typedef size_t yy_size_t;
 #define YY_STRUCT_YY_BUFFER_STATE
 struct yy_buffer_state
 	{
-
-	std::istream* yy_input_file;
+	FILE *yy_input_file;
 
 	char *yy_ch_buf;		/* input buffer */
 	char *yy_buf_pos;		/* current position in input buffer */
@@ -192,15 +202,25 @@ struct yy_buffer_state
 	};
 #endif /* !YY_STRUCT_YY_BUFFER_STATE */
 
-void *yyalloc (yy_size_t  );
-void *yyrealloc (void *,yy_size_t  );
-void yyfree (void *  );
+void yyrestart (FILE *input_file ,yyscan_t yyscanner );
+void yy_switch_to_buffer (YY_BUFFER_STATE new_buffer ,yyscan_t yyscanner );
+YY_BUFFER_STATE yy_create_buffer (FILE *file,int size ,yyscan_t yyscanner );
+void yy_delete_buffer (YY_BUFFER_STATE b ,yyscan_t yyscanner );
+void yy_flush_buffer (YY_BUFFER_STATE b ,yyscan_t yyscanner );
+void yypush_buffer_state (YY_BUFFER_STATE new_buffer ,yyscan_t yyscanner );
+void yypop_buffer_state (yyscan_t yyscanner );
+
+YY_BUFFER_STATE yy_scan_buffer (char *base,yy_size_t size ,yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_string (yyconst char *yy_str ,yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_bytes (yyconst char *bytes,int len ,yyscan_t yyscanner );
+
+void *yyalloc (yy_size_t ,yyscan_t yyscanner );
+void *yyrealloc (void *,yy_size_t ,yyscan_t yyscanner );
+void yyfree (void * ,yyscan_t yyscanner );
 
 /* Begin user sect3 */
 
-#define yytext_ptr yytext
-
-#include "FlexLexer.h"
+#define yytext_ptr yytext_r
 
 #ifdef YY_HEADER_EXPORT_START_CONDITIONS
 #define INITIAL 0
@@ -222,12 +242,57 @@ void yyfree (void *  );
 #define YY_EXTRA_TYPE void *
 #endif
 
+int yylex_init (yyscan_t* scanner);
+
+int yylex_init_extra (YY_EXTRA_TYPE user_defined,yyscan_t* scanner);
+
+/* Accessor methods to globals.
+   These are made visible to non-reentrant scanners for convenience. */
+
+int yylex_destroy (yyscan_t yyscanner );
+
+int yyget_debug (yyscan_t yyscanner );
+
+void yyset_debug (int debug_flag ,yyscan_t yyscanner );
+
+YY_EXTRA_TYPE yyget_extra (yyscan_t yyscanner );
+
+void yyset_extra (YY_EXTRA_TYPE user_defined ,yyscan_t yyscanner );
+
+FILE *yyget_in (yyscan_t yyscanner );
+
+void yyset_in  (FILE * in_str ,yyscan_t yyscanner );
+
+FILE *yyget_out (yyscan_t yyscanner );
+
+void yyset_out  (FILE * out_str ,yyscan_t yyscanner );
+
+int yyget_leng (yyscan_t yyscanner );
+
+char *yyget_text (yyscan_t yyscanner );
+
+int yyget_lineno (yyscan_t yyscanner );
+
+void yyset_lineno (int line_number ,yyscan_t yyscanner );
+
+/* Macros after this point can all be overridden by user definitions in
+ * section 1.
+ */
+
+#ifndef YY_SKIP_YYWRAP
+#ifdef __cplusplus
+extern "C" int yywrap (yyscan_t yyscanner );
+#else
+extern int yywrap (yyscan_t yyscanner );
+#endif
+#endif
+
 #ifndef yytext_ptr
-static void yy_flex_strncpy (char *,yyconst char *,int );
+static void yy_flex_strncpy (char *,yyconst char *,int ,yyscan_t yyscanner);
 #endif
 
 #ifdef YY_NEED_STRLEN
-static int yy_flex_strlen (yyconst char * );
+static int yy_flex_strlen (yyconst char * ,yyscan_t yyscanner);
 #endif
 
 #ifndef YY_NO_INPUT
@@ -249,7 +314,10 @@ static int yy_flex_strlen (yyconst char * );
  */
 #ifndef YY_DECL
 #define YY_DECL_IS_OURS 1
-#define YY_DECL int yyFlexLexer::yylex()
+
+extern int yylex (yyscan_t yyscanner);
+
+#define YY_DECL int yylex (yyscan_t yyscanner)
 #endif /* !YY_DECL */
 
 /* yy_get_previous_state - get the state just before the EOB char was reached */
@@ -266,9 +334,9 @@ static int yy_flex_strlen (yyconst char * );
 #undef YY_DECL
 #endif
 
-#line 51 "ttl.l"
+#line 68 "ttl.l"
 
 
-#line 273 "flex_ttl.h"
+#line 341 "flex_ttl.h"
 #undef yyIN_HEADER
 #endif /* yyHEADER_H */
