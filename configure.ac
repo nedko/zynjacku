@@ -82,6 +82,38 @@ AM_CHECK_PYTHON_HEADERS(,[AC_MSG_ERROR(Could not find Python headers)])
 #AS_AC_EXPAND(PYTHONDIR, $pythondir)
 #AC_SUBST(PYTHONDIR)
 
+# Allow the user to override AM_PATH_PYTHON choice of PYTHON_PREFIX
+# and PYTHON_EXEC_PREFIX by setting PYLIBDIR
+AC_ARG_VAR(PYLIBDIR, [Override default Python site-packages dir])
+if test "$PYLIBDIR" ; then
+   pylibdir=$PYLIBDIR
+   AC_MSG_NOTICE([User set PYLIBDIR... $pylibdir])
+   AC_SUBST([pythondir],$pylibdir)
+   AC_SUBST([pyexecdir],$pylibdir)
+fi
+
+# Warn if python does not search in the installed places
+#AC_MSG_NOTICE([Checking to see whether Python will find installed files...])
+
+# Figure out the script directory
+if test "$prefix" == 'NONE'; then
+  #AC_MSG_NOTICE([prefix not set, falling back to ac_default_prefix...])
+  pyprefix=$ac_default_prefix
+else
+  pyprefix=$prefix
+fi
+abs_pythondir=`echo $pythondir | $SED s='${prefix}'=$pyprefix=`
+#AC_MSG_NOTICE([Python script dir will be: $abs_pythondir])
+match_pythondir=no
+for p in `$PYTHON -c "import sys
+for p in sys.path:
+  print p"`
+do
+  #AC_MSG_NOTICE([Checking Python sys.path entry $p ...])
+  if test $p == $abs_pythondir ; then
+    match_pythondir=
+  fi
+done
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
@@ -89,6 +121,23 @@ AC_MSG_RESULT([])
 AC_MSG_RESULT([========================])
 AC_MSG_RESULT([Prefix                    : $prefix])
 AC_MSG_RESULT([Dynparam1 plugins support : $HAVE_DYNPARAMS])
-AC_MSG_RESULT([Python dir                : $PYTHON_INCLUDES])
+AC_MSG_RESULT([Python include dir        : $PYTHON_INCLUDES])
+AC_MSG_RESULT([Python script dir         : $abs_pythondir])
 AC_MSG_RESULT([Dev version               : $dev_version])
 AC_MSG_RESULT([])
+
+if test "$match_pythondir"; then
+   AC_MSG_WARN([==================================================])
+   AC_MSG_WARN([==                                              ==])
+   AC_MSG_WARN([== pythondir is NOT in your Python's sys.path   ==])
+   AC_MSG_WARN([== which means you should add it to PYTHONPATH  ==])
+   AC_MSG_WARN([== at runtime, or add a .pth file to one of     ==])
+   AC_MSG_WARN([== your Python's existing sys.path directories. ==])
+   AC_MSG_WARN([==                                              ==])
+   AC_MSG_WARN([== Alternatively, re-run ./configure with       ==])
+   AC_MSG_WARN([== PYLIBDIR set to override the default         ==])
+   AC_MSG_WARN([== pythondir, or adjust prefix to match the     ==])
+   AC_MSG_WARN([== prefix used to build your Python.            ==])
+   AC_MSG_WARN([==                                              ==])
+   AC_MSG_WARN([==================================================])
+fi
