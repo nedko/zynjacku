@@ -2291,6 +2291,9 @@ class host:
 
     def new_plugin(self, uri, parameters=[], maps={}):
         info = self.lv2db.getPluginInfo(uri)
+        if not info:
+            print 'Cannot get info for plugin "%s"' % uri
+            return False
 
         plugin = zynjacku.Plugin(
             uri = uri,
