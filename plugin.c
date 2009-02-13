@@ -918,9 +918,8 @@ zynjacku_plugin_ui_off(
   {
     zynjacku_gtk2gui_ui_off(plugin_ptr->gtk2gui);
   }
-  else
 #if HAVE_DYNPARAMS
-  if (plugin_ptr->dynparams)
+  else if (plugin_ptr->dynparams)
   {
     lv2dynparam_host_ui_off(plugin_ptr->dynparams);
   }
