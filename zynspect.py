@@ -33,6 +33,23 @@ def show_plugin_info(plugin):
     print "Required features: %s" % list(plugin.requiredFeatures)
     print "Optional features: %s" % list(plugin.optionalFeatures)
     print "Binary: " + plugin.binary
+
+    print
+    if plugin.presets:
+        print "Presets:"
+        for preset in plugin.presets:
+            print "    URI:  " + preset
+            info = db.get_preset_info(plugin.uri, preset)
+            #print "    " + info.name
+            print "    Name: " + info.name
+            print "    Port values:"
+            for port in info.ports:
+                print "        %s: %s" % (port.symbol, port.value)
+            print
+    else:
+        print "No presets"
+    print
+
     print "Ports:"
     types = ["Audio", "Control", "Event", "Input", "Output", "String", "LarslMidi"]
     for port in plugin.ports:
