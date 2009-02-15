@@ -18,6 +18,13 @@ doap = "http://usefulinc.com/ns/doap#"
 lv2ui = "http://lv2plug.in/ns/extensions/ui#"
 lv2ui_ui = lv2ui + "ui"
 lv2ui_binary = lv2ui + "binary"
+lv2preset = "http://lv2plug.in/ns/dev/presets#"
+lv2preset_preset = lv2preset + "Preset"
+lv2preset_appliesTo = lv2preset + "appliesTo"
+lv2preset_hasPreset = lv2preset + "hasPreset"
+lv2preset_value = lv2preset + "value"
+dc = "http://dublincore.org/documents/dcmi-namespace/"
+dc_title = dc + "title"
 
 event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
@@ -53,6 +60,7 @@ class SimpleRDFModel:
         self.bySubject = {}
         self.bySubject["$classes"] = {}
         self.byPredicate = {}
+        #self.byObject = {}
         self.object_sources = {}
     def getByType(self, classname):
         classes = self.bySubject["$classes"]
@@ -117,16 +125,27 @@ class SimpleRDFModel:
         self.object_sources[o].add(source)
         if p == rdf_type:
             p = "a"
+        #if p == 'a' and o == lv2preset_preset:
+        #    print 'preset "%s" found' % s
+
         if s not in self.bySubject:
             self.bySubject[s] = {}
         if p not in self.bySubject[s]:
             self.bySubject[s][p] = []
         self.bySubject[s][p].append(o)
+
         if p not in self.byPredicate:
             self.byPredicate[p] = {}
         if s not in self.byPredicate[p]:
             self.byPredicate[p][s] = []
         self.byPredicate[p][s].append(o)
+
+        #if o not in self.byObject:
+        #    self.byObject[o] = {}
+        #if p not in self.byObject[o]:
+        #    self.byObject[o][p] = []
+        #self.byObject[o][p].append(s)
+
         if p == "a":
             self.addTriple("$classes", o, s, source)
     def copyFrom(self, src):
@@ -240,6 +259,10 @@ class LV2UI(object):
     def __init__(self):
         pass
         
+class LV2Preset(object):
+    def __init__(self):
+        pass
+        
 class LV2DB:
     def __init__(self, sources=[], debug = False):
         self.debug = debug
@@ -344,7 +367,9 @@ class LV2DB:
                 sources = world.sources
             else:
                 self.plugin_info[uri] = self.manifests
+
         info = self.plugin_info[uri]
+
         dest = LV2Plugin()
         dest.uri = uri
 
@@ -440,6 +465,11 @@ class LV2DB:
         else:
             dest.ui = []
 
+        if info.bySubject[uri].has_key(lv2preset_hasPreset):
+            dest.presets = info.bySubject[uri][lv2preset_hasPreset]
+        else:
+            dest.presets = []
+
         dest.sources = sources
 
         return dest
@@ -453,5 +483,23 @@ class LV2DB:
         dest.binary = info.getProperty(uri, lv2ui_binary)[0]
         dest.requiredFeatures = info.getProperty(uri, lv2ui + "requiredFeature", optional = True)
         dest.optionalFeatures = info.getProperty(uri, lv2ui + "optionalFeature", optional = True)
+
+        return dest
+
+    def get_preset_info(self, plugin_uri, uri):
+        info = self.plugin_info[plugin_uri]
+
+        dest = LV2Preset()
+        dest.uri = uri
+        dest.name = info.getProperty(uri, dc_title)[0]
+
+        dest.ports = []
+        for port in info.bySubject[uri][lv2 + "port"]:
+            psubj = info.bySubject[port]
+            pdata = LV2Port()
+            pdata.uri = port
+            pdata.symbol = info.getProperty(psubj, lv2 + "symbol")[0]
+            pdata.value = info.getProperty(psubj, lv2preset_value)[0]
+            dest.ports.append(pdata)
 
         return dest
