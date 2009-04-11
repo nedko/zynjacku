@@ -2786,7 +2786,13 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.synths_widget = glade_xml.get_widget("treeview_synths")
 
-        self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+        self.store = gtk.ListStore(
+            gobject.TYPE_BOOLEAN,       # UI visible
+            gobject.TYPE_STRING,        # Instance name
+            gobject.TYPE_STRING,        # Plugin name
+            gobject.TYPE_STRING,        # Plugin URI
+            gobject.TYPE_PYOBJECT)      # Plugin object
+
         text_renderer = gtk.CellRendererText()
         self.toggle_renderer = gtk.CellRendererToggle()
         self.toggle_renderer.set_property('activatable', True)
