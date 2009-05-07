@@ -13,6 +13,9 @@ rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 epi = "http://lv2plug.in/ns/dev/extportinfo#"
 rdf_type = rdf + "type"
+rdfs_see_also = rdfs + "seeAlso"
+rdfs_label = rdfs + "label"
+rdfs_subclass_of = rdfs + "subClassOf"
 tinyname_uri = "http://lv2plug.in/ns/dev/tiny-name"
 foaf = "http://xmlns.com/foaf/0.1/"
 doap = "http://usefulinc.com/ns/doap#"
@@ -312,8 +315,8 @@ class LV2DB:
                 filenames = set()
                 for spec in specs:
                     subj = self.manifests.bySubject[spec]
-                    if rdfs+"seeAlso" in subj:
-                        for fn in subj[rdfs+"seeAlso"]:
+                    if rdfs_see_also in subj:
+                        for fn in subj[rdfs_see_also]:
                             filenames.add(fn)
                 for fn in filenames:
                     parseTTL(fn, file(fn).read(), self.manifests, self.debug)
@@ -329,12 +332,12 @@ class LV2DB:
         self.add_category_recursive([], lv2 + "Plugin")
         
     def add_category_recursive(self, tree_pos, category):
-        cat_name = self.manifests.getProperty(category, rdfs + "label", single = True, optional = True)
+        cat_name = self.manifests.getProperty(category, rdfs_label, single = True, optional = True)
         if not cat_name:
             return
         self.category_paths.append(((tree_pos + [cat_name])[1:], category))
         self.categories.add(category)
-        items = self.manifests.byPredicate[rdfs + "subClassOf"]
+        items = self.manifests.byPredicate[rdfs_subclass_of]
         for subj in items:
             if subj in self.categories:
                 continue
@@ -360,8 +363,8 @@ class LV2DB:
                 world = SimpleRDFModel()
                 world.sources = set()
                 world.copyFrom(self.manifests)
-                if self.manifests.bySubject[uri].has_key("http://www.w3.org/2000/01/rdf-schema#seeAlso"):
-                  seeAlso = self.manifests.bySubject[uri]["http://www.w3.org/2000/01/rdf-schema#seeAlso"]
+                if self.manifests.bySubject[uri].has_key(rdfs_see_also):
+                  seeAlso = self.manifests.bySubject[uri][rdfs_see_also]
                   try:
                       for doc in seeAlso:
                           # print "Loading " + doc + " for plugin " + uri
@@ -445,7 +448,7 @@ class LV2DB:
             if sp and len(sp):
                 splist = []
                 for pt in sp:
-                    name = info.getProperty(pt, rdfs + "label", optional = True, single = True)
+                    name = info.getProperty(pt, rdfs_label, optional = True, single = True)
                     if name != None:
                         value = info.getProperty(pt, rdf + "value", optional = True, single = True)
                         if value != None:
