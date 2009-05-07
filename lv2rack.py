@@ -156,19 +156,8 @@ class lv2rack(zynjacku.host):
                     continue
                 continue
 
-            if audio_in_ports_count == 0 or audio_out_ports_count == 0:
-#                 print "Skipping %s (%s), [effect] plugin with unsupported port configuration" % (plugin.name, plugin.uri)
-#                 #print "  midi input ports: %d" % midi_in_ports_count
-#                 #print "  control ports: %d" % control_ports_count
-#                 #print "  string ports: %d" % string_ports_count
-#                 #print "  event ports: %d" % event_ports_count
-#                 #print "  event midi input ports: %d" % midi_event_in_ports_count
-#                 print "  audio input ports: %d" % audio_in_ports_count
-#                 print "  audio output ports: %d" % audio_out_ports_count
-#                 #print "  total ports %d" % ports_count
-                return False;
-
-#             print "Found effect plugin '%s' %s", (plugin.name, plugin.uri)
+        if audio_in_ports_count == 0 or audio_out_ports_count == 0:
+#             print "Skipping %s (%s), [effect] plugin with unsupported port configuration" % (plugin.name, plugin.uri)
 #             #print "  midi input ports: %d" % midi_in_ports_count
 #             #print "  control ports: %d" % control_ports_count
 #             #print "  string ports: %d" % string_ports_count
@@ -177,7 +166,18 @@ class lv2rack(zynjacku.host):
 #             print "  audio input ports: %d" % audio_in_ports_count
 #             print "  audio output ports: %d" % audio_out_ports_count
 #             #print "  total ports %d" % ports_count
-            return True;
+            return False;
+
+#         print "Found effect plugin '%s' %s", (plugin.name, plugin.uri)
+#         #print "  midi input ports: %d" % midi_in_ports_count
+#         #print "  control ports: %d" % control_ports_count
+#         #print "  string ports: %d" % string_ports_count
+#         #print "  event ports: %d" % event_ports_count
+#         #print "  event midi input ports: %d" % midi_event_in_ports_count
+#         print "  audio input ports: %d" % audio_in_ports_count
+#         print "  audio output ports: %d" % audio_out_ports_count
+#         #print "  total ports %d" % ports_count
+        return True;
 
     def load_plugin(self, uri, parameters=[], maps={}):
         statusbar_context_id = self.statusbar.get_context_id("loading plugin")
