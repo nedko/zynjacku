@@ -246,7 +246,7 @@ zynjacku_lv2_unload(
   zynjacku_lv2_handle lv2handle)
 {
   size_t i;
-  
+
   plugin_ptr->lv2->cleanup(plugin_ptr->lv2handle);
   dlclose(plugin_ptr->dlhandle);
   for (i = 0; i < dman_dlhandles_count; i++)

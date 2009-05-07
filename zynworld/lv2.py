@@ -301,10 +301,10 @@ class LV2DB:
                     if os.path.exists(fn):
                         parseTTL(fn, file(fn).read(), self.manifests, self.debug)
             # Read dynamic manifests
-	    wrappers = self.manifests.getByType(dman + "DynManifest")
+            wrappers = self.manifests.getByType(dman + "DynManifest")
             for w in wrappers:
                 subj = self.manifests.bySubject[w]
-		if lv2 + "binary" in subj:
+                if lv2 + "binary" in subj:
                     parseTTL(subj[lv2 + "binary"][0], zynjacku_c.zynjacku_lv2_dman_get(subj[lv2 + "binary"][0]), self.manifests, self.debug)
             # Read all specifications from all manifests
             if (lv2 + "Specification" in self.manifests.bySubject["$classes"]):
@@ -360,25 +360,25 @@ class LV2DB:
                 world = SimpleRDFModel()
                 world.sources = set()
                 world.copyFrom(self.manifests)
-		if self.manifests.bySubject[uri].has_key("http://www.w3.org/2000/01/rdf-schema#seeAlso"):
+                if self.manifests.bySubject[uri].has_key("http://www.w3.org/2000/01/rdf-schema#seeAlso"):
                   seeAlso = self.manifests.bySubject[uri]["http://www.w3.org/2000/01/rdf-schema#seeAlso"]
                   try:
                       for doc in seeAlso:
                           # print "Loading " + doc + " for plugin " + uri
                           parseTTL(doc, file(doc).read(), world, self.debug)
                           world.sources.add(doc)
-                      self.plugin_info[uri] = world                
+                      self.plugin_info[uri] = world
                   except Exception, e:
                       print "ERROR %s: %s" % (uri, str(e))
                       return None
-		else:
-		  self.plugin_info[uri] = world
+                else:
+                  self.plugin_info[uri] = world
                 for source in self.manifests.object_sources[uri]:
                     world.sources.add(source)
                 sources = world.sources
             else:
                 self.plugin_info[uri] = self.manifests
-        
+
         info = self.plugin_info[uri]
 
         dest = LV2Plugin()
