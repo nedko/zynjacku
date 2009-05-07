@@ -27,6 +27,10 @@ typedef struct { int _unused; } * zynjacku_lv2_handle;
 
 struct zynjacku_port;
 
+char *
+zynjacku_lv2_dman_get(
+  const char * dlpath);
+
 zynjacku_lv2_handle
 zynjacku_lv2_load(
   const char * uri,

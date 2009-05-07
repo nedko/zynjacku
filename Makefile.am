@@ -96,7 +96,7 @@ zynjacku_c_la_SOURCES += midi_cc_map_internal.h
 PYGTK_DEFS=`pkg-config --variable=defsdir pygtk-2.0`
 PYGTK_CODEGEN=`pkg-config --variable=codegendir pygtk-2.0`
 
-zynjacku.defs: engine.h rack.h plugin.h enum.h hints.h midi_cc_map.h
+zynjacku.defs: engine.h rack.h plugin.h enum.h hints.h midi_cc_map.h lv2.h
 	python $(PYGTK_CODEGEN)/h2def.py $^ | \
 	sed -e '/define-method set_parameter/,/^$$/ { s/\("midi_cc_map_obj_ptr"\)/\1 (null-ok) (default "NULL")/g; }' \
 	    -e '/define-method set_midi_cc_map/,/^$$/ { s/\("midi_cc_map_obj_ptr"\)/\1 (null-ok)/g; }' \
