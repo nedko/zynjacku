@@ -61,14 +61,13 @@ class DumpRDFModel:
 class SimpleRDFModel:
     def __init__(self):
         self.bySubject = {}
-        self.bySubject["$classes"] = {}
         self.byPredicate = {}
         #self.byObject = {}
+        self.byClass = {}
         self.object_sources = {}
     def getByType(self, classname):
-        classes = self.bySubject["$classes"]
-        if classname in classes:
-            return classes[classname]
+        if classname in self.byClass:
+            return self.byClass[classname]
         return []
     def getByPropType(self, propname):
         if propname in self.byPredicate:
@@ -150,7 +149,13 @@ class SimpleRDFModel:
         #self.byObject[o][p].append(s)
 
         if p == "a":
-            self.addTriple("$classes", o, s, source)
+            if not self.object_sources.has_key(s):
+                self.object_sources[s] = set()
+            self.object_sources[s].add(source)
+            if o in self.byClass:
+                self.byClass[o].append(s)
+            else:
+                self.byClass[o] = [s]
     def copyFrom(self, src):
         for s in src.bySubject:
             po = src.bySubject[s]
@@ -302,7 +307,7 @@ class LV2DB:
                     if os.path.exists(fn):
                         parseTTL(fn, file(fn).read(), self.manifests, self.debug)
             # Read all specifications from all manifests
-            if (lv2 + "Specification" in self.manifests.bySubject["$classes"]):
+            if lv2 + "Specification" in self.manifests.byClass:
                 specs = self.manifests.getByType(lv2 + "Specification")
                 filenames = set()
                 for spec in specs:
