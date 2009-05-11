@@ -2406,7 +2406,12 @@ class host:
     def check_plugin(self, plugin):
         return False
 
-    def rescan_plugins(self, store, progressbar, force):
+    def rescan_plugins(self, view, progressbar, force):
+        # detach from store to optimize speed
+        store = view.get_model()
+        view.set_model(None)
+        view.set_sensitive(False)
+
         store.clear()
 
         progressbar.show()
@@ -2478,6 +2483,8 @@ class host:
 
         progressbar.hide()
 
+        view.set_sensitive(True)
+        view.set_model(store)
 
     def plugins_load(self, title="LV2 plugins"):
         dialog = self.glade_xml.get_widget("zynjacku_plugin_repo")
@@ -2516,7 +2523,7 @@ class host:
             plugin_repo_widget.connect("row-activated", on_row_activated)
 
         dialog.show()
-        self.rescan_plugins(store, progressbar, False)
+        self.rescan_plugins(plugin_repo_widget, progressbar, False)
         while True:
             ret = dialog.run()
             if ret == 0:
@@ -2526,7 +2533,7 @@ class host:
                 self.progress_window.hide()
                 return
             elif ret == 1:
-                self.rescan_plugins(store, progressbar, True)
+                self.rescan_plugins(plugin_repo_widget, progressbar, True)
             else:
                 dialog.hide()
                 return
