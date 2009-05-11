@@ -4,6 +4,7 @@ import sys
 import tempfile
 import cProfile
 import pstats
+import time
 
 old_path = sys.path
 
@@ -26,8 +27,30 @@ sys.path = old_path
 def lv2scan():
     db = lv2.LV2DB()
     uris = db.getPluginList()
+    count = 0
+    best = 0.0
+    worst = 0.0
     for uri in uris:
+        print uri,
+        t1 = time.time()
         db.getPluginInfo(uri)
+        t2 = time.time()
+        dt = t2 - t1
+        print(" %.3fs" % dt)
+        if count == 0:
+            best = dt
+            worst = dt
+        else:
+            if dt < best:
+                best = dt
+                print("NEW BEST: %.3fs" % best)
+            elif dt > worst:
+                worst = dt
+                print("NEW WORST: %.3fs" % worst)
+        count += 1
+    print("Count: %u" % count)
+    print("Best: %.3fs" % best)
+    print("Worst: %.3fs" % worst)
 
 fh, path = tempfile.mkstemp()
 
