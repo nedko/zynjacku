@@ -63,14 +63,13 @@ class DumpRDFModel:
 class SimpleRDFModel:
     def __init__(self):
         self.bySubject = {}
-        self.bySubject["$classes"] = {}
         self.byPredicate = {}
         #self.byObject = {}
+        self.byClass = {}
         self.object_sources = {}
     def getByType(self, classname):
-        classes = self.bySubject["$classes"]
-        if classname in classes:
-            return classes[classname]
+        if classname in self.byClass:
+            return self.byClass[classname]
         return []
     def getByPropType(self, propname):
         if propname in self.byPredicate:
@@ -120,30 +119,36 @@ class SimpleRDFModel:
             else:
                 return None
         return list(anyprops)
-        
-                
+
     def addTriple(self, s, p, o, source=None):
         #if p == lv2 + "binary":
         #    print 'binary "%s" of %s found' % (o, s)
-        if not self.object_sources.has_key(o):
-            self.object_sources[o] = set()
-        self.object_sources[o].add(source)
+        if o not in self.object_sources:
+            self.object_sources[o] = set((source,))
+        else:
+            self.object_sources[o].add(source)
         if p == rdf_type:
             p = "a"
         #if p == 'a' and o == lv2preset_preset:
         #    print 'preset "%s" found' % s
 
-        if s not in self.bySubject:
-            self.bySubject[s] = {}
-        if p not in self.bySubject[s]:
-            self.bySubject[s][p] = []
-        self.bySubject[s][p].append(o)
+        if s in self.bySubject:
+            predicates = self.bySubject[s]
+        else:
+            self.bySubject[s] = predicates = {}
+        if p in predicates:
+            predicates[p].append(o)
+        else:
+            predicates[p] = [o]
 
-        if p not in self.byPredicate:
-            self.byPredicate[p] = {}
-        if s not in self.byPredicate[p]:
-            self.byPredicate[p][s] = []
-        self.byPredicate[p][s].append(o)
+        if p in self.byPredicate:
+            subjects = self.byPredicate[p]
+        else:
+            self.byPredicate[p] = subjects = {}
+        if s in subjects:
+            subjects[s].append(o)
+        else:
+            subjects[s] = [o]
 
         #if o not in self.byObject:
         #    self.byObject[o] = {}
@@ -152,7 +157,13 @@ class SimpleRDFModel:
         #self.byObject[o][p].append(s)
 
         if p == "a":
-            self.addTriple("$classes", o, s, source)
+            if s not in self.object_sources:
+                self.object_sources[s] = set()
+            self.object_sources[s].add(source)
+            if o in self.byClass:
+                self.byClass[o].append(s)
+            else:
+                self.byClass[o] = [s]
     def copyFrom(self, src):
         for s in src.bySubject:
             po = src.bySubject[s]
@@ -310,7 +321,7 @@ class LV2DB:
                 if lv2 + "binary" in subj:
                     parseTTL(subj[lv2 + "binary"][0], zynjacku_c.zynjacku_lv2_dman_get(subj[lv2 + "binary"][0]), self.manifests, self.debug)
             # Read all specifications from all manifests
-            if (lv2 + "Specification" in self.manifests.bySubject["$classes"]):
+            if lv2 + "Specification" in self.manifests.byClass:
                 specs = self.manifests.getByType(lv2 + "Specification")
                 filenames = set()
                 for spec in specs:
