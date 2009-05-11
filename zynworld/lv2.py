@@ -121,12 +121,10 @@ class SimpleRDFModel:
     def addTriple(self, s, p, o, source=None):
         #if p == lv2 + "binary":
         #    print 'binary "%s" of %s found' % (o, s)
-        if not self.object_sources.has_key(o):
-            object_source = set()
-            self.object_sources[o] = object_source
+        if o not in self.object_sources:
+            self.object_sources[o] = set((source,))
         else:
-            object_source = self.object_sources[o]
-        object_source.add(source)
+            self.object_sources[o].add(source)
         if p == rdf_type:
             p = "a"
         #if p == 'a' and o == lv2preset_preset:
@@ -135,26 +133,20 @@ class SimpleRDFModel:
         if s in self.bySubject:
             predicates = self.bySubject[s]
         else:
-            predicates = {}
-            self.bySubject[s] = predicates
+            self.bySubject[s] = predicates = {}
         if p in predicates:
-            predicate = predicates[p]
+            predicates[p].append(o)
         else:
-            predicate = []
-            predicates[p] = predicate
-        predicate.append(o)
+            predicates[p] = [o]
 
         if p in self.byPredicate:
             subjects = self.byPredicate[p]
         else:
-            subjects = {}
-            self.byPredicate[p] = subjects
+            self.byPredicate[p] = subjects = {}
         if s in subjects:
-            subject = subjects[s]
+            subjects[s].append(o)
         else:
-            subject = []
-            subjects[s] = subject
-        subject.append(o)
+            subjects[s] = [o]
 
         #if o not in self.byObject:
         #    self.byObject[o] = {}
@@ -163,7 +155,7 @@ class SimpleRDFModel:
         #self.byObject[o][p].append(s)
 
         if p == "a":
-            if not self.object_sources.has_key(s):
+            if s not in self.object_sources:
                 self.object_sources[s] = set()
             self.object_sources[s].add(source)
             if o in self.byClass:
