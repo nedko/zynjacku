@@ -132,21 +132,21 @@ class SimpleRDFModel:
 
         if s in self.bySubject:
             predicates = self.bySubject[s]
+            if p in predicates:
+                predicates[p].append(o)
+            else:
+                predicates[p] = [o]
         else:
-            self.bySubject[s] = predicates = {}
-        if p in predicates:
-            predicates[p].append(o)
-        else:
-            predicates[p] = [o]
+            self.bySubject[s] = { p : [o] }
 
         if p in self.byPredicate:
             subjects = self.byPredicate[p]
+            if s in subjects:
+                subjects[s].append(o)
+            else:
+                subjects[s] = [o]
         else:
-            self.byPredicate[p] = subjects = {}
-        if s in subjects:
-            subjects[s].append(o)
-        else:
-            subjects[s] = [o]
+            self.byPredicate[p] = { s : [o] }
 
         #if o not in self.byObject:
         #    self.byObject[o] = {}
@@ -163,11 +163,22 @@ class SimpleRDFModel:
             else:
                 self.byClass[o] = [s]
     def copyFrom(self, src):
-        for s in src.bySubject:
-            po = src.bySubject[s]
-            for p in po:
-                for o in po[p]:
-                    self.addTriple(s, p, o)
+        self.bySubject = {}
+        self.byPredicate = {}
+        self.object_sources = {}
+        self.byClass = {}
+        for s, src_s in src.bySubject.iteritems():
+            dst_s = self.bySubject[s] = {}
+            for p, plist in src_s.iteritems():
+                dst_s[p] = list(plist)
+        for p, src_p in src.byPredicate.iteritems():
+            dst_p = self.byPredicate[p] = {}
+            for s, slist in src_p.iteritems():
+                dst_p[s] = list(slist)
+        for o, val in src.object_sources.iteritems():
+            self.object_sources[o] = set(val)
+        for c, val in src.byClass.iteritems():
+            self.byClass[c] = list(set(val))
     def dump(self):
         for s in self.bySubject.keys():
             for p in self.bySubject[s].keys():
