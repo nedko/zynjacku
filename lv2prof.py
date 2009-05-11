@@ -25,7 +25,8 @@ sys.path = old_path
 
 def lv2scan():
     db = lv2.LV2DB()
-    for uri in db.getPluginList():
+    uris = db.getPluginList()
+    for uri in uris:
         db.getPluginInfo(uri)
 
 fh, path = tempfile.mkstemp()
