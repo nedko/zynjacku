@@ -11,6 +11,10 @@ headers
 #include "enum.h"
 #include "hints.h"
 #include "midi_cc_map.h"
+
+char *
+zynjacku_lv2_dman_get(
+  const char * dlpath);
 %%
 modulename zynjacku_c
 %%

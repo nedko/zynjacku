@@ -2316,19 +2316,19 @@ class host:
             elif port.isControl:
                 if port.isInput:
                     default_provided = port.__dict__.has_key('defaultValue')
-                    if default_provided:
+                    if default_provided and port.defaultValue != None:
                         default_value = float(port.defaultValue)
                     else:
                         default_value = 0.0
 
                     min_provided = port.__dict__.has_key('minimum')
-                    if min_provided:
+                    if min_provided and port.minimum != None:
                         min_value = float(port.minimum);
                     else:
                         min_value = 0.0
 
                     max_provided = port.__dict__.has_key('maximum')
-                    if max_provided:
+                    if max_provided and port.maximum != None:
                         max_value = float(port.maximum)
                     else:
                         max_value = 1.0
