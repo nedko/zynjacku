@@ -2315,20 +2315,20 @@ class host:
                     return False
             elif port.isControl:
                 if port.isInput:
-                    default_provided = port.__dict__.has_key('defaultValue')
-                    if default_provided and port.defaultValue != None:
+                    default_provided = not port.defaultValue is None
+                    if default_provided:
                         default_value = float(port.defaultValue)
                     else:
                         default_value = 0.0
 
-                    min_provided = port.__dict__.has_key('minimum')
-                    if min_provided and port.minimum != None:
+                    min_provided = not port.minimum is None
+                    if min_provided:
                         min_value = float(port.minimum);
                     else:
                         min_value = 0.0
 
-                    max_provided = port.__dict__.has_key('maximum')
-                    if max_provided and port.maximum != None:
+                    max_provided = not port.maximum is None
+                    if max_provided:
                         max_value = float(port.maximum)
                     else:
                         max_value = 1.0
