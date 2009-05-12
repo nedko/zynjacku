@@ -415,7 +415,7 @@ class LV2DB:
             if self.sources: # cache/subset preloaded
                 self.plugin_info[uri] = self.manifests
                 model = self.manifests
-                return model, sources
+                return model, self.sources
 
             world = SimpleRDFModel()
             world.copyFrom(self.manifests)
