@@ -370,7 +370,9 @@ class LV2DB:
                 #print " *** Parse dynamic TTL *** ",
                 manifest = SimpleRDFModel()
                 filename = subj[lv2 + "binary"][0]
-                parseTTL(filename, zynjacku_c.zynjacku_lv2_dman_get(filename), manifest, self.debug)
+                data = zynjacku_c.zynjacku_lv2_dman_get(filename)
+                #print data
+                parseTTL(filename, data, manifest, self.debug)
                 # add wrapper filename to list of sources so it gets cached
                 for source in self.manifests.object_sources[w]:
                     #print "adding wrapper ttl " + source
