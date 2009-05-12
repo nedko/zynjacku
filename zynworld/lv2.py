@@ -67,6 +67,11 @@ class SimpleRDFModel:
         #self.byObject = {}
         self.byClass = {}
         self.object_sources = {}
+        self.len = 0
+
+    def size(self):
+        return self.len
+
     def getByType(self, classname):
         if classname in self.byClass:
             return self.byClass[classname]
@@ -121,6 +126,8 @@ class SimpleRDFModel:
         return list(anyprops)
 
     def addTriple(self, s, p, o, source=None):
+        self.len += 1
+
         #if p == lv2 + "binary":
         #    print 'binary "%s" of %s found' % (o, s)
         if o not in self.object_sources:
@@ -165,6 +172,7 @@ class SimpleRDFModel:
             else:
                 self.byClass[o] = [s]
     def copyFrom(self, src):
+        #print " *** RDF Model Copy *** ",
         self.bySubject = {}
         self.byPredicate = {}
         self.object_sources = {}
@@ -187,6 +195,7 @@ class SimpleRDFModel:
                 print "%s %s %s" % (s, p, self.bySubject[s][p])
 
 def parseTTL(uri, content, model, debug):
+    #print " *** Parse TTL *** ",
     # Missing stuff: translated literals, blank nodes
     if debug:
         print "Parsing: %s" % uri
@@ -316,6 +325,7 @@ class LV2DB:
             print "LV2_PATH not set, defaulting to %s" % repr(lv2path)
 
         self.manifests = SimpleRDFModel()
+        self.dynmanifests = []
         self.paths = {}
         self.plugin_info = dict()
         if not self.sources:
@@ -330,7 +340,10 @@ class LV2DB:
             for w in wrappers:
                 subj = self.manifests.bySubject[w]
                 if lv2 + "binary" in subj:
-                    parseTTL(subj[lv2 + "binary"][0], zynjacku_c.zynjacku_lv2_dman_get(subj[lv2 + "binary"][0]), self.manifests, self.debug)
+                    #print " *** Parse dynamic TTL *** ",
+                    manifest = SimpleRDFModel()
+                    parseTTL(subj[lv2 + "binary"][0], zynjacku_c.zynjacku_lv2_dman_get(subj[lv2 + "binary"][0]), manifest, self.debug)
+                    self.dynmanifests.append(manifest)
             # Read all specifications from all manifests
             if lv2 + "Specification" in self.manifests.byClass:
                 specs = self.manifests.getByType(lv2 + "Specification")
@@ -349,6 +362,10 @@ class LV2DB:
             #fn = "/usr/lib/lv2/lv2core.lv2/lv2.ttl"
             #parseTTL(fn, file(fn).read(), self.manifests, self.debug)
             self.plugins = set(self.manifests.getByType(lv2 + "Plugin"))
+
+        for dynmanifest in self.dynmanifests:
+            self.plugins += set(dynmanifest.getByType(lv2 + "Plugin"))
+
         self.categories = set()
         self.category_paths = []
         self.add_category_recursive([], lv2 + "Plugin")
@@ -372,39 +389,57 @@ class LV2DB:
         
     def getPluginList(self):
         return self.plugins
-        
+
+    def get_plugin_full_model(self, uri):
+        sources = []
+        model = None
+
+        if uri in self.plugin_info:
+            model = self.plugin_info[uri]
+            return model, sources
+
+        if self.manifests.bySubject.has_key(uri):
+            if self.sources: # cache/subset preloaded
+                self.plugin_info[uri] = self.manifests
+                model = self.manifests
+                return model, sources
+
+            world = SimpleRDFModel()
+            world.sources = set()
+            world.copyFrom(self.manifests)
+            #msg = "#%u#" % world.size()
+            #print msg,
+            seeAlso = self.manifests.bySubject[uri][rdfs_see_also]
+            try:
+                for doc in seeAlso:
+                    #print "Loading " + doc + " for plugin " + uri
+                    parseTTL(doc, file(doc).read(), world, self.debug)
+                    #msg = "#%u#" % world.size()
+                    #print msg,
+                    world.sources.add(doc)
+                self.plugin_info[uri] = world
+            except Exception, e:
+                print "ERROR %s: %s" % (uri, str(e))
+                return None
+            for source in self.manifests.object_sources[uri]:
+                world.sources.add(source)
+            sources = world.sources
+            return world, sources
+
+        for model in self.dynmanifests:
+            if model.bySubject.has_key(uri):
+                self.plugin_info[uri] = model
+                return model, sources
+
+        #print 'no subject "%s"' % uri
+        return None
+
     def getPluginInfo(self, uri):
         #print "getting info for plugin " + uri
-        if not self.manifests.bySubject.has_key(uri):
-            #print 'no subject "%s"' % uri
+
+        info, sources = self.get_plugin_full_model(uri)
+        if not info:
             return None
-
-        sources = []
-        if uri not in self.plugin_info:
-            if not self.sources:
-                world = SimpleRDFModel()
-                world.sources = set()
-                world.copyFrom(self.manifests)
-                if self.manifests.bySubject[uri].has_key(rdfs_see_also):
-                  seeAlso = self.manifests.bySubject[uri][rdfs_see_also]
-                  try:
-                      for doc in seeAlso:
-                          # print "Loading " + doc + " for plugin " + uri
-                          parseTTL(doc, file(doc).read(), world, self.debug)
-                          world.sources.add(doc)
-                      self.plugin_info[uri] = world
-                  except Exception, e:
-                      print "ERROR %s: %s" % (uri, str(e))
-                      return None
-                else:
-                  self.plugin_info[uri] = world
-                for source in self.manifests.object_sources[uri]:
-                    world.sources.add(source)
-                sources = world.sources
-            else:
-                self.plugin_info[uri] = self.manifests
-
-        info = self.plugin_info[uri]
 
         dest = LV2Plugin()
         dest.uri = uri
