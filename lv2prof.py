@@ -27,17 +27,22 @@ sys.path = old_path
 def lv2scan():
     db = lv2.LV2DB()
     uris = db.getPluginList()
+    total = len(uris)
     count = 0
     best = 0.0
     worst = 0.0
     for uri in uris:
-        print uri,
+        percent = float(count) / total * 100
+        count += 1
+        msg = "[% 3u%%] [% 3u/% 3u] %s " % (percent, count, total, uri)
+        print msg,
+        sys.stdout.flush()
         t1 = time.time()
         db.getPluginInfo(uri)
         t2 = time.time()
         dt = t2 - t1
-        print(" %.3fs" % dt)
-        if count == 0:
+        print("%.3fs" % dt)
+        if count == 1:
             best = dt
             worst = dt
         else:
@@ -47,7 +52,6 @@ def lv2scan():
             elif dt > worst:
                 worst = dt
                 print("NEW WORST: %.3fs" % worst)
-        count += 1
     print("Count: %u" % count)
     print("Best: %.3fs" % best)
     print("Worst: %.3fs" % worst)
