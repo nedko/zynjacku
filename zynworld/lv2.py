@@ -67,6 +67,7 @@ class SimpleRDFModel:
         #self.byObject = {}
         self.byClass = {}
         self.object_sources = {}
+        self.sources = set()
         self.len = 0
 
     def size(self):
@@ -124,6 +125,12 @@ class SimpleRDFModel:
             else:
                 return None
         return list(anyprops)
+
+    def add_object_source(self, uri, source):
+        if o not in self.object_sources:
+            self.object_sources[o] = set((source,))
+        else:
+            self.object_sources[o].add(source)
 
     def addTriple(self, s, p, o, source=None):
         self.len += 1
@@ -328,6 +335,7 @@ class LV2DB:
         self.dynmanifests = []
         self.paths = {}
         self.plugin_info = dict()
+
         if not self.sources:
             # Scan manifests
             for dir in lv2path:
@@ -335,15 +343,6 @@ class LV2DB:
                     fn = bundle+"/manifest.ttl"
                     if os.path.exists(fn):
                         parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-            # Read dynamic manifests
-            wrappers = self.manifests.getByType(dman + "DynManifest")
-            for w in wrappers:
-                subj = self.manifests.bySubject[w]
-                if lv2 + "binary" in subj:
-                    #print " *** Parse dynamic TTL *** ",
-                    manifest = SimpleRDFModel()
-                    parseTTL(subj[lv2 + "binary"][0], zynjacku_c.zynjacku_lv2_dman_get(subj[lv2 + "binary"][0]), manifest, self.debug)
-                    self.dynmanifests.append(manifest)
             # Read all specifications from all manifests
             if lv2 + "Specification" in self.manifests.byClass:
                 specs = self.manifests.getByType(lv2 + "Specification")
@@ -355,16 +354,30 @@ class LV2DB:
                             filenames.add(fn)
                 for fn in filenames:
                     parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-            self.plugins = self.manifests.getByType(lv2 + "Plugin")
         else:
             for source in self.sources:
                 parseTTL(source, file(source).read(), self.manifests, self.debug)
             #fn = "/usr/lib/lv2/lv2core.lv2/lv2.ttl"
             #parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-            self.plugins = set(self.manifests.getByType(lv2 + "Plugin"))
 
-        for dynmanifest in self.dynmanifests:
-            self.plugins += set(dynmanifest.getByType(lv2 + "Plugin"))
+        self.plugins = set(self.manifests.getByType(lv2 + "Plugin"))
+
+        # Read dynamic manifests
+        wrappers = self.manifests.getByType(dman + "DynManifest")
+        for w in wrappers:
+            subj = self.manifests.bySubject[w]
+            if lv2 + "binary" in subj:
+                #print " *** Parse dynamic TTL *** ",
+                manifest = SimpleRDFModel()
+                filename = subj[lv2 + "binary"][0]
+                parseTTL(filename, zynjacku_c.zynjacku_lv2_dman_get(filename), manifest, self.debug)
+                # add wrapper filename to list of sources so it gets cached
+                for source in self.manifests.object_sources[w]:
+                    #print "adding wrapper ttl " + source
+                    manifest.sources.add(source)
+                self.dynmanifests.append(manifest)
+                for plugin in manifest.getByType(lv2 + "Plugin"):
+                    self.plugins.add(plugin)
 
         self.categories = set()
         self.category_paths = []
@@ -405,7 +418,6 @@ class LV2DB:
                 return model, sources
 
             world = SimpleRDFModel()
-            world.sources = set()
             world.copyFrom(self.manifests)
             #msg = "#%u#" % world.size()
             #print msg,
@@ -429,7 +441,8 @@ class LV2DB:
         for model in self.dynmanifests:
             if model.bySubject.has_key(uri):
                 self.plugin_info[uri] = model
-                return model, sources
+                #print model.sources
+                return model, model.sources
 
         #print 'no subject "%s"' % uri
         return None
