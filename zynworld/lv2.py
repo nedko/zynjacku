@@ -196,6 +196,7 @@ class SimpleRDFModel:
             self.object_sources[o] = set(val)
         for c, val in src.byClass.iteritems():
             self.byClass[c] = list(set(val))
+        self.len = src.len
     def dump(self):
         for s in self.bySubject.keys():
             for p in self.bySubject[s].keys():
@@ -354,6 +355,7 @@ class LV2DB:
                             filenames.add(fn)
                 for fn in filenames:
                     parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+            #print "%u triples in global world" % self.manifests.size()
         else:
             for source in self.sources:
                 parseTTL(source, file(source).read(), self.manifests, self.debug)
@@ -373,6 +375,7 @@ class LV2DB:
                 data = zynjacku_c.zynjacku_lv2_dman_get(filename)
                 #print data
                 parseTTL(filename, data, manifest, self.debug)
+                #print "%u triples in %s dynmanifest world" % (manifest.size(), filename)
                 # add wrapper filename to list of sources so it gets cached
                 for source in self.manifests.object_sources[w]:
                     #print "adding wrapper ttl " + source
@@ -438,6 +441,7 @@ class LV2DB:
             for source in self.manifests.object_sources[uri]:
                 world.sources.add(source)
             sources = world.sources
+            #print "%u triples in %s world" % (world.size(), uri)
             return world, sources
 
         for model in self.dynmanifests:
