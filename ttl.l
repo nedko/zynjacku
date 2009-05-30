@@ -46,10 +46,11 @@ TRIPLEQUOTE \"\"\"
 {SYMBOL}?:{SYMBOL}? { add_token_str("prnot", yytext); } 
 {SYMBOL} { add_token_str("symbol", yytext); } 
 [.,;\[\]\(\)] { add_token_str(yytext, yytext); } 
-[ \t\n] ;
+[ \t\n\r] ;
 
 . { 
     // TODO concat with yytext
+    //printf("yytext = '%u''%u'\n", yytext[0], yytext[1]);
     PyErr_SetString(PyExc_ValueError, "Unexpected characters");
     yyerror("Syntax error");
 }

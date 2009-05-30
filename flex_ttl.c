@@ -9,7 +9,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 34
+#define YY_FLEX_SUBMINOR_VERSION 35
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -192,13 +192,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 #define unput(c) yyunput( c, yyg->yytext_ptr , yyscanner )
 
-/* The following is because we cannot portably get our hands on size_t
- * (without autoconf's help, which isn't available because we want
- * flex-generated scanners to compile on their own).
- * Given that the standard has decreed that size_t exists since 1989,
- * I guess we can afford to depend on it. Manoj.
- */
-
 #ifndef YY_TYPEDEF_YY_SIZE_T
 #define YY_TYPEDEF_YY_SIZE_T
 typedef size_t yy_size_t;
@@ -375,7 +368,7 @@ static yyconst flex_int16_t yy_accept[61] =
 static yyconst flex_int32_t yy_ec[256] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    2,    3,
-        1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
+        1,    1,    2,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    2,    1,    4,    5,    1,    1,    1,    1,    6,
         6,    1,    7,    6,    8,    9,    1,   10,   10,   10,
@@ -510,7 +503,7 @@ void add_token(const char *name, PyObject *value)
 }        
 
 
-#line 514 "flex_ttl.c"
+#line 507 "flex_ttl.c"
 
 #define INITIAL 0
 #define C_COMMENT 1
@@ -735,7 +728,7 @@ YY_DECL
 #line 37 "ttl.l"
 
 
-#line 739 "flex_ttl.c"
+#line 732 "flex_ttl.c"
 
 	if ( !yyg->yy_init )
 		{
@@ -876,58 +869,59 @@ YY_RULE_SETUP
 #line 51 "ttl.l"
 { 
     // TODO concat with yytext
+    //printf("yytext = '%u''%u'\n", yytext[0], yytext[1]);
     PyErr_SetString(PyExc_ValueError, "Unexpected characters");
     yyerror("Syntax error");
 }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 57 "ttl.l"
+#line 58 "ttl.l"
 { add_token("string", tmp_string); BEGIN(INITIAL); }
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 58 "ttl.l"
+#line 59 "ttl.l"
 add_to(yytext);
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 59 "ttl.l"
+#line 60 "ttl.l"
 add_to("\"");
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 61 "ttl.l"
+#line 62 "ttl.l"
 { add_token("string", tmp_string); BEGIN(INITIAL); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 62 "ttl.l"
+#line 63 "ttl.l"
 add_to("\""); 
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 63 "ttl.l"
+#line 64 "ttl.l"
 add_to(yytext);
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 65 "ttl.l"
+#line 66 "ttl.l"
 { BEGIN(INITIAL); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 66 "ttl.l"
+#line 67 "ttl.l"
 ;
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 68 "ttl.l"
+#line 69 "ttl.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 931 "flex_ttl.c"
+#line 925 "flex_ttl.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(C_COMMENT):
 case YY_STATE_EOF(C_LONGSTRING):
@@ -2048,7 +2042,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 68 "ttl.l"
+#line 69 "ttl.l"
 
 
 
