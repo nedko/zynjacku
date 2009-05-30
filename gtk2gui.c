@@ -364,6 +364,7 @@ zynjacku_gtk2gui_callback_write(
   }
 
   zynjacku_plugin_ui_set_port_value(ui_ptr->ports[port_index]->plugin_ptr, ui_ptr->ports[port_index], buffer, buffer_size);
+  zynjacku_gtk2gui_port_event(ui_ptr, ui_ptr->ports[port_index]);
 }
 
 bool
