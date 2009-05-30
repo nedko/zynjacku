@@ -125,17 +125,17 @@ zynjacku_gtk2gui_create(
 
   if (strcmp(ui_type_uri, LV2_UI_GTK_URI) == 0)
   {
-    LOG_NOTICE("GtkUI for '%s'", uri);
+    LOG_NOTICE("GtkUI for '%s'", plugin_uri);
     type = UI_TYPE_GTK;
   }
   else if (strcmp(ui_type_uri, LV2_EXTERNAL_UI_URI) == 0)
   {
-    LOG_NOTICE("External UI for '%s'", uri);
+    LOG_NOTICE("External UI for '%s'", plugin_uri);
     type = UI_TYPE_EXTERNAL;
   }
   else
   {
-    LOG_DEBUG("zynjacku_plugin_repo_get_ui_info() failed for '%s'", uri);
+    LOG_DEBUG("Ignoring UI '%s' of plugin '%s', unknown type '%s'", ui_uri, plugin_uri, ui_type_uri);
     goto fail;
   }
 
