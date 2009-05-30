@@ -438,6 +438,8 @@ zynjacku_gtk2gui_ui_on(
 
       gtk_window_set_title(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->instance_name);
 
+      gtk_window_set_role(GTK_WINDOW(ui_ptr->window_ptr), "plugin_ui");
+
       gtk_window_set_resizable(GTK_WINDOW(ui_ptr->window_ptr), ui_ptr->resizable);
 
       gtk_container_add(GTK_CONTAINER(ui_ptr->window_ptr), ui_ptr->widget_ptr);
