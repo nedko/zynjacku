@@ -58,9 +58,15 @@ except:
     lash = None
 
 class lv2rack(zynjacku.host):
-    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
+    def __init__(self, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "lv2rack constructor called."
-        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, "lv2rack", "effect stack", lash_client)
+
+        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, preset_extension, preset_name, lash_client)
+
+class lv2rack_multi(lv2rack):
+    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
+        #print "lv2rack_multi constructor called."
+        lv2rack.__init__(self, client_name, "lv2rack", "effect stack", lash_client)
         
         self.data_dir = data_dir
         self.glade_xml = glade_xml
@@ -132,11 +138,11 @@ class lv2rack(zynjacku.host):
 
         self.store.clear()
 
-        zynjacku.host.__del__(self)
+        lv2rack.__del__(self)
 
     def new_plugin(self, uri, parameters=[], maps={}):
         self.progress_window.show(uri)
-        plugin = zynjacku.host.new_plugin(self, uri, parameters, maps)
+        plugin = lv2rack.new_plugin(self, uri, parameters, maps)
         return plugin
 
     def on_plugin_progress(self, engine, name, progress, message):
@@ -196,7 +202,7 @@ class lv2rack(zynjacku.host):
     def run(self):
         toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
 
-        zynjacku.host.run(self)
+        lv2rack.run(self)
 
         self.toggle_renderer.disconnect(toggled_connect_id)
 
@@ -272,10 +278,51 @@ class lv2rack(zynjacku.host):
         self.store.clear()
         self.clear_plugins()
 
+class lv2rack_single(lv2rack):
+    def __init__(self, glade_xml, client_name, uri):
+        #print "ZynjackuHostOne constructor called."
+        lv2rack.__init__(self, client_name, "lv2rack")
+
+        self.plugin = self.new_plugin(uri)
+        if not self.plugin:
+            print"Failed to construct %s" % uri
+            return
+
+        if not lv2rack.create_plugin_ui(self, self.plugin):
+            print"Failed to create synth window"
+            return
+
+    def new_plugin(self, uri, parameters=[], maps={}):
+        self.progress_window.show(uri)
+        plugin = lv2rack.new_plugin(self, uri, parameters, maps)
+        self.progress_window.hide()
+        return plugin
+
+    def on_plugin_progress(self, engine, name, progress, message):
+        self.progress_window.progress(name, progress, message)
+
+    def on_plugin_ui_window_destroyed(self, window, synth, row):
+        gtk.main_quit()
+
+    def run(self):
+        if not self.plugin:
+            self.run_done()
+            return
+
+        self.plugin.ui_win.show()
+        lv2rack.run(self)
+
+    def __del__(self):
+        #print "lv2rack_single destructor called."
+
+        lv2rack.__del__(self)
+
 def main():
     data_dir, glade_xml, the_license = zynjacku.file_setup()
 
     zynjacku.register_types()
+
+    client_name = "lv2rack"
 
     if lash:                        # If LASH python bindings are available
         # sys.argv is modified by this call
@@ -290,7 +337,12 @@ def main():
     if lash_client:
         print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
 
-    lv2rack(data_dir, glade_xml, "lv2rack", the_license, sys.argv[1:], lash_client).run()
+    if len(sys.argv) == 2 and sys.argv[1][-9:] != ".lv2rack":
+        host = lv2rack_single(glade_xml, client_name, sys.argv[1])
+    else:
+        host = lv2rack_multi(data_dir, glade_xml, client_name, the_license, sys.argv[1:], lash_client)
+
+    host.run()
 
     sys.stdout.flush()
     sys.stderr.flush()
