@@ -122,7 +122,7 @@ zynjacku_ttl_la_SOURCES += flex_ttl.c
 zynjacku_ttl_la_SOURCES += flex_ttl.h
 
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py lv2.py
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py zynworld/__init__.py  zynworld/lv2.py
 
 bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
 
