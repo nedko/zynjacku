@@ -127,7 +127,7 @@ EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py 
 bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
 
 zynjackudir = $(pkgdatadir)
-dist_zynjacku_DATA = gpl.txt zynjacku.glade logo.png
+dist_zynjacku_DATA = gpl.txt zynjacku.glade art/logo/logo.png
 
 install-exec-hook:
 	ln -vfs zynjacku.py $(DESTDIR)$(bindir)/zynjacku

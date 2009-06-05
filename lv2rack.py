@@ -64,14 +64,14 @@ class lv2rack(zynjacku.host):
         zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, preset_extension, preset_name, lash_client)
 
 class lv2rack_multi(lv2rack):
-    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
+    def __init__(self, program_data, client_name, uris, lash_client):
         #print "lv2rack_multi constructor called."
         lv2rack.__init__(self, client_name, "lv2rack", "effect stack", lash_client)
-        
-        self.data_dir = data_dir
-        self.glade_xml = glade_xml
 
-        self.main_window = glade_xml.get_widget("lv2rack")
+        self.program_data = program_data
+        self.glade_xml = program_data['glade_xml']
+
+        self.main_window = self.glade_xml.get_widget("lv2rack")
         self.main_window.set_title(client_name)
 
         self.statusbar = self.glade_xml.get_widget("lv2rack_statusbar")
@@ -87,15 +87,13 @@ class lv2rack_multi(lv2rack):
 
         self.signal_ids = []
         for k, v in dic.items():
-            w = glade_xml.get_widget(k)
+            w = self.glade_xml.get_widget(k)
             if not w:
                 print "failed to get glade widget '%s'" % k
                 continue
             self.signal_ids.append([w, w.connect("activate", v)])
 
-        self.the_license = the_license
-
-        self.effects_widget = glade_xml.get_widget("lv2rack_treeview_effects")
+        self.effects_widget = self.glade_xml.get_widget("lv2rack_treeview_effects")
 
         self.store = gtk.ListStore(gobject.TYPE_BOOLEAN, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         text_renderer = gtk.CellRendererText()
@@ -228,21 +226,7 @@ class lv2rack_multi(lv2rack):
                 self.statusbar.push(statusbar_context_id, "Failed to construct show effect UI")
 
     def on_about(self, widget):
-        about = gtk.AboutDialog()
-        about.set_transient_for(self.main_window)
-        about.set_name("lv2rack")
-        if zynjacku_c.zynjacku_get_version() == "dev":
-            about.set_comments("(development snapshot)")
-        else:
-            about.set_version(zynjacku_c.zynjacku_get_version())
-        about.set_license(self.the_license)
-        about.set_website("http://home.gna.org/zynjacku/")
-        about.set_authors(["Nedko Arnaudov"])
-        #about.set_artists(["Thorsten Wilms"])
-        #about.set_logo(gtk.gdk.pixbuf_new_from_file("%s/logo.png" % self.data_dir))
-        about.show()
-        about.run()
-        about.hide()
+        zynjacku.run_about_dialog(self.main_window, self.program_data)
 
     def on_preset_load(self, widget):
         self.preset_load_ask()
@@ -279,9 +263,11 @@ class lv2rack_multi(lv2rack):
         self.clear_plugins()
 
 class lv2rack_single(lv2rack):
-    def __init__(self, glade_xml, client_name, uri):
+    def __init__(self, program_data, client_name, uri):
         #print "ZynjackuHostOne constructor called."
         lv2rack.__init__(self, client_name, "lv2rack")
+
+        self.glade_xml = program_data['glade_xml']
 
         self.plugin = self.new_plugin(uri)
         if not self.plugin:
@@ -318,7 +304,7 @@ class lv2rack_single(lv2rack):
         lv2rack.__del__(self)
 
 def main():
-    data_dir, glade_xml, the_license = zynjacku.file_setup()
+    program_data = zynjacku.get_program_data('lv2rack')
 
     zynjacku.register_types()
 
@@ -338,9 +324,9 @@ def main():
         print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
 
     if len(sys.argv) == 2 and sys.argv[1][-9:] != ".lv2rack":
-        host = lv2rack_single(glade_xml, client_name, sys.argv[1])
+        host = lv2rack_single(program_data, client_name, sys.argv[1])
     else:
-        host = lv2rack_multi(data_dir, glade_xml, client_name, the_license, sys.argv[1:], lash_client)
+        host = lv2rack_multi(program_data, client_name, sys.argv[1:], lash_client)
 
     host.run()
 

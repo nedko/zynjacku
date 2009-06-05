@@ -2752,20 +2752,39 @@ class ZynjackuHost(host):
 
         host.__init__(self, zynjacku.Engine(), client_name, preset_extension, preset_name, lash_client)
 
+def run_about_dialog(transient_for, program_data):
+    about = gtk.AboutDialog()
+    about.set_transient_for(transient_for)
+    about.set_name(program_data['name'])
+    if program_data.has_key('comments'):
+        about.set_name(program_data['comments'])
+    if program_data.has_key('version'):
+        about.set_version(program_data['version'])
+    about.set_license(program_data['license'])
+    about.set_website(program_data['website'])
+    about.set_authors(program_data['authors'])
+    if program_data.has_key('artists'):
+        about.set_artists(program_data['artists'])
+    if program_data.has_key('logo'):
+        about.set_logo(gtk.gdk.pixbuf_new_from_file(program_data['logo']))
+    about.show()
+    about.run()
+    about.hide()
+
 class ZynjackuHostMulti(ZynjackuHost):
-    def __init__(self, data_dir, glade_xml, client_name, the_license, uris, lash_client):
+    def __init__(self, program_data, client_name, uris, lash_client):
         #print "ZynjackuHostMulti constructor called."
         ZynjackuHost.__init__(self, client_name, "zynjacku", "synth stack", lash_client)
         
-        self.data_dir = data_dir
-        self.glade_xml = glade_xml
+        self.program_data = program_data
+        self.glade_xml = program_data['glade_xml']
 
-        self.main_window = glade_xml.get_widget("zynjacku_main")
+        self.main_window = self.glade_xml.get_widget("zynjacku_main")
         self.main_window.set_title(client_name)
 
         self.statusbar = self.glade_xml.get_widget("statusbar")
 
-        self.hbox_menubar = glade_xml.get_widget("hbox_menubar")
+        self.hbox_menubar = self.glade_xml.get_widget("hbox_menubar")
         self.midi_led = midi_led()
         self.midi_led_frame = gtk.Frame()
         self.midi_led_frame.set_shadow_type(gtk.SHADOW_OUT)
@@ -2783,15 +2802,13 @@ class ZynjackuHostMulti(ZynjackuHost):
 
         self.signal_ids = []
         for k, v in dic.items():
-            w = glade_xml.get_widget(k)
+            w = self.glade_xml.get_widget(k)
             if not w:
                 print "failed to get glade widget '%s'" % k
                 continue
             self.signal_ids.append([w, w.connect("activate", v)])
 
-        self.the_license = the_license
-
-        self.synths_widget = glade_xml.get_widget("treeview_synths")
+        self.synths_widget = self.glade_xml.get_widget("treeview_synths")
 
         self.store = gtk.ListStore(
             gobject.TYPE_BOOLEAN,       # UI visible
@@ -2963,21 +2980,7 @@ class ZynjackuHostMulti(ZynjackuHost):
                 self.statusbar.push(statusbar_context_id, "Failed to show synth UI")
 
     def on_about(self, widget):
-        about = gtk.AboutDialog()
-        about.set_transient_for(self.main_window)
-        about.set_name("zynjacku")
-        if zynjacku.zynjacku_get_version() == "dev":
-            about.set_comments("(development snapshot)")
-        else:
-            about.set_version(zynjacku.zynjacku_get_version())
-        about.set_license(self.the_license)
-        about.set_website("http://home.gna.org/zynjacku/")
-        about.set_authors(["Nedko Arnaudov"])
-        about.set_artists(["Thorsten Wilms"])
-        about.set_logo(gtk.gdk.pixbuf_new_from_file("%s/logo.png" % self.data_dir))
-        about.show()
-        about.run()
-        about.hide()
+        run_about_dialog(self.main_window, self.program_data)
 
     def on_preset_load(self, widget):
         self.preset_load_ask()
@@ -3003,7 +3006,7 @@ class ZynjackuHostMulti(ZynjackuHost):
         self.clear_plugins()
 
 class ZynjackuHostOne(ZynjackuHost):
-    def __init__(self, glade_xml, client_name, uri):
+    def __init__(self, program_data, client_name, uri):
         #print "ZynjackuHostOne constructor called."
         ZynjackuHost.__init__(self, client_name, "zynjacku")
 
@@ -3041,7 +3044,15 @@ class ZynjackuHostOne(ZynjackuHost):
 
         ZynjackuHost.__del__(self)
 
-def file_setup():
+def get_program_data(program_name):
+    program_data = {}
+
+    program_data['name'] = program_name
+    if zynjacku.zynjacku_get_version() == "dev":
+        program_data['comments'] = "(development snapshot)"
+    else:
+        program_data['version'] = zynjacku.zynjacku_get_version()
+
     data_dir = os.path.dirname(sys.argv[0])
 
     # since ppl tend to run "python zynjacku.py", lets assume that it is in current directory
@@ -3054,15 +3065,37 @@ def file_setup():
     if not os.path.isfile(glade_file):
         data_dir = data_dir + os.sep + ".." + os.sep + "share"+ os.sep + "zynjacku"
         glade_file = data_dir + os.sep + "zynjacku.glade"
+        logo_dir = data_dir
+    else:
+        logo_dir = data_dir + os.sep + 'art' + os.sep + 'logo'
 
     #print 'data dir is "%s"' % data_dir
     #print 'Loading glade from "%s"' % glade_file
 
-    the_license = file(data_dir + os.sep + "gpl.txt").read()
+    program_data['license'] = file(data_dir + os.sep + "gpl.txt").read()
 
-    glade_xml = gtk.glade.XML(glade_file)
+    program_data['glade_xml'] = gtk.glade.XML(glade_file)
 
-    return data_dir, glade_xml, the_license
+
+    program_data['website'] = "http://home.gna.org/zynjacku/"
+
+    program_data['authors'] = [
+        "Nedko Arnaudov",
+        "Krzysztof Foltman",
+        "Stefano D'Angelo",
+        ]
+
+    program_data['logo'] = "%s/logo.png" % logo_dir
+    program_data['artists'] = [
+        "Thorsten Wilms",
+        "Lapo Calamandrei",
+        ]
+
+    if program_name != 'zynjacku':
+        del program_data['artists']
+        del program_data['logo']
+
+    return program_data
 
 def register_types():
     gobject.signal_new("zynjacku-parameter-changed", PluginUIUniversalParameter, gobject.SIGNAL_RUN_FIRST | gobject.SIGNAL_ACTION, gobject.TYPE_NONE, [])
@@ -3074,7 +3107,7 @@ def register_types():
     gobject.type_register(PluginUIUniversalParameterBool)
 
 def main():
-    data_dir, glade_xml, the_license = file_setup()
+    program_data = get_program_data('zynjacku')
 
     register_types()
 
@@ -3094,9 +3127,9 @@ def main():
         print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
 
     if len(sys.argv) == 2 and sys.argv[1][-9:] != ".zynjacku":
-        host = ZynjackuHostOne(glade_xml, client_name, sys.argv[1])
+        host = ZynjackuHostOne(program_data, client_name, sys.argv[1])
     else:
-        host = ZynjackuHostMulti(data_dir, glade_xml, client_name, the_license, sys.argv[1:], lash_client)
+        host = ZynjackuHostMulti(program_data, client_name, sys.argv[1:], lash_client)
 
     host.run()
 
