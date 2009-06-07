@@ -339,6 +339,13 @@ zynjacku_gtk2gui_destroy(
   zynjacku_gtk2gui_handle ui_handle)
 {
   LOG_DEBUG("zynjacku_on_gtk2gui_destroy() called");
+
+  if (ui_ptr->ui_handle != NULL &&
+      ui_ptr->type == UI_TYPE_EXTERNAL)
+  {
+    LV2_EXTERNAL_UI_HIDE(ui_ptr->external_ui_control);
+  }
+
   dlclose(ui_ptr->dlhandle);
   free(ui_ptr->ports);
   free(ui_ptr->bundle_path);
