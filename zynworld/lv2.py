@@ -29,7 +29,7 @@ lv2preset_hasPreset = lv2preset + "hasPreset"
 lv2preset_value = lv2preset + "value"
 dc = "http://dublincore.org/documents/dcmi-namespace/"
 dc_title = dc + "title"
-dman = "http://naspro.atheme.org/rdf/dman#"
+dman = "http://naspro.atheme.org/rdf/old-dman#"
 
 event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
