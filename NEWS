@@ -1,3 +1,17 @@
+= Version 5 on 2009-06-13 =
+ * slv2 is no longer required
+ * cache list of suitable plugins
+ * speedup plugin list window
+ * new tool, zynspect, that can be used to list and inspect available
+   lv2 plguins.
+ * Fix assert when restoring rack presets
+ * By default, sort plugins by name
+ * Experimental support for dynmanifest extension. Combined with
+   NASPRO allows loading ladspa plugins in lv2rack.
+ * Set plugin GUI window's role to "plugin_ui" (for WM kludges etc)
+ * single plugin mode for lv2rack
+ * Hide external UIs when zynjacku/lv2rack quits
+
 = Version 4 on 2009-01-28 =
  * lv2rack does no longer require PHAT (it was not really using it even
    in zynjacku-3 release)
