@@ -1508,7 +1508,14 @@ class PluginUIUniversal(PluginUI):
         self.layout_type = layout_type
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        self.window.set_size_request(600,300)
+
+        # nasty workaround: we assume that dynparam plugins have bigger layout and
+        # non-dynparam plugins have no port grouping and thus their layout is vertical
+        if plugin.dynparams_supported:
+            self.window.set_size_request(600,300)
+        else:
+            self.window.set_size_request(200,400)
+
         self.window.set_title(plugin.get_instance_name())
         self.window.set_role("plugin_ui")
 
@@ -2377,8 +2384,12 @@ class host:
             #    for sp in splist:
             #        print "       Scale point %s: %s" % (sp[1], sp[0])
 
+        plugin.dynparams_supported = False
+
         for feature in info.requiredFeatures + info.optionalFeatures:
             plugin.add_supported_feature(feature)
+            if feature == "http://home.gna.org/lv2dynparam/v1":
+                plugin.dynparams_supported = True
 
         if not self.engine.construct_plugin(plugin):
             return False
