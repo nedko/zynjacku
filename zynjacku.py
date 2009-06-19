@@ -1510,7 +1510,7 @@ class PluginUIUniversal(PluginUI):
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_size_request(600,300)
         self.window.set_title(plugin.get_instance_name())
-        self.window.set_role("zynjacku_synth_ui")
+        self.window.set_role("plugin_ui")
 
         self.window.connect("destroy", self.on_window_destroy)
 
