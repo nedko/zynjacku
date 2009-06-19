@@ -2474,6 +2474,7 @@ class host:
                     license_map = {
                         "http://usefulinc.com/doap/licenses/gpl": "GNU General Public License",
                         "http://usefulinc.com/doap/licenses/lgpl":"GNU Lesser General Public License",
+                        "http://usefulinc.com/doap/licenses/unknown":"unknown", # fake doap license that is used by NASPRO
                         }
                     if license_map.has_key(plugin.license):
                         plugin.license_decoded = license_map[plugin.license]
