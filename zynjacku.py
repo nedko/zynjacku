@@ -2514,17 +2514,17 @@ class host:
             column_name = gtk.TreeViewColumn("Name", text_renderer, text=0)
             column_uri = gtk.TreeViewColumn("URI", text_renderer, text=1)
             column_license = gtk.TreeViewColumn("License", text_renderer, text=2)
-            column_author = gtk.TreeViewColumn("Author", text_renderer, text=3)
+            column_maintainer = gtk.TreeViewColumn("Maintainer", text_renderer, text=3)
 
             column_name.set_sort_column_id(0)
             column_uri.set_sort_column_id(1)
             column_license.set_sort_column_id(2)
-            column_author.set_sort_column_id(3)
+            column_maintainer.set_sort_column_id(3)
 
             plugin_repo_widget.append_column(column_name)
             plugin_repo_widget.append_column(column_uri)
             plugin_repo_widget.append_column(column_license)
-            plugin_repo_widget.append_column(column_author)
+            plugin_repo_widget.append_column(column_maintainer)
 
             store.set_sort_column_id(0, gtk.SORT_ASCENDING)
 
