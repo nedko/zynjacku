@@ -29,7 +29,7 @@ lv2preset_hasPreset = lv2preset + "hasPreset"
 lv2preset_value = lv2preset + "value"
 dc = "http://dublincore.org/documents/dcmi-namespace/"
 dc_title = dc + "title"
-dman = "http://naspro.atheme.org/rdf/old-dman#"
+dman = "http://lv2plug.in/ns/ext/dynmanifest#"
 
 event_type_names = {
     "http://lv2plug.in/ns/ext/midi#MidiEvent" : "MIDI"
@@ -370,19 +370,33 @@ class LV2DB:
             subj = self.manifests.bySubject[w]
             if lv2 + "binary" in subj:
                 #print " *** Parse dynamic TTL *** ",
-                manifest = SimpleRDFModel()
+                subj_manifest = SimpleRDFModel()
                 filename = subj[lv2 + "binary"][0]
-                data = zynjacku_c.zynjacku_lv2_dman_get(filename)
-                #print data
-                parseTTL(filename, data, manifest, self.debug)
+                #print filename
+                dman_handle = zynjacku_c.zynjacku_lv2_dman_open(filename)
+                if not dman_handle:
+                    continue
+                data = zynjacku_c.zynjacku_lv2_dman_get_subjects(dman_handle)
+                if not data:
+                    zynjacku_c.zynjacku_lv2_dman_close(dman_handle)
+                    continue
+                parseTTL(filename, data, subj_manifest, self.debug)
                 #print "%u triples in %s dynmanifest world" % (manifest.size(), filename)
-                # add wrapper filename to list of sources so it gets cached
-                for source in self.manifests.object_sources[w]:
-                    #print "adding wrapper ttl " + source
-                    manifest.sources.add(source)
-                self.dynmanifests.append(manifest)
-                for plugin in manifest.getByType(lv2 + "Plugin"):
+                for plugin in subj_manifest.getByType(lv2 + "Plugin"):
+                    #print plugin
+                    manifest = SimpleRDFModel()
+                    p_data = zynjacku_c.zynjacku_lv2_dman_get_data(dman_handle, plugin)
+                    if not p_data:
+                        continue
+                    #print p_data
+                    parseTTL(filename, p_data, manifest, self.debug)
+                    # add wrapper filename to list of sources so it gets cached
+                    for source in self.manifests.object_sources[w]:
+                        #print "adding wrapper ttl " + source
+                        manifest.sources.add(source)
                     self.plugins.add(plugin)
+                    self.dynmanifests.append(manifest)
+                zynjacku_c.zynjacku_lv2_dman_close(dman_handle)
 
         self.categories = set()
         self.category_paths = []
@@ -445,6 +459,7 @@ class LV2DB:
             return world, sources
 
         for model in self.dynmanifests:
+            #print model
             if model.bySubject.has_key(uri):
                 self.plugin_info[uri] = model
                 #print model.sources

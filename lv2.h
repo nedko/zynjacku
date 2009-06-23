@@ -24,12 +24,26 @@
 #define LV2_H__F5AF3921_19C9_47C0_95B6_AF05FCD9C767__INCLUDED
 
 typedef struct { int _unused; } * zynjacku_lv2_handle;
+typedef struct { int _unused; } * zynjacku_lv2_dman_handle;
 
 struct zynjacku_port;
 
-char *
-zynjacku_lv2_dman_get(
+zynjacku_lv2_dman_handle
+zynjacku_lv2_dman_open(
   const char * dlpath);
+
+char *
+zynjacku_lv2_dman_get_subjects(
+  zynjacku_lv2_dman_handle dman);
+
+char *
+zynjacku_lv2_dman_get_data(
+  zynjacku_lv2_dman_handle dman,
+  const char *uri);
+
+void
+zynjacku_lv2_dman_close(
+  zynjacku_lv2_dman_handle dman);
 
 zynjacku_lv2_handle
 zynjacku_lv2_load(

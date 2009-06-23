@@ -12,9 +12,8 @@ headers
 #include "hints.h"
 #include "midi_cc_map.h"
 
-char *
-zynjacku_lv2_dman_get(
-  const char * dlpath);
+#include <lv2.h>
+#include "lv2.h"
 %%
 modulename zynjacku_c
 %%
@@ -25,3 +24,76 @@ ignore-glob
   zynjacku_enum_set
   zynjacku_hints_set
 %%
+override zynjacku_lv2_dman_open kwargs
+static PyObject *
+_wrap_zynjacku_lv2_dman_open(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  static char *kwlist[] = { "dlpath", NULL };
+  char *dlpath = NULL;
+  zynjacku_lv2_dman_handle handle = NULL;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &dlpath))
+    return NULL;
+
+  handle = zynjacku_lv2_dman_open(dlpath);
+
+  return PyCObject_FromVoidPtr(handle, NULL);
+}
+%%
+override zynjacku_lv2_dman_get_subjects kwargs
+static PyObject *
+_wrap_zynjacku_lv2_dman_get_subjects(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  static char *kwlist[] = { "dman", NULL };
+  PyCObject *py_handle = NULL;
+  zynjacku_lv2_dman_handle handle = NULL;
+  PyStringObject *py_string = NULL;
+  char *string = NULL;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &py_handle))
+    return NULL;
+
+  handle = PyCObject_AsVoidPtr(py_handle);
+  string = zynjacku_lv2_dman_get_subjects(handle);
+  py_string = PyString_FromString(string);
+
+  return py_string;
+}
+%%
+override zynjacku_lv2_dman_get_data kwargs
+static PyObject *
+_wrap_zynjacku_lv2_dman_get_data(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  static char *kwlist[] = { "dman", "uri", NULL };
+  PyCObject *py_handle = NULL;
+  zynjacku_lv2_dman_handle handle = NULL;
+  PyStringObject *py_string = NULL;
+  char *string = NULL;
+  char *uri = NULL;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Os", kwlist, &py_handle, &uri))
+    return NULL;
+
+  handle = PyCObject_AsVoidPtr(py_handle);
+  string = zynjacku_lv2_dman_get_data(handle, uri);
+  py_string = PyString_FromString(string);
+
+  return py_string;
+}
+%%
+override zynjacku_lv2_dman_close kwargs
+static PyObject *
+_wrap_zynjacku_lv2_dman_close(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  static char *kwlist[] = { "dman", NULL };
+  PyCObject *py_handle = NULL;
+  zynjacku_lv2_dman_handle handle = NULL;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &py_handle))
+    return NULL;
+
+  handle = PyCObject_AsVoidPtr(py_handle);
+  zynjacku_lv2_dman_close(handle);
+
+  return Py_None;
+}

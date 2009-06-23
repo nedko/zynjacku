@@ -38,6 +38,7 @@
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 #endif
+#include <lv2_dyn_manifest.h>
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"
@@ -61,66 +62,127 @@ struct zynjacku_lv2_plugin
   LV2_Handle lv2handle;
 };
 
-/* TODO: cleanup allocation dman_dlhandles */
-static void **dman_dlhandles = NULL;
-static size_t dman_dlhandles_count = 0;
-
-char *
-zynjacku_lv2_dman_get(
-  const char * dlpath)
+struct zynjacku_lv2_dman
 {
   void *dlhandle;
-  FILE * (*lv2_dyn_manifest)();
-  void   (*lv2_dyn_manifest_done)(FILE *fp);
-  void *tmp;
-  FILE *fp;
-  long size;
-  char *ret;
+  LV2_Dyn_Manifest_Handle handle;
+  int (*open)(LV2_Dyn_Manifest_Handle *handle,
+              const LV2_Dyn_Manifest_Feature *const * features);
+  int (*get_subjects)(LV2_Dyn_Manifest_Handle handle, FILE *fp);
+  int (*get_data)(LV2_Dyn_Manifest_Handle handle, FILE *fp, const char *uri);
+  void (*close)(LV2_Dyn_Manifest_Handle handle);
+};
 
-  dlhandle = dlopen(dlpath, RTLD_NOW);
-  if (dlhandle == NULL)
+#define dman_ptr ((struct zynjacku_lv2_dman *)dman)
+
+zynjacku_lv2_dman_handle
+zynjacku_lv2_dman_open(
+  const char * dlpath)
+{
+  struct zynjacku_lv2_dman tmp, *ret;
+  const LV2_Dyn_Manifest_Feature * const * features = {NULL};
+  int err;
+
+  tmp.dlhandle = dlopen(dlpath, RTLD_NOW);
+  if (tmp.dlhandle == NULL)
   {
     LOG_ERROR("Unable to open library %s (%s)", dlpath, dlerror());
     return NULL;
   }
 
   dlerror();
-  lv2_dyn_manifest = dlsym(dlhandle, "lv2_dyn_manifest");
-  if (lv2_dyn_manifest == NULL)
+  tmp.open = dlsym(tmp.dlhandle, "lv2_dyn_manifest_open");
+  if (tmp.open == NULL)
   {
-    LOG_ERROR("Cannot retrieve dynamic manifest generator function of LV2 plugin %s (%s)", dlpath, dlerror());
-    dlclose(dlhandle);
+    LOG_ERROR("Cannot retrieve dynamic manifest open function of LV2 plugin %s (%s)", dlpath, dlerror());
+    dlclose(tmp.dlhandle);
     return NULL;
   }
 
   dlerror();
-  lv2_dyn_manifest_done = dlsym(dlhandle, "lv2_dyn_manifest_done");
-  if (lv2_dyn_manifest_done == NULL)
+  tmp.get_subjects = dlsym(tmp.dlhandle, "lv2_dyn_manifest_get_subjects");
+  if (tmp.get_subjects == NULL)
   {
-    LOG_ERROR("Cannot retrieve dynamic manifest destructor function of LV2 plugin %s (%s)", dlpath, dlerror());
-    dlclose(dlhandle);
+    LOG_ERROR("Cannot retrieve dynamic manifest get subjects function of LV2 plugin %s (%s)", dlpath, dlerror());
+    dlclose(tmp.dlhandle);
     return NULL;
   }
 
-  fp = lv2_dyn_manifest();
+  dlerror();
+  tmp.get_data = dlsym(tmp.dlhandle, "lv2_dyn_manifest_get_data");
+  if (tmp.open == NULL)
+  {
+    LOG_ERROR("Cannot retrieve dynamic manifest get data function of LV2 plugin %s (%s)", dlpath, dlerror());
+    dlclose(tmp.dlhandle);
+    return NULL;
+  }
+
+  dlerror();
+  tmp.close = dlsym(tmp.dlhandle, "lv2_dyn_manifest_close");
+  if (tmp.close == NULL)
+  {
+    LOG_ERROR("Cannot retrieve dynamic manifest close function of LV2 plugin %s (%s)", dlpath, dlerror());
+    dlclose(tmp.dlhandle);
+    return NULL;
+  }
+
+  err = tmp.open(&tmp.handle, features);
+  if (err != 0)
+  {
+    LOG_ERROR("Error while opening dynamic manifest of LV2 plugin %s (%d)", dlpath, err);
+    dlclose(tmp.dlhandle);
+    return NULL;
+  }
+
+  ret = malloc(sizeof(struct zynjacku_lv2_dman));
+  if (ret == NULL)
+  {
+    LOG_ERROR("Failed to allocate memory for dynamic manifest of LV2 plugin %s", dlpath);
+    tmp.close(tmp.handle);
+    dlclose(tmp.dlhandle);
+    return NULL;
+  }
+
+  *ret = tmp;
+
+  return (zynjacku_lv2_dman_handle)ret;
+}
+
+char *
+zynjacku_lv2_dman_get_subjects(
+  zynjacku_lv2_dman_handle dman)
+{
+  FILE *fp;
+  char *ret;
+  size_t size;
+  int err;
+
+  fp = tmpfile();
   if (fp == NULL)
   {
-    LOG_ERROR("LV2 plugin %s's lv2_dynamic_manifest() returned NULL", dlpath);
-    dlclose(dlhandle);
+    LOG_ERROR("Failed to generate temporary file for dynamic manifest (%s)", strerror(errno));
+    return NULL;
+  }
+
+  err = dman_ptr->get_subjects(dman_ptr->handle, fp);
+  if (err != 0)
+  {
+    LOG_ERROR("Failed to fetch subject URIs from dynamic manifest (%d)", err);
+    fclose(fp);
     return NULL;
   }
 
   if (fseek(fp, 0, SEEK_END) < 0)
   {
     LOG_ERROR("Cannot determine the size of dynamic manifest file (%s)", strerror(errno));
-    dlclose(dlhandle);
+    fclose(fp);
     return NULL;
   }
   size = ftell(fp);
   if (size < 0)
   {
     LOG_ERROR("Cannot determine the size of dynamic manifest file (%s)", strerror(errno));
-    dlclose(dlhandle);
+    fclose(fp);
     return NULL;
   }
   rewind(fp);
@@ -129,27 +191,80 @@ zynjacku_lv2_dman_get(
   if (ret == NULL)
   {
     LOG_ERROR("Failed to allocate memory to store the dynamically generated manifest file");
-    dlclose(dlhandle);
+    fclose(fp);
     return NULL;
   }
-
-  tmp = realloc(dman_dlhandles, (dman_dlhandles_count + 1) * sizeof(void *));
-  if (tmp == NULL)
-  {
-    LOG_ERROR("Failed to allocate memory for dman_dlhandles");
-    free(ret);
-    dlclose(dlhandle);
-    return NULL;
-  }
-  dman_dlhandles = tmp;
-  dman_dlhandles[dman_dlhandles_count] = dlhandle;
-  dman_dlhandles_count++;
 
   size = fread(ret, 1, size, fp);
   ret[size] = '\0';
-  lv2_dyn_manifest_done(fp);
+  fclose(fp);
 
   return ret;
+}
+
+char *
+zynjacku_lv2_dman_get_data(
+  zynjacku_lv2_dman_handle dman,
+  const char *uri)
+{
+  FILE *fp;
+  char *ret;
+  size_t size;
+  int err;
+
+  fp = tmpfile();
+  if (fp == NULL)
+  {
+    LOG_ERROR("Failed to generate temporary file for dynamic manifest (%s)", strerror(errno));
+    return NULL;
+  }
+
+  err = dman_ptr->get_data(dman_ptr->handle, fp, uri);
+  if (err != 0)
+  {
+    LOG_ERROR("Failed to fetch data from dynamic manifest (%d)", err);
+    fclose(fp);
+    return NULL;
+  }
+
+  if (fseek(fp, 0, SEEK_END) < 0)
+  {
+    LOG_ERROR("Cannot determine the size of dynamic manifest file (%s)", strerror(errno));
+    fclose(fp);
+    return NULL;
+  }
+  size = ftell(fp);
+  if (size < 0)
+  {
+    LOG_ERROR("Cannot determine the size of dynamic manifest file (%s)", strerror(errno));
+    fclose(fp);
+    return NULL;
+  }
+  rewind(fp);
+
+  ret = malloc(size + 1);
+  if (ret == NULL)
+  {
+    LOG_ERROR("Failed to allocate memory to store the dynamically generated manifest file");
+    fclose(fp);
+    return NULL;
+  }
+
+  size = fread(ret, 1, size, fp);
+  ret[size] = '\0';
+  fclose(fp);
+
+  return ret;
+}
+
+void
+zynjacku_lv2_dman_close(
+  zynjacku_lv2_dman_handle dman)
+{
+  dman_ptr->close(dman_ptr->handle);
+  /* TODO: Cannot dlclose() here, otherwise descriptors are not guaranteed to be
+   *       consistent. This needs to be managed somehow. */
+  free(dman_ptr);
 }
 
 zynjacku_lv2_handle
@@ -245,17 +360,8 @@ void
 zynjacku_lv2_unload(
   zynjacku_lv2_handle lv2handle)
 {
-  size_t i;
-
   plugin_ptr->lv2->cleanup(plugin_ptr->lv2handle);
   dlclose(plugin_ptr->dlhandle);
-  for (i = 0; i < dman_dlhandles_count; i++)
-    if (dman_dlhandles[i] == plugin_ptr->dlhandle)
-    {
-      dlclose(plugin_ptr->dlhandle);
-      dman_dlhandles[i] = NULL;
-      break;
-    }
   free(plugin_ptr);
 }
 
