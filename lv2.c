@@ -67,7 +67,7 @@ struct zynjacku_lv2_dman
   void *dlhandle;
   LV2_Dyn_Manifest_Handle handle;
   int (*open)(LV2_Dyn_Manifest_Handle *handle,
-              const LV2_Dyn_Manifest_Feature *const * features);
+              const LV2_Feature *const * features);
   int (*get_subjects)(LV2_Dyn_Manifest_Handle handle, FILE *fp);
   int (*get_data)(LV2_Dyn_Manifest_Handle handle, FILE *fp, const char *uri);
   void (*close)(LV2_Dyn_Manifest_Handle handle);
@@ -80,7 +80,7 @@ zynjacku_lv2_dman_open(
   const char * dlpath)
 {
   struct zynjacku_lv2_dman tmp, *ret;
-  const LV2_Dyn_Manifest_Feature * const * features = {NULL};
+  const LV2_Feature * const * features = {NULL};
   int err;
 
   tmp.dlhandle = dlopen(dlpath, RTLD_NOW);
