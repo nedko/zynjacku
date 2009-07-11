@@ -3044,11 +3044,10 @@ class ZynjackuHostOne(ZynjackuHost):
         gtk.main_quit()
 
     def run(self):
-        if not self.plugin:
+        if not self.plugin or not self.plugin.ui_win.show():
             self.run_done()
             return
 
-        self.plugin.ui_win.show()
         ZynjackuHost.run(self)
 
     def __del__(self):

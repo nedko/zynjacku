@@ -291,11 +291,10 @@ class lv2rack_single(lv2rack):
         gtk.main_quit()
 
     def run(self):
-        if not self.plugin:
+        if not self.plugin or not self.plugin.ui_win.show():
             self.run_done()
             return
 
-        self.plugin.ui_win.show()
         lv2rack.run(self)
 
     def __del__(self):
