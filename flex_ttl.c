@@ -1,3 +1,4 @@
+#include <Python.h>
 #line 2 "flex_ttl.c"
 
 #line 4 "flex_ttl.c"

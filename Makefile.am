@@ -139,3 +139,6 @@ uninstall-hook:
 
 ttl_flex_regenerate:
 	flex --batch --nodefault -o flex_ttl.c --header-file=flex_ttl.h ttl.l
+	mv flex_ttl.c flex_ttl.tmp
+	echo "#include <Python.h>" | cat - flex_ttl.tmp > flex_ttl.c
+	rm flex_ttl.tmp
