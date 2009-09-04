@@ -38,7 +38,7 @@
 #include <lv2dynparam/lv2_rtmempool.h>
 #include <lv2dynparam/host.h>
 #endif
-#include <lv2_dyn_manifest.h>
+#include "lv2_dyn_manifest.h"
 
 #include "lv2-miditype.h"
 #include "lv2_event.h"
