@@ -39,6 +39,7 @@ try:
         import zynjacku_c
     else:
         from zynworld import zynjacku_c
+    from zynworld import host as zynhost
 except Exception, e:
     print "Failed to import zynjacku internal python modules"
     print repr(e)
@@ -49,19 +50,17 @@ except Exception, e:
 
 sys.path = old_path
 
-import zynjacku as zynjacku
-
 try:
     import lash
 except:
     print "Cannot load LASH python bindings, you want LASH unless you enjoy manual jack plumbing each time you use this app"
     lash = None
 
-class lv2rack(zynjacku.host):
+class lv2rack(zynhost.host):
     def __init__(self, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "lv2rack constructor called."
 
-        zynjacku.host.__init__(self, zynjacku_c.Rack(), client_name, preset_extension, preset_name, lash_client)
+        zynhost.host.__init__(self, zynjacku_c.Rack(), client_name, preset_extension, preset_name, lash_client)
 
 class lv2rack_multi(lv2rack):
     def __init__(self, program_data, client_name, uris, lash_client):
@@ -226,7 +225,7 @@ class lv2rack_multi(lv2rack):
                 self.statusbar.push(statusbar_context_id, "Failed to construct show effect UI")
 
     def on_about(self, widget):
-        zynjacku.run_about_dialog(self.main_window, self.program_data)
+        zynhost.run_about_dialog(self.main_window, self.program_data)
 
     def on_preset_load(self, widget):
         self.preset_load_ask()
@@ -304,9 +303,9 @@ class lv2rack_single(lv2rack):
         lv2rack.__del__(self)
 
 def main():
-    program_data = zynjacku.get_program_data('lv2rack')
+    program_data = zynhost.get_program_data('lv2rack')
 
-    zynjacku.register_types()
+    zynhost.register_types()
 
     client_name = "lv2rack"
 

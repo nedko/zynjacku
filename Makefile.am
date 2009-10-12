@@ -40,7 +40,7 @@ INCLUDES = $(PYTHON_INCLUDES) $(zynjacku_c_CFLAGS)
 pkgpyexecdir = $(pythondir)/zynworld/
 
 pkgpyexec_LTLIBRARIES = zynjacku_c.la zynjacku_ttl.la
-pkgpyexec_SCRIPTS = zynworld/lv2.py zynworld/__init__.py
+pkgpyexec_SCRIPTS = zynworld/__init__.py zynworld/lv2.py zynworld/host.py
 
 ZYNJACKU_LDFLAGS = @GTK_LIBS@
 ZYNJACKU_LDFLAGS += @PYGTK_LIBS@
@@ -122,7 +122,7 @@ zynjacku_ttl_la_SOURCES += flex_ttl.c
 zynjacku_ttl_la_SOURCES += flex_ttl.h
 
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py zynworld/__init__.py  zynworld/lv2.py
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py zynworld/__init__.py  zynworld/lv2.py zynworld/host.py
 
 bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
 
