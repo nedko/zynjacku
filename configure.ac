@@ -20,7 +20,7 @@
 #
 
 AC_PREREQ(2.61)
-AC_INIT(zynjacku, 5.1)
+AC_INIT(zynjacku, 5.2)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADER([config.h])
