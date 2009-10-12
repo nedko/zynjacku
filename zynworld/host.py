@@ -32,6 +32,11 @@ from colorsys import hls_to_rgb, rgb_to_hls
 from distutils import sysconfig
 import lv2, zynjacku_c
 
+try:
+    import lash
+except:
+    lash = None
+
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
               "togglefloat": "http://home.gna.org/zynjacku/hints#togglefloat",
               "onesubgroup": "http://home.gna.org/zynjacku/hints#onesubgroup",
