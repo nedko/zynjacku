@@ -40,7 +40,7 @@ INCLUDES = $(PYTHON_INCLUDES) $(zynjacku_c_CFLAGS)
 pkgpyexecdir = $(pythondir)/zynworld/
 
 pkgpyexec_LTLIBRARIES = zynjacku_c.la zynjacku_ttl.la
-pkgpyexec_SCRIPTS = zynworld/lv2.py zynworld/__init__.py
+pkgpyexec_SCRIPTS = zynworld/__init__.py zynworld/lv2.py zynworld/host.py
 
 ZYNJACKU_LDFLAGS = @GTK_LIBS@
 ZYNJACKU_LDFLAGS += @PYGTK_LIBS@
@@ -122,20 +122,12 @@ zynjacku_ttl_la_SOURCES += flex_ttl.c
 zynjacku_ttl_la_SOURCES += flex_ttl.h
 
 CLEANFILES = zynjacku_wrap.c *.pyc zynjacku.defs
-EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku.py lv2rack.py zynspect.py zynworld/__init__.py  zynworld/lv2.py
+EXTRA_DIST = zynjacku.override zynjacku.defs zynjacku lv2rack zynspect zynworld/__init__.py  zynworld/lv2.py zynworld/host.py
 
-bin_SCRIPTS = zynjacku.py lv2rack.py zynspect.py
+bin_SCRIPTS = zynjacku lv2rack zynspect
 
 zynjackudir = $(pkgdatadir)
 dist_zynjacku_DATA = gpl.txt zynjacku.glade art/logo/logo.png
-
-install-exec-hook:
-	ln -vfs zynjacku.py $(DESTDIR)$(bindir)/zynjacku
-	ln -vfs lv2rack.py $(DESTDIR)$(bindir)/lv2rack
-	ln -vfs zynspect.py $(DESTDIR)$(bindir)/zynspect
-
-uninstall-hook:
-	rm -vf $(DESTDIR)$(bindir)/zynjacku
 
 ttl_flex_regenerate:
 	flex --batch --nodefault -o flex_ttl.c --header-file=flex_ttl.h ttl.l

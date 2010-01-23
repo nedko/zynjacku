@@ -30,35 +30,11 @@ import cairo
 from math import pi, sin, cos, atan2
 from colorsys import hls_to_rgb, rgb_to_hls
 from distutils import sysconfig
-
-old_path = sys.path
-
-inplace_libs = os.path.join(os.path.dirname(sys.argv[0]), ".libs")
-if os.access(inplace_libs, os.R_OK):
-    sys.path.append(inplace_libs)
-else:
-    inplace_libs = None
-
-try:
-    if inplace_libs:
-        import zynjacku_c as zynjacku
-    else:
-        from zynworld import zynjacku_c as zynjacku
-    from zynworld import lv2
-except Exception, e:
-    print "Failed to import zynjacku internal python modules"
-    print repr(e)
-    print "These directories were searched"
-    for path in sys.path:
-        print "    " + path
-    sys.exit(1)
-
-sys.path = old_path
+import lv2, zynjacku_c
 
 try:
     import lash
 except:
-    print "Cannot load LASH python bindings, you want LASH unless you enjoy manual jack plumbing each time you use this app"
     lash = None
 
 hint_uris = { "hidden": "http://home.gna.org/zynjacku/hints#hidden",
@@ -1960,7 +1936,7 @@ class PluginUIUniversalParameterFloat(PluginUIUniversalParameter):
         if not map:
             #print "new map"
             new_map = True
-            map = zynjacku.MidiCcMap()
+            map = zynjacku_c.MidiCcMap()
             map.point_create(0, self.adjustment.lower)
             map.point_create(127, self.adjustment.upper)
             if not self.window.plugin.set_midi_cc_map(self.context, map):
@@ -2302,7 +2278,7 @@ class host:
             print 'Cannot get info for plugin "%s"' % uri
             return False
 
-        plugin = zynjacku.Plugin(
+        plugin = zynjacku_c.Plugin(
             uri = uri,
             name = info.name,
             dlpath = info.binary,
@@ -2614,7 +2590,7 @@ class host:
                         #print "%s='%f'" % (name, value)
                         parameters.append([name, value, node.getAttribute("mapid")])
                     elif node.nodeName == 'midi_cc_map':
-                        mapobj = zynjacku.MidiCcMap()
+                        mapobj = zynjacku_c.MidiCcMap()
                         mapid = node.getAttribute("id")
                         mapobj.cc_no_assign(int(node.getAttribute("cc_no")))
 
@@ -2758,12 +2734,6 @@ class host:
         print repr(obj1)
         print repr(obj2)
 
-class ZynjackuHost(host):
-    def __init__(self, client_name, preset_extension=None, preset_name=None, lash_client=None):
-        #print "ZynjackuHost constructor called."
-
-        host.__init__(self, zynjacku.Engine(), client_name, preset_extension, preset_name, lash_client)
-
 def run_about_dialog(transient_for, program_data):
     about = gtk.AboutDialog()
     about.set_transient_for(transient_for)
@@ -2783,286 +2753,14 @@ def run_about_dialog(transient_for, program_data):
     about.run()
     about.hide()
 
-class ZynjackuHostMulti(ZynjackuHost):
-    def __init__(self, program_data, client_name, uris, lash_client):
-        #print "ZynjackuHostMulti constructor called."
-        ZynjackuHost.__init__(self, client_name, "zynjacku", "synth stack", lash_client)
-        
-        self.program_data = program_data
-        self.glade_xml = program_data['glade_xml']
-
-        self.main_window = self.glade_xml.get_widget("zynjacku_main")
-        self.main_window.set_title(client_name)
-
-        self.statusbar = self.glade_xml.get_widget("statusbar")
-
-        self.hbox_menubar = self.glade_xml.get_widget("hbox_menubar")
-        self.midi_led = midi_led()
-        self.midi_led_frame = gtk.Frame()
-        self.midi_led_frame.set_shadow_type(gtk.SHADOW_OUT)
-        self.midi_led_frame.add(self.midi_led);
-        self.hbox_menubar.pack_start(self.midi_led_frame, False, False)
-
-	# Create our dictionary and connect it
-        dic = {"quit" : self.on_quit,
-               "about" : self.on_about,
-               "preset_load" : self.on_preset_load,
-               "preset_save_as" : self.on_preset_save_as,
-               "synth_load" : self.on_synth_load,
-               "synth_clear" : self.on_synth_clear,
-               }
-
-        self.signal_ids = []
-        for k, v in dic.items():
-            w = self.glade_xml.get_widget(k)
-            if not w:
-                print "failed to get glade widget '%s'" % k
-                continue
-            self.signal_ids.append([w, w.connect("activate", v)])
-
-        self.synths_widget = self.glade_xml.get_widget("treeview_synths")
-
-        self.store = gtk.ListStore(
-            gobject.TYPE_BOOLEAN,       # UI visible
-            gobject.TYPE_STRING,        # Instance name
-            gobject.TYPE_STRING,        # Plugin name
-            gobject.TYPE_STRING,        # Plugin URI
-            gobject.TYPE_PYOBJECT)      # Plugin object
-
-        text_renderer = gtk.CellRendererText()
-        self.toggle_renderer = gtk.CellRendererToggle()
-        self.toggle_renderer.set_property('activatable', True)
-
-        column_ui_visible = gtk.TreeViewColumn("UI", self.toggle_renderer)
-        column_ui_visible.add_attribute(self.toggle_renderer, "active", 0)
-        column_instance = gtk.TreeViewColumn("Instance", text_renderer, text=1)
-        column_name = gtk.TreeViewColumn("Name", text_renderer, text=2)
-        #column_uri = gtk.TreeViewColumn("URI", text_renderer, text=3)
-
-        self.synths_widget.append_column(column_ui_visible)
-        self.synths_widget.append_column(column_instance)
-        self.synths_widget.append_column(column_name)
-        #self.synths_widget.append_column(column_uri)
-
-        self.synths_widget.set_model(self.store)
-
-        self.main_window.show_all()
-        self.signal_ids.append([self.main_window, self.main_window.connect("destroy", self.on_quit)])
-
-        if len(uris) == 1 and uris[0][-9:] == ".zynjacku":
-            self.preset_load(uris[0])
-        else:
-            for uri in uris:
-                self.load_plugin(uri)
-            self.progress_window.hide()
-
-    def on_quit(self, window=None):
-        #print "ZynjackuHostMulti::on_quit() called"
-        for cid in self.signal_ids:
-            #print "disconnecting %u" % cid[1]
-            cid[0].disconnect(cid[1])
-            #print "host object refcount is %u" % sys.getrefcount(self)
-        gtk.main_quit()
-
-    def __del__(self):
-        #print "ZynjackuHostMulti destructor called."
-
-        self.store.clear()
-
-        ZynjackuHost.__del__(self)
-
-    def new_plugin(self, uri, parameters=[], maps={}):
-        self.progress_window.show(uri)
-        plugin = ZynjackuHost.new_plugin(self, uri, parameters, maps)
-        return plugin
-
-    def on_plugin_progress(self, engine, name, progress, message):
-        self.progress_window.progress(name, progress, message)
-
-    def update_midi_led(self):
-        self.midi_led.set(self.engine.get_midi_activity())
-        return True
-
-    def check_plugin(self, plugin):
-        ports_count = len(plugin.ports)
-        audio_in_ports_count = 0
-        audio_out_ports_count = 0
-        midi_in_ports_count = 0
-        control_ports_count = 0
-        string_ports_count = 0
-        event_ports_count = 0
-        midi_event_in_ports_count = 0
-
-        for port in plugin.ports:
-            if port.isAudio:
-                if port.isInput:
-                    audio_in_ports_count += 1
-                    continue
-                if port.isOutput:
-                    audio_out_ports_count += 1
-                    continue
-                continue
-            if port.isLarslMidi:
-                if port.isInput:
-                    midi_in_ports_count += 1
-                    continue
-                continue
-            if port.isEvent:
-                event_ports_count += 1
-                if port.isInput and "http://lv2plug.in/ns/ext/midi#MidiEvent" in port.events:
-                    midi_event_in_ports_count += 1
-                    continue
-                continue
-            if port.isControl:
-                control_ports_count += 1
-                continue
-            if port.isString:
-                string_ports_count += 1
-                continue
-
-        # TODO: we must be smarter and check for "optional connect" property
-        if (midi_in_ports_count + control_ports_count + string_ports_count + event_ports_count + audio_out_ports_count != ports_count) or \
-               (midi_in_ports_count + midi_event_in_ports_count != 1) or \
-               (audio_out_ports_count == 0):
-            #print "Skipping %s (%s), [synth] plugin with unsupported port configuration" % (plugin.name, plugin.uri)
-            #print "  midi input ports: %d" % midi_in_ports_count
-            #print "  control ports: %d" % control_ports_count
-            #print "  string ports: %d" % string_ports_count
-            #print "  event ports: %d" % event_ports_count
-            #print "  event midi input ports: %d" % midi_event_in_ports_count
-            #print "  audio input ports: %d" % audio_in_ports_count
-            #print "  audio output ports: %d" % audio_out_ports_count
-            #print "  total ports %d" % ports_count
-            return False
-
-#         print "Found \"simple\" synth plugin '%s' %s" % (plugin.name, plugin.uri)
-#         print "  midi input ports: %d" % midi_in_ports_count
-#         print "  control ports: %d" % control_ports_count
-#         print "  event ports: %d" % event_ports_count
-#         print "  event midi input ports: %d" % midi_event_in_ports_count
-#         print "  audio input ports: %d" % audio_in_ports_count
-#         print "  audio output ports: %d" % audio_out_ports_count
-#         print "  total ports %d" % ports_count
-        return True
-
-    def load_plugin(self, uri, parameters=[], maps={}):
-        statusbar_context_id = self.statusbar.get_context_id("loading plugin")
-        statusbar_id = self.statusbar.push(statusbar_context_id, "Loading %s" % uri)
-        while gtk.events_pending():
-            gtk.main_iteration()
-        self.statusbar.pop(statusbar_id)
-        synth = self.new_plugin(uri, parameters, maps)
-        if not synth:
-            self.statusbar.push(statusbar_context_id, "Failed to construct %s" % uri)
-        else:
-            row = False, synth.get_instance_name(), synth.get_name(), synth.uri, synth
-            self.store.append(row)
-            self.statusbar.remove(statusbar_context_id, statusbar_id)
-
-    def run(self):
-        toggled_connect_id = self.toggle_renderer.connect('toggled', self.on_ui_visible_toggled, self.store)
-
-        update_midi_led_callback_id = gobject.timeout_add(100, self.update_midi_led)
-
-        ZynjackuHost.run(self)
-
-        gobject.source_remove(update_midi_led_callback_id)
-
-        self.toggle_renderer.disconnect(toggled_connect_id)
-
-    def on_plugin_ui_window_destroyed(self, window, synth, row):
-        synth.ui_win.disconnect(synth.ui_win.destroy_connect_id) # signal connection holds reference to synth object...
-        synth.ui_win = None
-        row[0] = False
-
-    def on_ui_visible_toggled(self, cell, path, model):
-        #print "on_ui_visible_toggled() called."
-        if model[path][0]:
-            model[path][4].ui_win.hide()
-            model[path][0] = False
-        else:
-            if not model[path][4].ui_win:
-                if not self.create_plugin_ui(model[path][4], model[path]):
-                    return
-
-            statusbar_context_id = self.statusbar.get_context_id("loading plugin UI")
-            if model[path][4].ui_win.show():
-                model[path][0] = True
-            else:
-                self.statusbar.push(statusbar_context_id, "Failed to show synth UI")
-
-    def on_about(self, widget):
-        run_about_dialog(self.main_window, self.program_data)
-
-    def on_preset_load(self, widget):
-        self.preset_load_ask()
-
-    def preset_get_pre_plugins_xml(self):
-        xml = "<zynjacku>\n"
-        xml += "  <plugins>\n"
-        return xml
-
-    def preset_get_post_plugins_xml(self):
-        xml = "  </plugins>\n"
-        xml += "</zynjacku>\n"
-        return xml
-
-    def on_preset_save_as(self, widget):
-        self.preset_save_ask()
-
-    def on_synth_load(self, widget):
-        self.plugins_load("LV2 synth plugins")
-
-    def on_synth_clear(self, widget):
-        self.store.clear()
-        self.clear_plugins()
-
-class ZynjackuHostOne(ZynjackuHost):
-    def __init__(self, program_data, client_name, uri):
-        #print "ZynjackuHostOne constructor called."
-        ZynjackuHost.__init__(self, client_name, "zynjacku")
-
-        self.plugin = self.new_plugin(uri)
-        if not self.plugin:
-            print"Failed to construct %s" % uri
-            return
-
-        if not ZynjackuHost.create_plugin_ui(self, self.plugin):
-            print"Failed to create synth window"
-            return
-
-    def new_plugin(self, uri, parameters=[], maps={}):
-        self.progress_window.show(uri)
-        plugin = ZynjackuHost.new_plugin(self, uri, parameters, maps)
-        self.progress_window.hide()
-        return plugin
-
-    def on_plugin_progress(self, engine, name, progress, message):
-        self.progress_window.progress(name, progress, message)
-
-    def on_plugin_ui_window_destroyed(self, window, synth, row):
-        gtk.main_quit()
-
-    def run(self):
-        if not self.plugin or not self.plugin.ui_win.show():
-            self.run_done()
-            return
-
-        ZynjackuHost.run(self)
-
-    def __del__(self):
-        #print "ZynjackuHostOne destructor called."
-
-        ZynjackuHost.__del__(self)
-
 def get_program_data(program_name):
     program_data = {}
 
     program_data['name'] = program_name
-    if zynjacku.zynjacku_get_version() == "dev":
+    if zynjacku_c.zynjacku_get_version() == "dev":
         program_data['comments'] = "(development snapshot)"
     else:
-        program_data['version'] = zynjacku.zynjacku_get_version()
+        program_data['version'] = zynjacku_c.zynjacku_get_version()
 
     data_dir = os.path.dirname(sys.argv[0])
 
@@ -3116,37 +2814,3 @@ def register_types():
     gobject.type_register(PluginUIUniversalGroupToggleFloat)
     gobject.type_register(PluginUIUniversalParameterFloat)
     gobject.type_register(PluginUIUniversalParameterBool)
-
-def main():
-    program_data = get_program_data('zynjacku')
-
-    register_types()
-
-    client_name = "zynjacku"
-
-    if lash:                        # If LASH python bindings are available
-        # sys.argv is modified by this call
-        lash_client = lash.init(sys.argv, "zynjacku", lash.LASH_Config_File)
-    else:
-        lash_client = None
-
-    # TODO: generic argument processing goes here
-
-    # Yeah , this sounds stupid, we connected earlier, but we dont want to show this if we got --help option
-    # This issue should be fixed in pylash, there is a reason for having two functions for initialization after all
-    if lash_client:
-        print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
-
-    if len(sys.argv) == 2 and sys.argv[1][-9:] != ".zynjacku":
-        host = ZynjackuHostOne(program_data, client_name, sys.argv[1])
-    else:
-        host = ZynjackuHostMulti(program_data, client_name, sys.argv[1:], lash_client)
-
-    host.run()
-
-    #print "stone after host.run(), host object refcount is %u" % sys.getrefcount(host)
-    sys.stdout.flush()
-    sys.stderr.flush()
-
-if __name__ == '__main__':
-    main()
