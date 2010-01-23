@@ -2419,7 +2419,10 @@ class host:
 
             plugins = self.lv2db.getPluginList()
 
-            step = 1.0 / len(plugins)
+            if len(plugins) > 0:
+                step = 1.0 / len(plugins)
+            else:
+                step = 1.0
             progress = 0.0
 
             for uri in plugins:
