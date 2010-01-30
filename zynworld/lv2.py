@@ -503,14 +503,17 @@ class LV2DB:
             for maintainer in info.bySubject[uri][doap + "maintainer"]:
                 maintainersubj = info.bySubject[maintainer]
                 maintainerdict = {}
-                maintainerdict['name'] = info.getProperty(maintainersubj, foaf + "name")[0]
+                maintainer_names = info.getProperty(maintainersubj, foaf + "name")
+                if maintainer_names:
+                    maintainerdict['name'] = maintainer_names[0]
                 homepages = info.getProperty(maintainersubj, foaf + "homepage")
                 if homepages:
                     maintainerdict['homepage'] = homepages[0]
                 mboxes = info.getProperty(maintainersubj, foaf + "mbox")
                 if mboxes:
                     maintainerdict['mbox'] = mboxes[0]
-                dest.maintainers.append(maintainerdict)
+                if maintainerdict:
+                    dest.maintainers.append(maintainerdict)
 
         ports = []
         portDict = {}
