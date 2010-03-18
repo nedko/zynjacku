@@ -127,20 +127,16 @@ class SimpleRDFModel:
         return list(anyprops)
 
     def add_object_source(self, uri, source):
-        if o not in self.object_sources:
-            self.object_sources[o] = set((source,))
-        else:
-            self.object_sources[o].add(source)
+        if uri not in self.object_sources:
+            self.object_sources[uri] = set()
+        self.object_sources[uri].add(source)
 
     def addTriple(self, s, p, o, source=None):
         self.len += 1
 
         #if p == lv2 + "binary":
         #    print 'binary "%s" of %s found' % (o, s)
-        if o not in self.object_sources:
-            self.object_sources[o] = set((source,))
-        else:
-            self.object_sources[o].add(source)
+        self.add_object_source(o, source)
         if p == rdf_type:
             p = "a"
         #if p == 'a' and o == lv2preset_preset:
