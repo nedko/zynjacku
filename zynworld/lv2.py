@@ -198,7 +198,7 @@ class SimpleRDFModel:
             for p in self.bySubject[s].keys():
                 print "%s %s %s" % (s, p, self.bySubject[s][p])
 
-def parseTTL(uri, content, model, debug):
+def parseTTL(uri, content, model = SimpleRDFModel(), debug = False):
     #print " *** Parse TTL *** ",
     # Missing stuff: translated literals, blank nodes
     if debug:
@@ -208,14 +208,31 @@ def parseTTL(uri, content, model, debug):
     spo = ["", "", ""]
     item = 0
     anoncnt = 1
+    last_string = None
+    string_tail = None
     for x in zynjacku_ttl.scan_string(content):
+        #print "item %u; %s" % (item, repr(x))
         if x[0] == '':
             continue
         if x[0] == "URI_": x = ('URI', x[1][1:-1])
         if x[0] == "float": x = ('number', float(x[1]))
+        if last_string:
+            if x[0] in ("datatype_URI", "language"):
+                string_tail = [last_string, x[0]]
+                last_string = None
+                continue
+            last_string = None
         if x[0] == 'prefix':
             spo[0] = "@prefix"
             item = 1
+            continue
+        if string_tail and x[0] == "symbol" and string_tail[1] == "language":
+            #print "string '%s' with language '%s'" % (string_tail[0], x[1])
+            string_tail = None
+            continue
+        if string_tail and (x[0] == "URI" or x[0] == "prnot") and string_tail[1] == "datatype_URI":
+            #print "string '%s' with language '%s'" % (string_tail[0], x[1])
+            string_tail = None
             continue
         elif (x[0] == '.' and spo_stack == []) or x[0] == ';' or x[0] == ',':
             if item == 3:
@@ -251,6 +268,8 @@ def parseTTL(uri, content, model, debug):
                 x = ("URI", os.path.dirname(uri) + "/" + x[1])
             spo[item] = x[1]
             item += 1
+            if x[0] == "string":
+                last_string = x[1]
         elif x[0] == '[':
             if item != 2:
                 raise Exception, "Incorrect use of ["
@@ -277,7 +296,7 @@ def parseTTL(uri, content, model, debug):
             item = 2
             anoncnt += 1
         else:
-            print uri + ": Unexpected: " + repr(x)
+            print uri + ": Unexpected(%u): %s" % (item, repr(x))
 
 class LV2Port(object):
     def __init__(self):
