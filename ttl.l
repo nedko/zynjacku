@@ -18,6 +18,7 @@ void add_to(const char *str)
 
 void add_token_str(const char *name, const char *value)
 {
+    //printf("add_token_str: name='%s', value='%s'\n", name, value);
     PyList_Append(ttl_list, Py_BuildValue("(ss)", name, value));
 }
 
@@ -47,10 +48,12 @@ TRIPLEQUOTE \"\"\"
 {SYMBOL} { add_token_str("symbol", yytext); } 
 [.,;\[\]\(\)] { add_token_str(yytext, yytext); } 
 [ \t\n\r] ;
+\^{2} { add_token_str("datatype_URI", yytext); } 
+@ { add_token_str("language", yytext); } 
 
 . { 
     // TODO concat with yytext
-    //printf("yytext = '%u''%u'\n", yytext[0], yytext[1]);
+    //printf("unrecognised char '%c' (0x%02X) at line %d\n", *yytext, *yytext, yylineno);
     PyErr_SetString(PyExc_ValueError, "Unexpected characters");
     yyerror("Syntax error");
 }
