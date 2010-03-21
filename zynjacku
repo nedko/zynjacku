@@ -61,6 +61,7 @@ class ZynjackuHost(zynhost.host):
     def __init__(self, client_name, preset_extension=None, preset_name=None, lash_client=None):
         #print "ZynjackuHost constructor called."
 
+        gtk.gdk.threads_init()
         zynhost.host.__init__(self, zynjacku_c.Engine(), client_name, preset_extension, preset_name, lash_client)
 
 class ZynjackuHostMulti(ZynjackuHost):
