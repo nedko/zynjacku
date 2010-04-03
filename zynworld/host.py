@@ -2257,7 +2257,7 @@ class host:
 
             if not features_match:
                 print "Skipping UI %s because of missing required feature %s" % (ui_uri, required_feature)
-                break
+                continue
 
             ui_type_uri = ui.type
             ui_binary_path = ui.binary
