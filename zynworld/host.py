@@ -2276,6 +2276,21 @@ class host:
         return
 
     def new_plugin(self, uri, parameters=[], maps={}):
+        if uri.startswith("/") and uri.endswith("/"):
+            regexp = re.compile(uri[1:-1])
+            candidates = []
+            for f in self.lv2db.getPluginList():
+                if regexp.search(f):
+                    candidates.append(f)
+            if len(candidates) == 0:
+                print "No plugins found matching %s" % uri
+                return False
+            elif len(candidates) >= 2:
+                print "More than one plugin match %s:" % uri
+                for l in candidates:
+                    print "    %s" % l
+                return False
+            uri = candidates[0]
         info = self.lv2db.getPluginInfo(uri)
         if not info:
             print 'Cannot get info for plugin "%s"' % uri
