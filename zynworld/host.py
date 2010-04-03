@@ -2185,6 +2185,7 @@ class host:
                 break
             self.lv2features_supported.append(feature)
             index += 1
+        self.lv2guifeatures_supported = self.lv2features_supported + ["http://lv2plug.in/ns/extensions/ui#makeResident"]
 
         self.available_plugins = []
 
@@ -2244,12 +2245,14 @@ class host:
         ui_binary_path = None
 
         for ui_uri in info.ui:
-            ui = self.lv2db.get_ui_info(plugin.uri, ui_uri)
+            try:
+                ui = self.lv2db.get_ui_info(plugin.uri, ui_uri)
+            except ValueError, e:
+                print "Skipping UI %s: %s" % (ui_uri, str(e))
+                continue
             features_match = True
             for required_feature in ui.requiredFeatures:
-                if required_feature == "http://lv2plug.in/ns/extensions/ui#makeResident":
-                    continue
-                if not required_feature in self.lv2features_supported:
+                if not required_feature in self.lv2guifeatures_supported:
                     features_match = False
 
             if not features_match:

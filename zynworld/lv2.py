@@ -600,9 +600,19 @@ class LV2DB:
     def get_ui_info(self, plugin_uri, uri):
         info = self.plugin_info[plugin_uri]
 
+        classes = info.getProperty(uri, "a")
+        if classes is None:
+            raise ValueError, "No RDF type specified"
+        supported_classes = set(classes).intersection(set([lv2ui + 'GtkUI', lv2ui + 'external']))
+        if len(supported_classes) == 0:
+            if len(classes) == 1:
+                raise ValueError, "GUI RDF type not supported: %s" % classes[0]
+            else:
+                raise ValueError, "Neither of these types is supported: %s" % (", ".join(classes))
+
         dest = LV2Plugin()
         dest.uri = uri
-        dest.type = set(info.getProperty(uri, "a")).intersection(set([lv2ui + 'GtkUI', lv2ui + 'external'])).pop()
+        dest.type = classes.pop()
         dest.binary = info.getProperty(uri, lv2ui_binary)[0]
         dest.requiredFeatures = info.getProperty(uri, lv2ui + "requiredFeature", optional = True)
         dest.optionalFeatures = info.getProperty(uri, lv2ui + "optionalFeature", optional = True)
