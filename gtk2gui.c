@@ -223,14 +223,14 @@ zynjacku_gtk2gui_create(
   ui_ptr->dlhandle = dlopen(ui_binary_path, RTLD_NOW);
   if (ui_ptr->dlhandle == NULL)
   {
-    LOG_WARNING("Cannot load \"%s\": %s", ui_binary_path, dlerror());
+    LOG_ERROR("Cannot load \"%s\": %s", ui_binary_path, dlerror());
     goto fail_free_bundle_path;
   }
 
   lookup = (LV2UI_DescriptorFunction)dlsym(ui_ptr->dlhandle, "lv2ui_descriptor");
   if (lookup == NULL)
   {
-    LOG_WARNING("Cannot find symbol lv2ui_descriptor");
+    LOG_ERROR("Cannot find symbol lv2ui_descriptor");
     goto fail_dlclose;
   }
 
