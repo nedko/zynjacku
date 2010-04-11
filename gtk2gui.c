@@ -344,6 +344,7 @@ zynjacku_gtk2gui_destroy(
       ui_ptr->type == UI_TYPE_EXTERNAL)
   {
     LV2_EXTERNAL_UI_HIDE(ui_ptr->external_ui_control);
+    ui_ptr->lv2ui->cleanup(ui_ptr->ui_handle);
   }
 
   dlclose(ui_ptr->dlhandle);
