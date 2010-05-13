@@ -489,6 +489,11 @@ zynjacku_gtk2gui_push_measure_ports(
     LV2_EXTERNAL_UI_RUN(ui_ptr->external_ui_control);
   }
 
+  if (ui_ptr->ui_handle == NULL)
+  {
+    return;
+  }
+
   if (ui_ptr->lv2ui->port_event == NULL)
   {
     return;
