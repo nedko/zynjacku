@@ -321,7 +321,7 @@ def main():
     if lash_client:
         print "Successfully connected to LASH server at " +  lash.lash_get_server_name(lash_client)
 
-    if len(sys.argv) == 2 and sys.argv[1][-9:] != ".lv2rack":
+    if len(sys.argv) == 2 and sys.argv[1][-8:] != ".lv2rack":
         host = lv2rack_single(program_data, client_name, sys.argv[1])
     else:
         host = lv2rack_multi(program_data, client_name, sys.argv[1:], lash_client)
