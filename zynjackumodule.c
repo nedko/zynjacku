@@ -19,7 +19,7 @@
  *   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *****************************************************************************/
-
+#define NO_IMPORT_PYGOBJECT
 #include <pygobject.h>
  
 void zynjacku_c_register_classes(PyObject * obj);
