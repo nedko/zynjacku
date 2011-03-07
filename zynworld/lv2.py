@@ -504,7 +504,11 @@ class LV2DB:
             return None
         dest.name = dest.name[0]
 
-        dest.license = info.bySubject[uri][doap + 'license'][0]
+        dest.license = info.getProperty(uri, doap + 'license', optional = True)
+        if len(dest.license):
+            dest.license = dest.license[0]
+        else:
+            dest.license = None
         dest.classes = info.bySubject[uri]["a"]
         dest.requiredFeatures = info.getProperty(uri, lv2 + "requiredFeature", optional = True)
         dest.optionalFeatures = info.getProperty(uri, lv2 + "optionalFeature", optional = True)
