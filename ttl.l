@@ -43,6 +43,7 @@ TRIPLEQUOTE \"\"\"
 \" { tmp_string = PyString_FromString("");  BEGIN(C_STRING); }
 \<[^>]*\> { add_token_str("URI_", yytext); }
 [+-]?([0-9]+\.[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)? { add_token_str("float", yytext); }
+[+-]?[0-9]+[eE][-+]?[0-9]+ { add_token_str("float", yytext); }
 [+-]?[0-9]+ { add_token("number", PyInt_FromLong(atol(yytext))); }
 {SYMBOL}?:{SYMBOL}? { add_token_str("prnot", yytext); } 
 {SYMBOL} { add_token_str("symbol", yytext); } 
