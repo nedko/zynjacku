@@ -36,6 +36,10 @@ _wrap_zynjacku_lv2_dman_open(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
 
   handle = zynjacku_lv2_dman_open(dlpath);
+  if (handle == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
 
   return PyCObject_FromVoidPtr(handle, NULL);
 }
