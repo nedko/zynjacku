@@ -9,8 +9,10 @@ static PyObject * scan_file(PyObject *self, PyObject *args)
     char *ttl_name = NULL;
     PyObject *tmp = NULL;
     yyscan_t scanner;
-    if (!PyArg_ParseTuple(args, "s:scan_file", &ttl_name))
-        return NULL;
+    if (!PyArg_ParseTuple(args, "s:scan_file", &ttl_name)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
     
     tmp = ttl_list = PyList_New(0);
     yylex_init(&scanner);
@@ -28,8 +30,10 @@ static PyObject * scan_string(PyObject *self, PyObject *args)
     yyscan_t scanner;
     YY_BUFFER_STATE buffer;
 
-    if (!PyArg_ParseTuple(args, "s:scan_string", &ttl_text))
-        return NULL;
+    if (!PyArg_ParseTuple(args, "s:scan_string", &ttl_text)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
 
     tmp = ttl_list = PyList_New(0);
     yylex_init(&scanner);
