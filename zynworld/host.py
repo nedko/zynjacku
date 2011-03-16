@@ -2719,6 +2719,9 @@ class host:
 
     def clear_plugins(self):
         for plugin in self.plugins:
+            if plugin.ui_win:
+                plugin.ui_win.hide()
+                plugin.ui_win.disconnect(plugin.ui_win.destroy_connect_id)
             plugin.destruct()
         self.plugins = []
 
