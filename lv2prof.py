@@ -31,6 +31,7 @@ def lv2scan():
     count = 0
     best = 0.0
     worst = 0.0
+    sum = 0.0
     for uri in uris:
         percent = float(count) / total * 100
         count += 1
@@ -42,6 +43,7 @@ def lv2scan():
         t2 = time.time()
         dt = t2 - t1
         print("%.3fs" % dt)
+        sum = sum + dt
         if count == 1:
             best = dt
             worst = dt
@@ -55,6 +57,8 @@ def lv2scan():
     print("Count: %u" % count)
     print("Best: %.3fs" % best)
     print("Worst: %.3fs" % worst)
+    avg = sum / count
+    print("Average: %.3fs" % avg)
 
 fh, path = tempfile.mkstemp()
 
