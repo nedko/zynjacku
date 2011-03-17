@@ -65,7 +65,16 @@ TRIPLEQUOTE \"\"\"
 
 <C_STRING>\" { add_token("string", tmp_string); BEGIN(INITIAL); }
 <C_STRING>\\\" add_to("\""); 
+<C_STRING>\\u([0-9A-F]){4} add_to(yytext);
+<C_STRING>\\U([0-9A-F]){8} add_to(yytext);
+<C_STRING>\\[tnr] add_to(yytext);
 <C_STRING>[^\\\"\n]+ add_to(yytext);
+<C_STRING>. {
+    // TODO concat with yytext
+    //printf("unrecognised char '%c' (0x%02X) at line %d\n", *yytext, *yytext, yylineno);
+    PyErr_SetString(PyExc_ValueError, "Unexpected characters");
+    yyerror("Syntax error");
+}
 
 <C_COMMENT>\n { BEGIN(INITIAL); }
 <C_COMMENT>. ;
