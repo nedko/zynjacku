@@ -493,6 +493,8 @@ class LV2DB:
         dest = LV2Plugin()
         dest.uri = uri
 
+        dest.triples = info.size()
+
         dest.binary = info.getProperty(uri, lv2 + "binary", optional = True)
         if not dest.binary:
             #print "No binary"
