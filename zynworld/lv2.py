@@ -210,93 +210,99 @@ def parseTTL(uri, content, model = SimpleRDFModel(), debug = 0):
     anoncnt = 1
     last_string = None
     string_tail = None
-    for x in zynjacku_ttl.scan_string(content):
-        #print "item %u; %s" % (item, repr(x))
-        if x[0] == '':
-            continue
-        if x[0] == "URI_": x = ('URI', x[1][1:-1])
-        if x[0] == "float": x = ('number', float(x[1]))
-        if last_string:
-            if x[0] in ("datatype_URI", "language"):
-                string_tail = [last_string, x[0]]
-                last_string = None
+    try:
+        for x in zynjacku_ttl.scan_string(content):
+            if debug >= 3:
+                print "item %u; %s" % (item, repr(x))
+            if x[0] == '':
                 continue
-            last_string = None
-        if x[0] == 'prefix':
-            spo[0] = "@prefix"
-            item = 1
-            continue
-        if string_tail and x[0] == "symbol" and string_tail[1] == "language":
-            #print "string '%s' with language '%s'" % (string_tail[0], x[1])
-            string_tail = None
-            continue
-        if string_tail and (x[0] == "URI" or x[0] == "prnot") and string_tail[1] == "datatype_URI":
-            #print "string '%s' with language '%s'" % (string_tail[0], x[1])
-            string_tail = None
-            continue
-        elif (x[0] == '.' and spo_stack == []) or x[0] == ';' or x[0] == ',':
-            if item == 3:
-                if spo[0] == "@prefix":
-                    prefixes[spo[1][:-1]] = spo[2]
+            if x[0] == "URI_": x = ('URI', x[1][1:-1])
+            if x[0] == "float": x = ('number', float(x[1]))
+            if last_string:
+                if x[0] in ("datatype_URI", "language"):
+                    string_tail = [last_string, x[0]]
+                    last_string = None
+                    continue
+                last_string = None
+            if x[0] == 'prefix':
+                spo[0] = "@prefix"
+                item = 1
+                continue
+            if string_tail and x[0] == "symbol" and string_tail[1] == "language":
+                #print "string '%s' with language '%s'" % (string_tail[0], x[1])
+                string_tail = None
+                continue
+            if string_tail and (x[0] == "URI" or x[0] == "prnot") and string_tail[1] == "datatype_URI":
+                #print "string '%s' with language '%s'" % (string_tail[0], x[1])
+                string_tail = None
+                continue
+            elif (x[0] == '.' and spo_stack == []) or x[0] == ';' or x[0] == ',':
+                if item == 3:
+                    if spo[0] == "@prefix":
+                        prefixes[spo[1][:-1]] = spo[2]
+                    else:
+                        model.addTriple(spo[0], spo[1], spo[2], uri)
+                    if x[0] == '.': item = 0
+                    elif x[0] == ';': item = 1
+                    elif x[0] == ',': item = 2
                 else:
-                    model.addTriple(spo[0], spo[1], spo[2], uri)
-                if x[0] == '.': item = 0
-                elif x[0] == ';': item = 1
-                elif x[0] == ',': item = 2
-            else:
-                if x[0] == '.':
-                    item = 0
-                elif item != 0:
-                    raise Exception, uri+": Unexpected " + x[0]
-        elif x[0] == "prnot" and item < 3:
-            prnot = x[1].split(":")
-            if item != 0 and spo[0] == "@prefix":
+                    if x[0] == '.':
+                        item = 0
+                    elif item != 0:
+                        raise Exception, uri+": Unexpected " + x[0]
+            elif x[0] == "prnot" and item < 3:
+                prnot = x[1].split(":")
+                if item != 0 and spo[0] == "@prefix":
+                    spo[item] = x[1]
+                elif prnot[0] == "_":
+                    spo[item] = uri + "#" + prnot[1]
+                else:
+                    if prnot[0] not in prefixes:
+                        print 'WARNING %s: Prefix %s not defined. Ignoring %s:%s' % (uri, prnot[0], prnot[0], prnot[1])
+                    else:
+                        spo[item] = prefixes[prnot[0]] + prnot[1]
+                item += 1
+            elif (x[0] == 'URI' or x[0] == "string" or x[0] == "number" or (x[0] == "symbol" and x[1] == "a" and item == 1)) and (item < 3):
+                if x[0] == "URI" and x[1] == "":
+                    x = ("URI", uri)
+                elif x[0] == "URI" and x[1].find(":") == -1 and x[1] != "" and x[1][0] != "/":
+                    # This is quite silly
+                    x = ("URI", os.path.dirname(uri) + "/" + x[1])
                 spo[item] = x[1]
-            elif prnot[0] == "_":
-                spo[item] = uri + "#" + prnot[1]
+                item += 1
+                if x[0] == "string":
+                    last_string = x[1]
+            elif x[0] == '[':
+                if item != 2:
+                    raise Exception, "Incorrect use of ["
+                uri2 = uri + "$anon$" + str(anoncnt)
+                spo[2] = uri2
+                spo_stack.append(spo)
+                spo = [uri2, "", ""]
+                item = 1
+                anoncnt += 1
+            elif x[0] == ']' or x[0] == ')':
+                if item == 3:
+                    model.addTriple(spo[0], spo[1], spo[2], uri)
+                    item = 0
+                spo = spo_stack[-1]
+                spo_stack = spo_stack[:-1]
+                item = 3
+            elif x[0] == '(':
+                if item != 2:
+                    raise Exception, "Incorrect use of ("
+                uri2 = uri + "$anon$" + str(anoncnt)
+                spo[2] = uri2
+                spo_stack.append(spo)
+                spo = [uri2, "", ""]
+                item = 2
+                anoncnt += 1
             else:
-                if prnot[0] not in prefixes:
-                    print 'WARNING %s: Prefix %s not defined. Ignoring %s:%s' % (uri, prnot[0], prnot[0], prnot[1])
-                else:
-                    spo[item] = prefixes[prnot[0]] + prnot[1]
-            item += 1
-        elif (x[0] == 'URI' or x[0] == "string" or x[0] == "number" or (x[0] == "symbol" and x[1] == "a" and item == 1)) and (item < 3):
-            if x[0] == "URI" and x[1] == "":
-                x = ("URI", uri)
-            elif x[0] == "URI" and x[1].find(":") == -1 and x[1] != "" and x[1][0] != "/":
-                # This is quite silly
-                x = ("URI", os.path.dirname(uri) + "/" + x[1])
-            spo[item] = x[1]
-            item += 1
-            if x[0] == "string":
-                last_string = x[1]
-        elif x[0] == '[':
-            if item != 2:
-                raise Exception, "Incorrect use of ["
-            uri2 = uri + "$anon$" + str(anoncnt)
-            spo[2] = uri2
-            spo_stack.append(spo)
-            spo = [uri2, "", ""]
-            item = 1
-            anoncnt += 1
-        elif x[0] == ']' or x[0] == ')':
-            if item == 3:
-                model.addTriple(spo[0], spo[1], spo[2], uri)
-                item = 0
-            spo = spo_stack[-1]
-            spo_stack = spo_stack[:-1]
-            item = 3
-        elif x[0] == '(':
-            if item != 2:
-                raise Exception, "Incorrect use of ("
-            uri2 = uri + "$anon$" + str(anoncnt)
-            spo[2] = uri2
-            spo_stack.append(spo)
-            spo = [uri2, "", ""]
-            item = 2
-            anoncnt += 1
-        else:
-            print uri + ": Unexpected(%u): %s" % (item, repr(x))
+                print uri + ": Unexpected(%u): %s" % (item, repr(x))
+    except SyntaxError as e:
+        e.filename = uri
+        e.text = repr(content.split('\n')[e.lineno - 1])
+        raise e
 
 class LV2Port(object):
     def __init__(self):

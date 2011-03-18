@@ -6,9 +6,12 @@
 PyObject *ttl_list = NULL;
 static PyObject *tmp_string = NULL;
 
-void yyerror(const char *str)
+void unrecognized_char(unsigned char ch, int line)
 {
-    PyErr_SetString(PyExc_SyntaxError, str);
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "unrecognised char 0x%02X\n", ch);
+    PyErr_SetString(PyExc_SyntaxError, buffer);
+    PyErr_SyntaxLocation("", line);
 }
 
 void add_to(const char *str)
@@ -29,7 +32,7 @@ void add_token(const char *name, PyObject *value)
 
 %}
 
-%option nounput reentrant
+%option nounput reentrant yylineno
 %x C_COMMENT C_LONGSTRING C_STRING
 
 SYMBOL [A-Za-z_-][a-zA-Z0-9_-]*
@@ -52,12 +55,7 @@ TRIPLEQUOTE \"\"\"
 \^{2} { add_token_str("datatype_URI", yytext); } 
 @ { add_token_str("language", yytext); } 
 
-. { 
-    // TODO concat with yytext
-    //printf("unrecognised char '%c' (0x%02X) at line %d\n", *yytext, *yytext, yylineno);
-    PyErr_SetString(PyExc_ValueError, "Unexpected characters");
-    yyerror("Syntax error");
-}
+. { unrecognized_char(*yytext, yylineno); }
 
 <C_LONGSTRING>{TRIPLEQUOTE} { add_token("string", tmp_string); BEGIN(INITIAL); }
 <C_LONGSTRING>[^"]+ add_to(yytext);
@@ -69,12 +67,7 @@ TRIPLEQUOTE \"\"\"
 <C_STRING>\\U([0-9A-F]){8} add_to(yytext);
 <C_STRING>\\[tnr] add_to(yytext);
 <C_STRING>[^\\\"\n]+ add_to(yytext);
-<C_STRING>. {
-    // TODO concat with yytext
-    //printf("unrecognised char '%c' (0x%02X) at line %d\n", *yytext, *yytext, yylineno);
-    PyErr_SetString(PyExc_ValueError, "Unexpected characters");
-    yyerror("Syntax error");
-}
+<C_STRING>. { unrecognized_char(*yytext, yylineno); }
 
 <C_COMMENT>\n { BEGIN(INITIAL); }
 <C_COMMENT>. ;

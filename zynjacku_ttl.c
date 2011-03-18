@@ -38,6 +38,7 @@ static PyObject * scan_string(PyObject *self, PyObject *args)
     tmp = ttl_list = PyList_New(0);
     yylex_init(&scanner);
     buffer = yy_scan_string(ttl_text, scanner);
+    buffer->yy_bs_lineno = 1;
     yylex(scanner);
     yy_delete_buffer(buffer, scanner);
     yylex_destroy(scanner);
