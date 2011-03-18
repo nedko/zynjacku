@@ -91,7 +91,11 @@ def lv2scan():
         t2 = time.time()
         mem = memory()
         dt = t2 - t1
-        print("%.3fs; %u triples; %.3f MiB" % (dt, info.triples, (mem - oldmem) / 1024 / 1024))
+        if info:
+            triples = info.triples
+        else:
+            triples = 0
+        print("%.3fs; %u triples; %.3f MiB" % (dt, triples, (mem - oldmem) / 1024 / 1024))
         oldmem = mem
         sum = sum + dt
         if count == 1:

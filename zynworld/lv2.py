@@ -364,7 +364,14 @@ class LV2DB:
                 for bundle in glob.iglob(dir + "/*.lv2"):
                     fn = bundle+"/manifest.ttl"
                     if os.path.exists(fn):
-                        parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+                        try:
+                            parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+                        except SyntaxError, e:
+                            print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                            continue
+                        except Exception, e:
+                            print "ERROR %s: %s" % (fn, str(e))
+                            continue
             # Read all specifications from all manifests
             if lv2 + "Specification" in self.manifests.byClass:
                 specs = self.manifests.getByType(lv2 + "Specification")
@@ -375,14 +382,26 @@ class LV2DB:
                         for fn in subj[rdfs_see_also]:
                             filenames.add(fn)
                 for fn in filenames:
-                    parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+                    try:
+                        parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+                    except SyntaxError, e:
+                        print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                        continue
+                    except Exception, e:
+                        print "ERROR %s: %s" % (fn, str(e))
+                        continue
             if self.debug >= 1:
                 print "%u triples in global world" % self.manifests.size()
         else:
             for source in self.sources:
-                parseTTL(source, file(source).read(), self.manifests, self.debug)
-            #fn = "/usr/lib/lv2/lv2core.lv2/lv2.ttl"
-            #parseTTL(fn, file(fn).read(), self.manifests, self.debug)
+                try:
+                    parseTTL(source, file(source).read(), self.manifests, self.debug)
+                except SyntaxError, e:
+                    print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                    continue
+                except Exception, e:
+                    print "ERROR %s: %s" % (source, str(e))
+                    continue
 
         self.plugins = set(self.manifests.getByType(lv2 + "Plugin"))
 
@@ -402,7 +421,14 @@ class LV2DB:
                 if not data:
                     zynjacku_c.zynjacku_lv2_dman_close(dman_handle)
                     continue
-                parseTTL(filename, data, subj_manifest, self.debug)
+                try:
+                    parseTTL(filename, data, subj_manifest, self.debug)
+                except SyntaxError, e:
+                    print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                    continue
+                except Exception, e:
+                    print "ERROR %s: %s" % (filename, str(e))
+                    continue
                 if self.debug >= 1:
                     print "%u triples in %s dynmanifest world" % (subj_manifest.size(), filename)
                 for plugin_uri in subj_manifest.getByType(lv2 + "Plugin"):
@@ -471,18 +497,28 @@ class LV2DB:
                     parseTTL(doc, file(doc).read(), graph, self.debug)
                     graph.sources.add(doc)
                 self.plugin_info[uri] = graph
+            except SyntaxError, e:
+                print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                return None, None
             except Exception, e:
                 print "ERROR %s: %s" % (uri, str(e))
-                return None
+                return None, None
             return graph, graph.sources
 
         for graph in self.dynmanifests:
             #print graph
             if graph.plugin_uri == uri:
-                parseTTL(graph.filename, graph.ttl_data, graph, self.debug)
-                graph.ttl_data = None
-                self.plugin_info[uri] = graph
-                return graph, graph.sources
+                try:
+                    parseTTL(graph.filename, graph.ttl_data, graph, self.debug)
+                    graph.ttl_data = None
+                    self.plugin_info[uri] = graph
+                    return graph, graph.sources
+                except SyntaxError, e:
+                    print "SYNTAX ERROR at %s:%d - %s (%s)" % (e.filename, e.lineno, e.msg, e.text)
+                    return None, None
+                except Exception, e:
+                    print "ERROR %s: %s" % (graph.filename, str(e))
+                    return None, None
 
         #print 'no subject "%s"' % uri
         return None, None

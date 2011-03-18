@@ -9,7 +9,7 @@ static PyObject *tmp_string = NULL;
 void unrecognized_char(unsigned char ch, int line)
 {
     char buffer[256];
-    snprintf(buffer, sizeof(buffer), "unrecognised char 0x%02X\n", ch);
+    snprintf(buffer, sizeof(buffer), "unrecognised char 0x%02X", ch);
     PyErr_SetString(PyExc_SyntaxError, buffer);
     PyErr_SyntaxLocation("", line);
 }
