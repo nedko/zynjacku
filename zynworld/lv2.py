@@ -483,7 +483,7 @@ class LV2DB:
                 return model, model.sources
 
         #print 'no subject "%s"' % uri
-        return None
+        return None, None
 
     def getPluginInfo(self, uri):
         #print "getting info for plugin " + uri
