@@ -399,20 +399,21 @@ class LV2DB:
                 parseTTL(filename, data, subj_manifest, self.debug)
                 if self.debug >= 1:
                     print "%u triples in %s dynmanifest world" % (subj_manifest.size(), filename)
-                for plugin in subj_manifest.getByType(lv2 + "Plugin"):
-                    #print plugin
-                    manifest = SimpleRDFModel()
-                    p_data = zynjacku_c.zynjacku_lv2_dman_get_data(dman_handle, plugin)
-                    if not p_data:
+                for plugin_uri in subj_manifest.getByType(lv2 + "Plugin"):
+                    #print plugin_uri
+                    graph = SimpleRDFModel()
+                    graph.plugin_uri = plugin_uri
+                    graph.filename = filename + ':' + plugin_uri
+                    graph.ttl_data = zynjacku_c.zynjacku_lv2_dman_get_data(dman_handle, plugin_uri)
+                    if not graph.ttl_data:
                         continue
-                    #print p_data
-                    parseTTL(filename, p_data, manifest, self.debug)
+                    #print graph.ttl_data
                     # add wrapper filename to list of sources so it gets cached
                     for source in self.manifests.object_sources[w]:
                         #print "adding wrapper ttl " + source
-                        manifest.sources.add(source)
-                    self.plugins.add(plugin)
-                    self.dynmanifests.append(manifest)
+                        graph.sources.add(source)
+                    self.plugins.add(plugin_uri)
+                    self.dynmanifests.append(graph)
                 zynjacku_c.zynjacku_lv2_dman_close(dman_handle)
 
         self.categories = set()
@@ -475,12 +476,15 @@ class LV2DB:
             #print "%u triples in %s world" % (world.size(), uri)
             return world, sources
 
-        for model in self.dynmanifests:
-            #print model
-            if model.bySubject.has_key(uri):
-                self.plugin_info[uri] = model
-                #print model.sources
-                return model, model.sources
+        for graph in self.dynmanifests:
+            #print graph
+            if graph.plugin_uri == uri:
+                parseTTL(graph.filename, graph.ttl_data, graph, self.debug)
+                graph.ttl_data = None
+                self.plugin_info[uri] = graph
+                #print graph.sources
+                #print "%u triples in %s world" % (graph.size(), uri)
+                return graph, graph.sources
 
         #print 'no subject "%s"' % uri
         return None, None
