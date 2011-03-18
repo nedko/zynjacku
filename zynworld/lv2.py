@@ -454,27 +454,21 @@ class LV2DB:
                 model = self.manifests
                 return model, self.sources
 
-            world = SimpleRDFModel()
-            world.copyFrom(self.manifests)
-            #msg = "#%u#" % world.size()
-            #print msg,
-            seeAlso = self.manifests.bySubject[uri][rdfs_see_also]
+            graph = SimpleRDFModel()
+            docs = []
+            for source in self.manifests.object_sources[uri]:
+                docs.append(source)
+            docs = docs + self.manifests.bySubject[uri][rdfs_see_also]
             try:
-                for doc in seeAlso:
+                for doc in docs:
                     #print "Loading " + doc + " for plugin " + uri
-                    parseTTL(doc, file(doc).read(), world, self.debug)
-                    #msg = "#%u#" % world.size()
-                    #print msg,
-                    world.sources.add(doc)
-                self.plugin_info[uri] = world
+                    parseTTL(doc, file(doc).read(), graph, self.debug)
+                    graph.sources.add(doc)
+                self.plugin_info[uri] = graph
             except Exception, e:
                 print "ERROR %s: %s" % (uri, str(e))
                 return None
-            for source in self.manifests.object_sources[uri]:
-                world.sources.add(source)
-            sources = world.sources
-            #print "%u triples in %s world" % (world.size(), uri)
-            return world, sources
+            return graph, graph.sources
 
         for graph in self.dynmanifests:
             #print graph
@@ -482,8 +476,6 @@ class LV2DB:
                 parseTTL(graph.filename, graph.ttl_data, graph, self.debug)
                 graph.ttl_data = None
                 self.plugin_info[uri] = graph
-                #print graph.sources
-                #print "%u triples in %s world" % (graph.size(), uri)
                 return graph, graph.sources
 
         #print 'no subject "%s"' % uri
