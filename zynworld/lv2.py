@@ -198,10 +198,10 @@ class SimpleRDFModel:
             for p in self.bySubject[s].keys():
                 print "%s %s %s" % (s, p, self.bySubject[s][p])
 
-def parseTTL(uri, content, model = SimpleRDFModel(), debug = False):
+def parseTTL(uri, content, model = SimpleRDFModel(), debug = 0):
     #print " *** Parse TTL *** ",
     # Missing stuff: translated literals, blank nodes
-    if debug:
+    if debug >= 2:
         print "Parsing: %s" % uri
     prefixes = {}
     spo_stack = []
@@ -323,7 +323,7 @@ class LV2Preset(object):
         pass
         
 class LV2DB:
-    def __init__(self, sources=[], debug = False):
+    def __init__(self, sources=[], debug = 0):
         self.debug = debug
         self.sources = sources
         self.initManifests()
@@ -370,7 +370,8 @@ class LV2DB:
                             filenames.add(fn)
                 for fn in filenames:
                     parseTTL(fn, file(fn).read(), self.manifests, self.debug)
-            #print "%u triples in global world" % self.manifests.size()
+            if self.debug >= 1:
+                print "%u triples in global world" % self.manifests.size()
         else:
             for source in self.sources:
                 parseTTL(source, file(source).read(), self.manifests, self.debug)
@@ -396,7 +397,8 @@ class LV2DB:
                     zynjacku_c.zynjacku_lv2_dman_close(dman_handle)
                     continue
                 parseTTL(filename, data, subj_manifest, self.debug)
-                #print "%u triples in %s dynmanifest world" % (manifest.size(), filename)
+                if self.debug >= 1:
+                    print "%u triples in %s dynmanifest world" % (subj_manifest.size(), filename)
                 for plugin in subj_manifest.getByType(lv2 + "Plugin"):
                     #print plugin
                     manifest = SimpleRDFModel()

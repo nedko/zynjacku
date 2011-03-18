@@ -70,7 +70,7 @@ sys.path = old_path
 
 def lv2scan():
     mem1 = memory()
-    db = lv2.LV2DB()
+    db = lv2.LV2DB(debug=1)
     uris = db.getPluginList()
     total = len(uris)
     count = 0
