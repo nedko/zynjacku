@@ -2237,7 +2237,7 @@ send_message(
   lv2_contexts_unset_port_valid(input_data, port_ptr->index);
 }
 
-void
+bool
 zynjacku_plugin_ui_set_port_value(
   struct zynjacku_plugin * plugin_ptr,
   struct zynjacku_port * port_ptr,
@@ -2254,6 +2254,11 @@ zynjacku_plugin_ui_set_port_value(
   case PORT_TYPE_LV2_FLOAT:
     LOG_DEBUG("setting port %s to %f", port_ptr->symbol, *(float *)value_ptr);
 
+    if (port_ptr->data.lv2float.value == *(float *)value_ptr)
+    {
+      return false;
+    }
+
     port_ptr->data.lv2float.value = *(float *)value_ptr;
     /* se support only lv2:ControlPort ATM */
     assert(value_size == sizeof(float));
@@ -2261,7 +2266,7 @@ zynjacku_plugin_ui_set_port_value(
     {
       send_message(plugin_ptr, port_ptr, value_ptr);
     }
-    return;
+    return true;
   case PORT_TYPE_LV2_STRING:
     assert(value_size == sizeof(LV2_String_Data));
     src = (const LV2_String_Data *)value_ptr;
@@ -2285,7 +2290,7 @@ zynjacku_plugin_ui_set_port_value(
 
       free(port_ptr->data.lv2string.data);
       port_ptr->data.lv2string = lv2string;
-      return;
+      return true;
     }
 
     /* send it via RT thread */
@@ -2307,8 +2312,11 @@ zynjacku_plugin_ui_set_port_value(
     assert(plugin_ptr->command_result == &cmd);
     free(cmd.data);             /* free the old string storage */
     plugin_ptr->command_result = NULL;
-    return;
+    return true;
   }
+
+  assert(false);
+  return false;
 }
 
 void *

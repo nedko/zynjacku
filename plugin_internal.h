@@ -113,7 +113,7 @@ void
 zynjacku_plugin_ui_run(
   struct zynjacku_plugin * plugin_ptr);
 
-void
+bool
 zynjacku_plugin_ui_set_port_value(
   struct zynjacku_plugin * plugin_ptr,
   struct zynjacku_port * port_ptr,
