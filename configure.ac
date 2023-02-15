@@ -40,7 +40,9 @@ AC_PROG_LIBTOOL
 
 # Checks for libraries.
 
-PKG_CHECK_MODULES(LV2, lv2core >= 1)
+PKG_CHECK_MODULES([LV2], [lv2core >= 1],, [
+    PKG_CHECK_MODULES([LV2], [lv2])
+])
 PKG_CHECK_MODULES(GTK, gtk+-2.0)
 PKG_CHECK_MODULES(PYGTK, pygtk-2.0)
 PKG_CHECK_MODULES(JACK, jack)
