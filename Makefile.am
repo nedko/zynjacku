@@ -27,7 +27,7 @@ endif
 zynjacku_c_CFLAGS = -DDATA_DIR='"$(pkgdatadir)"' -Wall -g
 
 if DEV_VERSION
-zynjacku_c_CFLAGS += -Werror
+#zynjacku_c_CFLAGS += -Werror
 endif
 
 zynjacku_c_CFLAGS += @GTK_CFLAGS@
