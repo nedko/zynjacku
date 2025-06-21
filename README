@@ -9,4 +9,6 @@ synthesis to suit your needs.
 
 lv2rack is a host for LV2 effect plugins.
 
-http://home.gna.org/zynjacku/
+https://gitea.ladish.org/LADI/zynjacku/
+
+This software requires python2 and pygtk2.
